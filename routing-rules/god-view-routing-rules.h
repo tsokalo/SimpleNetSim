@@ -1,0 +1,87 @@
+/*
+ * GodViewRoutingRules.h
+ *
+ *  Created on: 27.10.2016
+ *      Author: tsokalo
+ */
+
+#ifndef GODVIEWROUTINGRULES_H_
+#define GODVIEWROUTINGRULES_H_
+
+#include "network/comm-net.h"
+#include "network/edge.h"
+#include "header.h"
+
+#include <stdint.h>
+#include <functional>
+#include <memory>
+#include <deque>
+#include <vector>
+#include <fstream>
+
+namespace ncr {
+
+class CommNet;
+
+class GodViewRoutingRules {
+	typedef std::shared_ptr<CommNet> comm_net_ptr;
+	typedef std::function<void()> Action;
+	typedef std::deque<Action> ActionBuffer;
+	typedef std::vector<priority_t> priorities_t;
+
+public:
+
+	GodViewRoutingRules(comm_net_ptr commNet);
+	virtual
+	~GodViewRoutingRules();
+
+	/*
+	 * returns the optimal average number of channel uses (data packets sent) per one new (not a copy of previously received) packet
+	 * received by the destination
+	 *
+	 * consider single sending data rate for all senders
+	 */
+	double GetOptChannelUses();
+
+	/*
+	 * if the indivisible time slot value approaches zero, the number of optimal TDM access plans approaches infinity
+	 *
+	 * The function below gives one of them
+	 */
+	TdmAccessPlan CalcTdmAccessPlan();
+
+	/*
+	 * get the upper bound of achievable data rate
+	 */
+	double GetOptDatarate();
+	/*
+	 * get highest achievable data rate with single-path routing
+	 */
+	double GetSinglePathDatarate();
+
+private:
+
+	void UpdatePriorities();
+	void UpdatePriority(int16_t nodeId, priorities_t *p_old, priorities_t *p_new, std::vector<bool> *updated);
+	void DeequalizePriorities(priorities_t &p);
+	void PrintPriorities();
+	Edges SortEdges(Edges edges);
+	priority_t CalcPriority(UanAddress id, priorities_t p_old);
+
+//	void CalcTdmRecursive(UanAddress id, TdmAccessPlan &plan, std::map<UanAddress, bool> checkStatus);
+
+	comm_net_ptr m_commNet;
+	priorities_t m_p;
+	std::map<UanAddress, Datarate> m_d;
+	ActionBuffer m_acBuf;
+	std::deque<int16_t> m_acBufGroupSizes;
+	uint64_t m_t;
+	MessType m_msgType;
+	LogBank m_logBank;
+
+	std::ofstream m_outFile;
+
+};
+}
+
+#endif /* GODVIEWROUTINGRULES_H_ */

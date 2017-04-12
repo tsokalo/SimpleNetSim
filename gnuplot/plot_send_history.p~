@@ -1,0 +1,18 @@
+set terminal svg enhanced size 800 200 fname "Times New Roman" fsize 22 solid
+set encoding iso_8859_1
+
+set border 4095 front linetype -1 linewidth 1.000
+set ticslevel 0
+
+set xlabel "Time"
+set xrange [0:*]
+
+set key samplen 1 spacing .9
+
+unset ytics
+set boxwidth 1.0 relative
+set style fill solid 1.0
+set grid xtics ytics back lw 1 lc rgb "#AFAFAF"
+set key outside right top
+
+

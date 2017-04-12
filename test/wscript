@@ -1,0 +1,18 @@
+
+from waflib import Utils
+from waflib.TaskGen import feature, before_method
+@feature('c')
+@before_method('apply_incpaths')
+def add_current_dir_to_includes(self):
+        self.includes = Utils.to_list(self.includes)
+        self.includes.append(self.path)
+        
+        
+def build(bld):
+    loc = bld.path.relpath()
+    def full_name(name):
+        return loc + '/' + name
+
+    for name, deps, inc in [        
+        ('test', ['BOOST', 'KODO', 'OTHER', 'CLPSOLVER'], ['..','../utils','../galois-field'])]:
+        bld.shlib(features='cxx', source=name+'.cpp', includes=inc, target=full_name(name), use=deps)       
