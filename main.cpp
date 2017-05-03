@@ -30,11 +30,22 @@
 namespace ncr {
 void CreateTriangleScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net = std::shared_ptr<CommNet>(new CommNet(3, sp));
-	net->ConnectNodes(0, 1, 0.1);
-	net->ConnectNodes(0, 2, 0.606);
-	net->ConnectNodes(1, 2, 0.3);
-	net->PrintNet();
+        net->ConnectNodes(0, 1, 0.1);
+        net->ConnectNodes(0, 2, 0.606);
+        net->ConnectNodes(1, 2, 0.3);
+        net->PrintNet();
 }
+
+void CreateKrishnaScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
+        net = std::shared_ptr<CommNet>(new CommNet(4, sp));
+        net->ConnectNodes(0, 1, 0.2);
+        net->ConnectNodes(0, 2, 0.4);
+        net->ConnectNodes(0, 3, 0.2);
+        net->ConnectNodes(1, 3, 0.3);
+        net->ConnectNodes(2, 3, 0.1);
+        net->PrintNet();
+}
+
 
 void CreateDiamondScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net = std::shared_ptr<CommNet>(new CommNet(4, sp));
@@ -154,9 +165,10 @@ int main(int argc, char *argv[]) {
 	//
 	// using default parameters
 	//
-	CreateStackScenario(net, 1, sim_par);
+//	CreateKrishnaScenario(net, sim_par);
+//	CreateStackScenario(net, 4, sim_par);
 //	CreateTriangleScenario(net, sim_par);
-//	CreateDiamondScenario(net, sim_par);
+	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);
 
@@ -190,30 +202,30 @@ int main(int argc, char *argv[]) {
 		auto without_dst = get_node_ids(net->GetDst());
 		auto without_src = get_node_ids(net->GetSrc());
 
-		//
-		// plot priorities; for all given nodes on one plot
-		//
-		PlotPriorities(without_dst, lb, subpath, useSns);
-
-		//
-		// plot input filters; for each given node a plot with filters for each input edge
-		//
-		PlotInputFilters(without_src, lb, subpath);
-
-		//
-		// plot loss ratios of output edges; for each given node a plot with ratios for each output edge
-		//
-		PlotLossRatios(without_dst, lb, subpath);
-
-		//
-		// plot coalition sizes; for all given nodes on one plot
-		//
-		PlotCoalitions(without_dst, lb, subpath, f);
-
-		//
-		// plot coding rates; for all given nodes on one plot
-		//
-		PlotCodingRates(without_dst, lb, subpath, f);
+//		//
+//		// plot priorities; for all given nodes on one plot
+//		//
+//		PlotPriorities(without_dst, lb, subpath, useSns);
+//
+//		//
+//		// plot input filters; for each given node a plot with filters for each input edge
+//		//
+//		PlotInputFilters(without_src, lb, subpath);
+//
+//		//
+//		// plot loss ratios of output edges; for each given node a plot with ratios for each output edge
+//		//
+//		PlotLossRatios(without_dst, lb, subpath);
+//
+//		//
+//		// plot coalition sizes; for all given nodes on one plot
+//		//
+//		PlotCoalitions(without_dst, lb, subpath, f, useSns);
+//
+//		//
+//		// plot coding rates; for all given nodes on one plot
+//		//
+//		PlotCodingRates(without_dst, lb, subpath, f);
 
 		//
 		// plot retransmission requests; for all given nodes on one plot

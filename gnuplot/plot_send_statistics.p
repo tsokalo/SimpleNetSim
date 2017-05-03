@@ -1,4 +1,4 @@
-set terminal svg enhanced size 800 600 fname "Times New Roman" fsize 22 solid
+set terminal svg enhanced size 800 600 fname "Times New Roman" fsize 26 solid
 set encoding iso_8859_1
 
 set border 4095 front linetype -1 linewidth 1.000

@@ -185,7 +185,7 @@ void PlotPriorities(std::vector<UanAddress> nids, LogBank lb, std::string path, 
 	plot_command << "plot ";
 	for (uint16_t i = 0; i < nids.size(); i++) {
 		if (useSns) {
-			plot_command << "\"" << data_file << "\"" << " using ($1/1000):(($2==" << nids.at(i) << ") ? $3/1000000 : 1/0)";
+			plot_command << "\"" << data_file << "\"" << " using ($1):(($2==" << nids.at(i) << ") ? $3/1000000 : 1/0)";
 		}
 		else {
 			plot_command << "\"" << data_file << "\"" << " using ($1/1000):(($2==" << nids.at(i) << ") ? $3 / 1024 : 1/0)";
@@ -202,7 +202,7 @@ void PlotPriorities(std::vector<UanAddress> nids, LogBank lb, std::string path, 
 	//
 	// make plot
 	//
-	std::string gnuplot_filename = gnuplot_dir + "plot_priorities_nsns.p";
+	std::string gnuplot_filename = gnuplot_dir + (useSns ? "plot_priorities_sns.p" : "plot_priorities.p");
 	std::string gnuplot_filename_temp = gnuplot_dir + "plot_priorities_temp.p";
 	ExecuteCommand(str_to_const_char("cp " + gnuplot_filename + " " + gnuplot_filename_temp));
 	std::ofstream f(gnuplot_filename_temp, std::ios_base::out | std::ios_base::app);
@@ -335,7 +335,7 @@ void PlotLossRatios(std::vector<UanAddress> nids, LogBank lb, std::string path) 
 		ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 	}
 }
-void PlotCoalitions(std::vector<UanAddress> nids, LogBank lb, std::string path, std::string logfile) {
+void PlotCoalitions(std::vector<UanAddress> nids, LogBank lb, std::string path, std::string logfile, bool useSns) {
 
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
@@ -349,7 +349,14 @@ void PlotCoalitions(std::vector<UanAddress> nids, LogBank lb, std::string path, 
 	plot_command << "set output '" << figure_file << "'" << std::endl;
 	plot_command << "plot ";
 	for (uint16_t i = 0; i < nids.size(); i++) {
-		plot_command << "\"" << data_file << "\" every 2" << " using ($1/1000):(($3==" << nids.at(i) << ") ? $7 : 1/0)";
+	    if(useSns)
+	      {
+		plot_command << "\"" << data_file << "\" every 2" << " using ($1):(($3==" << nids.at(i) << ") ? $7 : 1/0)";
+	      }
+	    else
+	      {
+	        plot_command << "\"" << data_file << "\" every 2" << " using ($1/1000):(($3==" << nids.at(i) << ") ? $7 : 1/0)";
+	      }
 		plot_command << " with linespoints ls 1 lw 1 linecolor " << nids.at(i) + 1 << " pt 7 ps 0.3 title \"vertex=" << nids.at(i) << "\"";
 		if (i != nids.size() - 1) plot_command << ",\\" << std::endl;
 	};;
@@ -362,7 +369,7 @@ void PlotCoalitions(std::vector<UanAddress> nids, LogBank lb, std::string path, 
 	//
 	// make plot
 	//
-	std::string gnuplot_filename = gnuplot_dir + "plot_coalitions.p";
+	std::string gnuplot_filename = gnuplot_dir + (useSns ? "plot_coalitions_sns.p" : "plot_coalitions.p");
 	std::string gnuplot_filename_temp = gnuplot_dir + "plot_coalitions_temp.p";
 	ExecuteCommand(str_to_const_char("cp " + gnuplot_filename + " " + gnuplot_filename_temp));
 	std::ofstream f(gnuplot_filename_temp, std::ios_base::out | std::ios_base::app);
@@ -602,7 +609,7 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 	fd << "\"Simulation (uncoded)\"\t" << (double) nru / dur / 1000000 << std::endl;
 	fd << "\"\\nSimulation (coded)\"\t" << (double) nr / dur / 1000000 << std::endl;
 	fd << "\"Maximum with ORP\"\t" << opt / 1000000 << std::endl;
-	fd << "\"\\nMaximum with LRP\"\t" << single_opt / 1000000 << std::endl;
+	fd << "\"\\nMaximum with CSRP\"\t" << single_opt / 1000000 << std::endl;
 	fd.close();
 
 	//

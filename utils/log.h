@@ -16,7 +16,7 @@
 #define LOSS_PROCESS_LOG        0
 #define NC_SYMBOL_LOG           0
 #define NC_POLICY_LOG           0
-#define GOD_VIEW                0
+#define GOD_VIEW                1
 #define EXOR_SOLVER_LOG         0
 #define BRR_LOG                 0
 #define ARQ_LOG                 0

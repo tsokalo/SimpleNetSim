@@ -54,7 +54,7 @@ LogBank ReadLogBank(std::string path);
 void PlotPriorities(std::vector<UanAddress> nids, LogBank lb, std::string path, bool useSns);
 void PlotInputFilters(std::vector<UanAddress> nids, LogBank lb, std::string path);
 void PlotLossRatios(std::vector<UanAddress> nids, LogBank lb, std::string path);
-void PlotCoalitions(std::vector<UanAddress> nids, LogBank lb, std::string path, std::string logfile);
+void PlotCoalitions(std::vector<UanAddress> nids, LogBank lb, std::string path, std::string logfile, bool useSns);
 void PlotCodingRates(std::vector<UanAddress> nids, LogBank lb, std::string path, std::string logfile);
 void PlotSendingStatistics(std::vector<UanAddress> nids, LogBank lb, std::string path, TdmAccessPlan godPlan, TdmAccessPlan optPlan);
 void PlotResourceWaste(LogBank lb, std::string path, double sigma);
