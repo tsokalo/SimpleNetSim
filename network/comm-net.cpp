@@ -94,11 +94,11 @@ void CommNet::SetSource(UanAddress i) {
  */
 void CommNet::SetDestination(UanAddress i) {
 	assert(m_nodes.size() > (uint16_t )i);
-	m_dst = i;
+	m_dst.push_back(i);
 
 	for (uint16_t j = 0; j < m_nodes.size(); j++) {
 		if (j == m_src) m_nodes.at(j)->Configure(SOURCE_NODE_TYPE, m_dst);
-		else if (j == m_dst) m_nodes.at(j)->Configure(DESTINATION_NODE_TYPE, m_dst);
+		else if (std::find(m_dst.begin(), m_dst.end(), j) != m_dst.end()) m_nodes.at(j)->Configure(DESTINATION_NODE_TYPE, m_dst);
 		else m_nodes.at(j)->Configure(RELAY_NODE_TYPE, m_dst);
 	}
 }
@@ -122,7 +122,7 @@ CommNet::node_ptr CommNet::SelectSender() {
 	do {
 		v.clear();
 		for (std::vector<node_ptr>::iterator it = m_nodes.begin(); it != m_nodes.end(); it++) {
-			if ((*it)->GetId() == m_dst) continue;
+//			if ((*it)->GetId() == m_dst) continue;
 			if ((*it)->DoIwannaSend()) v.push_back(std::distance(m_nodes.begin(), it));
 		}
 		assert(i++ < 1000);
