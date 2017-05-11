@@ -23,7 +23,9 @@ GodViewRoutingRules::GodViewRoutingRules(comm_net_ptr commNet) {
 	m_commNet = commNet;
 	m_p.resize(m_commNet->GetNodes().size(), 0);
 	m_p[m_commNet->GetDst()] = DESTINATION_PRIORITY;
-	for(auto node : m_commNet->GetNodes())m_d[node->GetId()] = node->GetDatarate();;
+	for (auto node : m_commNet->GetNodes())
+		m_d[node->GetId()] = node->GetDatarate();
+	;
 }
 
 GodViewRoutingRules::~GodViewRoutingRules() {
@@ -58,7 +60,8 @@ void GodViewRoutingRules::UpdatePriorities() {
 		auto p_old_it = p_old.begin();
 		auto p_it = m_p.begin();
 		while (p_old_it != p_old.end()) {
-			if (*p_it != DESTINATION_PRIORITY && *p_old_it != DESTINATION_PRIORITY) change += fabs(*p_it - *p_old_it);
+			if (*p_it != DESTINATION_PRIORITY && *p_old_it != DESTINATION_PRIORITY)
+				change += fabs(*p_it - *p_old_it);
 			p_old_it++;
 			p_it++;
 		}
@@ -69,14 +72,18 @@ void GodViewRoutingRules::UpdatePriorities() {
 		std::copy(p_old.begin(), p_old.end(), m_p.begin());
 
 		PrintPriorities();
-		SIM_LOG (GOD_VIEW, "Change level: " << change);
+		SIM_LOG(GOD_VIEW, "Change level: " << change);
 
 	} while (fabs(change) > CALC_ACCURACY);
 
-	for (auto node : m_commNet->GetNodes ())for (auto edge : node->GetOuts ())edge->SetMarked (false);;
+	for (auto node : m_commNet->GetNodes())
+		for (auto edge : node->GetOuts())
+			edge->SetMarked(false);
+	;
 }
 void GodViewRoutingRules::UpdatePriority(int16_t nodeId, priorities_t *p_old, priorities_t *p_new, std::vector<bool> *updated) {
-	if (updated->at(nodeId)) return;
+	if (updated->at(nodeId))
+		return;
 
 	SIM_LOG(GOD_VIEW, "Updating priority of node " << nodeId);
 	SIM_LOG(GOD_VIEW, "Using the following priorities: ");
@@ -90,11 +97,9 @@ void GodViewRoutingRules::UpdatePriority(int16_t nodeId, priorities_t *p_old, pr
 	SIM_LOG(GOD_VIEW, "Changed priority of node " << nodeId << " to " << p_new->at (nodeId));
 
 	uint16_t groupSize = 0;
-	for (auto i_edge : m_commNet->GetNodes ().at (nodeId)->GetIns ())
-	{
-		if (!updated->at (i_edge->v_))
-		{
-			m_acBuf.push_back (std::bind (&GodViewRoutingRules::UpdatePriority, this, i_edge->v_, p_old, p_new, updated));
+	for (auto i_edge : m_commNet->GetNodes().at(nodeId)->GetIns()) {
+		if (!updated->at(i_edge->v_)) {
+			m_acBuf.push_back(std::bind(&GodViewRoutingRules::UpdatePriority, this, i_edge->v_, p_old, p_new, updated));
 			groupSize++;
 		}
 	};;
@@ -126,10 +131,11 @@ void GodViewRoutingRules::PrintPriorities() {
 	}
 }
 Edges GodViewRoutingRules::SortEdges(Edges edges) {
-	std ::sort (edges.begin (), edges.end (), [&](Edge_ptr a, Edge_ptr b)
-			{
-				return m_p.at (a->v_) > m_p.at (b->v_);
-			});;
+	std::sort(edges.begin(), edges.end(), [&](Edge_ptr a, Edge_ptr b)
+	{
+		return m_p.at (a->v_) > m_p.at (b->v_);
+	});
+	;
 	//	for (auto edge : edges)
 	//	{
 	//		SIM_LOG(GOD_VIEW, "Edge owner: " << edge->v_ << " has priority " << m_p.at (edge->v_));
@@ -160,7 +166,8 @@ priority_t GodViewRoutingRules::CalcPriority(UanAddress id, priorities_t p_old) 
 
 		SIM_LOG_NP(GOD_VIEW, id, p_old[id], "a coefficient: prod_e = " << prod_e << ", m_d[id] = " << m_d[id]);
 		return m_d[id] * (1 - prod_e);
-	};;
+	};
+	;
 
 	auto b = [&](UanAddress u, comm_net_ptr commNet)->double
 	{
@@ -187,14 +194,15 @@ priority_t GodViewRoutingRules::CalcPriority(UanAddress id, priorities_t p_old) 
 				<< loss_on_e << ", m_d[id] = " << m_d[id] << ", p = " << p);
 
 		return p;
-	};;
+	};
+	;
 
 	double denominator = 1;
 
 	Edges outs = SortEdges(m_commNet->GetNodes().at(id)->GetOuts());
-	for (auto edge : outs)
-	{
-		if(p_old[id] >= p_old[edge->v_])break;
+	for (auto edge : outs) {
+		if (p_old[id] >= p_old[edge->v_])
+			break;
 		double bb = b(edge->v_, m_commNet);
 		denominator += bb / p_old[edge->v_];
 		SIM_LOG_NP(GOD_VIEW, id, p_old[id], "sink node " << edge->v_ << ", priority " << p_old[edge->v_] << ", b coefficient " << bb);
@@ -228,7 +236,8 @@ TdmAccessPlan GodViewRoutingRules::CalcTdmAccessPlan() {
 				check(edge->v_);
 			}
 		}
-	};;
+	};
+	;
 
 	//
 	// Calculate coding redundancy rate
@@ -246,7 +255,8 @@ TdmAccessPlan GodViewRoutingRules::CalcTdmAccessPlan() {
 
 		SIM_LOG(GOD_VIEW, "c[" << v << "] = " << (1 - prod_e));
 		return (1 - prod_e);
-	};;
+	};
+	;
 
 	//
 	// Calculate filtering probability
@@ -275,7 +285,8 @@ TdmAccessPlan GodViewRoutingRules::CalcTdmAccessPlan() {
 		SIM_LOG(GOD_VIEW, "pf[" << v << "," << u << "] = " << p);
 
 		return p;
-	};;
+	};
+	;
 
 	//
 	// sort output edges of the given node in ascending order of the edge sinks
@@ -309,7 +320,8 @@ TdmAccessPlan GodViewRoutingRules::CalcTdmAccessPlan() {
 		}
 
 		return edges;
-	};;
+	};
+	;
 
 	//
 	// calculate the message size to be sent by each node
@@ -343,7 +355,8 @@ TdmAccessPlan GodViewRoutingRules::CalcTdmAccessPlan() {
 				m_acBuf.push_back(std::bind(calc_n, n, u));
 			}
 		}
-	};;
+	};
+	;
 
 	//
 	// DO THE JOB
@@ -366,30 +379,29 @@ TdmAccessPlan GodViewRoutingRules::CalcTdmAccessPlan() {
 	// calculate the TDM access plan
 	//
 	TdmAccessPlan plan;
-	for(auto a : n)
-	{
+	for (auto a : n) {
 		plan[a.first] = a.second / m_d.at(a.first);
 	}
 
-	for(auto p : plan)
-	{
+	for (auto p : plan) {
 		SIM_LOG(GOD_VIEW, "Node " << p.first << " time = " << p.second);
 	}
 	double s = 0;
-	for (auto p : plan)s+=p.second;;
+	for (auto p : plan)
+		s += p.second;
+	;
 	SIM_LOG(GOD_VIEW, "s =  " << s << " 1/p(vs) " << 1/m_p[v]);
-	for(auto &p : plan)p.second /= s;
+	for (auto &p : plan)
+		p.second /= s;
 
-	for(auto p : plan)
-	{
+	for (auto p : plan) {
 		SIM_LOG(GOD_VIEW, "Node " << p.first << " share = " << p.second);
 	}
 
 	return plan;
 }
 
-double GodViewRoutingRules::GetOptDatarate()
-{
+double GodViewRoutingRules::GetOptDatarate() {
 	UpdatePriorities();
 
 	return m_p.at(m_commNet->GetSrc()).val();
@@ -399,14 +411,20 @@ double GodViewRoutingRules::GetSinglePathDatarate() {
 
 	typedef std::shared_ptr<lps::Graph> graph_ptr;
 
-	graph_ptr graph = graph_ptr(new lps::Graph(m_commNet->GetNodes().size()));
+	UanAddress s, d;
+	for (auto node : m_commNet->GetNodes()) {
+		if (node->GetNodeType() == DESTINATION_NODE_TYPE)
+			d = node->GetId();
+		if (node->GetNodeType() == SOURCE_NODE_TYPE)
+			s = node->GetId();
+	}
 
-	for(auto node : m_commNet->GetNodes())
-	{
+	graph_ptr graph = graph_ptr(new lps::Graph(m_commNet->GetNodes().size(), s, d));
+
+	for (auto node : m_commNet->GetNodes()) {
 		auto edges = node->GetOuts();
-		for(auto edge : edges)
-		{
-			graph->AddEdge(node->GetId(), edge->v_, edge->GetLossProcess()->GetMean ());
+		for (auto edge : edges) {
+			graph->AddEdge(node->GetId(), edge->v_, edge->GetLossProcess()->GetMean());
 		}
 	}
 
@@ -424,25 +442,28 @@ double GodViewRoutingRules::GetSinglePathDatarate() {
 			}
 		}
 		assert(0);
-	};;
+	};
+	;
 
 	double max_rate = 0;
 
-	for(auto path : paths)
-	{
+	for (auto path : paths) {
 		double v = 0;
-		for(auto e : path)
-		{
+		for (auto e : path) {
 			auto l = get_loss_ratio(e.from, e.to);
-			if(eq(l,1))continue;
+			if (eq(l, 1))
+				continue;
 			v += 1 / (1 - l) / m_commNet->GetNode(e.from)->GetDatarate();
-			if(GOD_VIEW)std::cout << "Edge<" << e.from << "," << e.to << "> : " << m_commNet->GetNode(e.from)->GetDatarate() * (1-l) << " / ";
+			if (GOD_VIEW)
+				std::cout << "Edge<" << e.from << "," << e.to << "> : " << m_commNet->GetNode(e.from)->GetDatarate() * (1 - l) << " / ";
 		}
-		if(GOD_VIEW)std::cout << std::endl;
+		if (GOD_VIEW)
+			std::cout << std::endl;
 		v = 1 / v;
-		if(max_rate < v)max_rate = v;
+		if (max_rate < v)
+			max_rate = v;
 	}
 
 	return max_rate;
 }
-}//ncr
+}	//ncr

@@ -38,7 +38,7 @@ NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress 
 
 	m_feedbackP = 0.0;
 	m_netDiscP = 0.1;
-	m_ttl = destAddress;
+	m_ttl = 10;
 	SIM_LOG_NP(BRR_LOG || TEMP_LOG, m_id, m_p, "Using TTL " << m_ttl);
 	SIM_ASSERT_MSG(m_ttl >= m_id, "TTL and addressing problem. TTL " << m_ttl << ", own ID " << m_id);
 	m_b = 0.05;

@@ -13,7 +13,7 @@
 #include <list>
 #include "lp-solver-header.h"
 /*
- * source is the node with index 0 and the destination is the node with index V-1
+ * source is the node with index 0 and the destination is the node with index m_numNodes-1
  */
 
 namespace lps
@@ -23,7 +23,7 @@ class Graph
 {
 public:
 
-  Graph (uint16_t V);
+  Graph (uint16_t numNodes, uint16_t s, uint16_t d);
   void
   AddEdge (uint16_t u, uint16_t v, double l);
 
@@ -43,7 +43,7 @@ public:
     for(auto o : m_M.at(i))std::cout << o << " ";
     std::cout << std::endl;
     return m_M.at(i);
-//    return std::vector<double>(V, 0);
+//    return std::vector<double>(m_numNodes, 0);
   }
   Bounds
   GetBounds(uint16_t i);
@@ -58,7 +58,7 @@ private:
   ConstructM ();
 
 
-  uint16_t V;
+  uint16_t m_numNodes;
   std::list<uint16_t> *adj;
   uint16_t s;
   uint16_t d;

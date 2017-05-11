@@ -20,7 +20,7 @@
 
 #include "header.h"
 #include "edge.h"
-#include "routing-rules/nc-routing-rules.h"
+#include "routing-rules/multicast-brr.h"
 #include "utils/coder.h"
 #include "traffic/traffic-generator.h"
 #include "traffic/traffic-sink.h"
@@ -33,7 +33,7 @@ typedef std::map<UanAddress, EdgeId> node_ids;
 
 class CommNode {
 
-	typedef std::shared_ptr<NcRoutingRules> routing_rules_ptr;
+	typedef std::shared_ptr<MulticastBrr> routing_rules_ptr;
 	typedef std::shared_ptr<TrafficGenerator> traf_gen_ptr;
 	typedef std::shared_ptr<TrafficSink> traf_sink_ptr;
 	typedef std::shared_ptr<encoder_queue> encoder_queue_ptr;
@@ -48,7 +48,7 @@ public:
 	void
 	SetLogCallback(add_log_func addLog);
 	void
-	Configure(NodeType type, UanAddress dst);
+	Configure(NodeType type, std::vector<UanAddress> dst);
 
 	Edge_ptr
 	CreateInputEdge(UanAddress src_id, double e);
@@ -95,6 +95,7 @@ public:
 	{
 		return m_sp.apiRate;
 	}
+	NodeType GetNodeType(){return m_nodeType;}
 
 	void SetMessTypeCallback(set_msg_type_func f);
 

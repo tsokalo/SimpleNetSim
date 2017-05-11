@@ -33,6 +33,7 @@ void CreateTriangleScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
         net->ConnectNodes(0, 1, 0.1);
         net->ConnectNodes(0, 2, 0.606);
         net->ConnectNodes(1, 2, 0.3);
+        net->Configure();
         net->PrintNet();
 }
 
@@ -43,6 +44,7 @@ void CreateKrishnaScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
         net->ConnectNodes(0, 3, 0.2);
         net->ConnectNodes(1, 3, 0.3);
         net->ConnectNodes(2, 3, 0.1);
+        net->Configure();
         net->PrintNet();
 }
 
@@ -54,6 +56,7 @@ void CreateDiamondScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net->ConnectNodes(1, 2, 0.2, 0.3);
 	net->ConnectNodes(1, 3, 0.5);
 	net->ConnectNodes(2, 3, 0.1);
+	net->Configure();
 	net->PrintNet();
 }
 
@@ -68,6 +71,7 @@ void CreateStackScenario(std::shared_ptr<CommNet> &net, uint16_t deepness, SimPa
 		net->ConnectNodes(i - 2, i, e2, e2);
 	}
 	net->ConnectNodes(num_nodes - 2, num_nodes - 1, e1, e1);
+	net->Configure();
 
 	net->PrintNet();
 }
@@ -80,6 +84,7 @@ void CreateFullMeshScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 			net->ConnectNodes(i, j, 0.1 + 1 / (double) ((numNodes - i) * j), 0.1 + 1 / (double) ((numNodes - i) * j));
 		}
 	}
+	net->Configure();
 
 	net->PrintNet();
 }
@@ -112,6 +117,7 @@ void CreateBigMeshScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net->ConnectNodes(7, 9, 0.2);
 
 	net->ConnectNodes(8, 9, 0.2);
+	net->Configure();
 
 	net->PrintNet();
 }
@@ -122,6 +128,7 @@ void CreateUmbrellaScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 		net->ConnectNodes(0, i, 0.7);
 		net->ConnectNodes(i, 9, 0.2);
 	}
+	net->Configure();
 	net->PrintNet();
 }
 

@@ -14,6 +14,6 @@ def build(bld):
         return loc + '/' + name
 
     for name, deps, inc in [        
-        ('comm-node', ['BOOST', 'KODO', 'OTHER', 'CLPSOLVER', 'traffic/traffic-generator', 'routing-rules/nc-routing-rules','utils/utils'], ['..','../utils','../traffic']),
-        ('comm-net', ['BOOST', 'KODO', 'OTHER', 'CLPSOLVER','network/comm-node','routing-rules/god-view-routing-rules'], ['..','../utils'])]:
+        ('comm-node', ['BOOST', 'KODO', 'OTHER', 'CLPSOLVER', 'traffic/traffic-generator', 'routing-rules/multicast-brr','utils/utils'], ['..','../utils','../traffic', '../routing-rules']),
+        ('comm-net', ['BOOST', 'KODO', 'OTHER', 'CLPSOLVER','network/comm-node','routing-rules/god-view-routing-rules'], ['..','../utils', '../routing-rules'])]:
         bld.shlib(features='cxx', source=name+'.cpp', includes=inc, target=full_name(name), use=deps)       

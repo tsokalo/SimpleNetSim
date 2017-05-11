@@ -23,8 +23,8 @@ CommNet::CommNet(uint16_t numNodes, SimParameters sp) :
 		i = std::shared_ptr<CommNode>(new CommNode(std::distance(m_nodes.begin(), it++), m_simulator, m_sp));
 	};;
 
-	SetSource(SRC_UANADDRESS);
-	SetDestination(m_nodes.size() - 1);
+//	SetSource(SRC_UANADDRESS);
+//	SetDestination(m_nodes.size() - 1);
 }
 CommNet::~CommNet() {
 
@@ -36,7 +36,8 @@ CommNet::~CommNet() {
  */
 void CommNet::ConnectNodes(UanAddress src, UanAddress dst, double e1, double e2) {
 
-	if (eq(e2, -1)) e2 = e1;
+	if (eq(e2, -1))
+		e2 = e1;
 	assert(m_nodes.size() > (uint16_t )src && m_nodes.size() > (uint16_t )dst && src != dst && m_nodes.at(src) && m_nodes.at(dst));
 
 	std::shared_ptr<Edge> fromSrc = m_nodes.at(src)->CreateOutputEdge(dst, m_nodes.at(dst)->CreateInputEdge(src, e1));
@@ -54,6 +55,20 @@ void CommNet::PrintNet() {
 		SIM_LOG(COMM_NET_LOG, ">> Node " << i->GetId ());
 		i->PrintEdges();
 	};;
+}
+
+void CommNet::Configure() {
+	if (std::function<bool()>([this] {for(auto node: m_nodes)if(node->GetNodeType() == SOURCE_NODE_TYPE)return false; return true;})())
+	{
+		std::cout << "Setting default SRC " << SRC_UANADDRESS << std::endl;
+		SetSource(SRC_UANADDRESS);
+	}
+
+	if (std::function<bool()>([this] {for(auto node: m_nodes)if(node->GetNodeType() == DESTINATION_NODE_TYPE)return false; return true;})())
+	{
+		std::cout << "Setting default DST " << m_nodes.size() - 1 << std::endl;
+		SetDestination(m_nodes.size() - 1);
+	}
 }
 void CommNet::Run(int64_t cycles) {
 
@@ -79,7 +94,8 @@ void CommNet::Run(int64_t cycles) {
 //		PrintProgress(cycles, i);
 		DoBroadcast(SelectSender());
 		m_simulator->Execute();
-		if (m_logger) m_logger->IncTime();
+		if (m_logger)
+			m_logger->IncTime();
 	}
 }
 /*
@@ -94,12 +110,16 @@ void CommNet::SetSource(UanAddress i) {
  */
 void CommNet::SetDestination(UanAddress i) {
 	assert(m_nodes.size() > (uint16_t )i);
+	assert(m_src != i);
 	m_dst.push_back(i);
 
 	for (uint16_t j = 0; j < m_nodes.size(); j++) {
-		if (j == m_src) m_nodes.at(j)->Configure(SOURCE_NODE_TYPE, m_dst);
-		else if (std::find(m_dst.begin(), m_dst.end(), j) != m_dst.end()) m_nodes.at(j)->Configure(DESTINATION_NODE_TYPE, m_dst);
-		else m_nodes.at(j)->Configure(RELAY_NODE_TYPE, m_dst);
+		if (m_nodes.at(j)->GetId() == m_src)
+			m_nodes.at(j)->Configure(SOURCE_NODE_TYPE, m_dst);
+		else if (std::find(m_dst.begin(), m_dst.end(), m_nodes.at(j)->GetId()) != m_dst.end())
+			m_nodes.at(j)->Configure(DESTINATION_NODE_TYPE, m_dst);
+		else
+			m_nodes.at(j)->Configure(RELAY_NODE_TYPE, m_dst);
 	}
 }
 void CommNet::DoBroadcast(node_ptr sender) {
@@ -123,7 +143,8 @@ CommNet::node_ptr CommNet::SelectSender() {
 		v.clear();
 		for (std::vector<node_ptr>::iterator it = m_nodes.begin(); it != m_nodes.end(); it++) {
 //			if ((*it)->GetId() == m_dst) continue;
-			if ((*it)->DoIwannaSend()) v.push_back(std::distance(m_nodes.begin(), it));
+			if ((*it)->DoIwannaSend())
+				v.push_back(std::distance(m_nodes.begin(), it));
 		}
 		assert(i++ < 1000);
 	} while (v.empty());

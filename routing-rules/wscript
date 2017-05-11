@@ -15,5 +15,6 @@ def build(bld):
 
     for name, deps, inc in [    	
         ('nc-routing-rules', ['BOOST', 'KODO', 'OTHER', 'CLPSOLVER','ccack/ccack'], ['..','../utils','../network','../ccack']),
+        ('multicast-brr', ['BOOST', 'KODO', 'OTHER', 'CLPSOLVER','ccack/ccack','routing-rules/nc-routing-rules'], ['..','../utils','../network','../ccack']),
         ('god-view-routing-rules', ['BOOST', 'KODO', 'OTHER', 'CLPSOLVER', 'utils/utils','lp-solver/lp-solver','lp-solver/graph'], ['..','../utils','../network','../lp-solver'])]:
         bld.shlib(features='cxx', source=name+'.cpp', includes=inc, target=full_name(name), use=deps)

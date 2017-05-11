@@ -8,7 +8,6 @@ RM := rm -rf
 
 # All of the sources participating in the build are defined here
 -include sources.mk
--include subdir.mk
 -include utils/subdir.mk
 -include traffic/subdir.mk
 -include test/subdir.mk
@@ -18,15 +17,7 @@ RM := rm -rf
 -include lp-solver/subdir.mk
 -include galois-field/subdir.mk
 -include ccack/subdir.mk
--include build/utils/subdir.mk
--include build/traffic/subdir.mk
--include build/test/subdir.mk
--include build/routing-rules/subdir.mk
--include build/network/subdir.mk
--include build/subdir.mk
--include build/lp-solver/subdir.mk
--include build/galois-field/subdir.mk
--include build/ccack/subdir.mk
+-include subdir.mk
 -include objects.mk
 
 ifneq ($(MAKECMDGOALS),clean)
@@ -55,19 +46,19 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: SimpleNetSim
+all: SnsMulticast
 
 # Tool invocations
-SimpleNetSim: $(OBJS) $(USER_OBJS)
+SnsMulticast: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	g++  -o"SimpleNetSim" $(OBJS) $(USER_OBJS) $(LIBS)
+	g++  -o "SnsMulticast" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(CC_DEPS)$(C++_DEPS)$(EXECUTABLES)$(C_UPPER_DEPS)$(CXX_DEPS)$(OBJS)$(CPP_DEPS)$(C_DEPS) SimpleNetSim
+	-$(RM) $(CC_DEPS)$(C++_DEPS)$(EXECUTABLES)$(C_UPPER_DEPS)$(CXX_DEPS)$(OBJS)$(CPP_DEPS)$(C_DEPS) SnsMulticast
 	-@echo ' '
 
 .PHONY: all clean dependents

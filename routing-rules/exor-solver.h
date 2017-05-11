@@ -72,7 +72,8 @@ private:
 			objectiveValues.push_back(solver.GetObjectiveValue());
 		}
 
-		auto i = std::distance(objectiveValues.begin(), std::max_element(objectiveValues.begin(), objectiveValues.end()));;
+		auto i = std::distance(objectiveValues.begin(), std::max_element(objectiveValues.begin(), objectiveValues.end()));
+		;
 
 		SIM_LOG(1, "Optimal objective: " << objectiveValues.at(i));
 		m_optObjective = objectiveValues.at(i);
@@ -83,21 +84,29 @@ private:
 
 		if (1) {
 			std::cout << "Optimal solution: ";
-			for(auto s : solutions.at(i)) std::cout << s << " ";
+			for (auto s : solutions.at(i))
+				std::cout << s << " ";
 			std::cout << std::endl;
 		}
 		SIM_LOG(EXOR_SOLVER_LOG, "Job finished successfully");
 	}
 
 	graph_ptr ConstructGraph() {
-		graph_ptr graph = graph_ptr(new lps::Graph(m_commNet->GetNodes().size()));
 
-		for(auto node : m_commNet->GetNodes())
-		{
+		UanAddress s, d;
+		for (auto node : m_commNet->GetNodes()) {
+			if (node->GetNodeType() == DESTINATION_NODE_TYPE)
+				d = node->GetId();
+			if (node->GetNodeType() == SOURCE_NODE_TYPE)
+				s = node->GetId();
+		}
+
+		graph_ptr graph = graph_ptr(new lps::Graph(m_commNet->GetNodes().size(), s, d));
+
+		for (auto node : m_commNet->GetNodes()) {
 			auto edges = node->GetOuts();
-			for(auto edge : edges)
-			{
-				graph->AddEdge(node->GetId(), edge->v_, edge->GetLossProcess()->GetMean ());
+			for (auto edge : edges) {
+				graph->AddEdge(node->GetId(), edge->v_, edge->GetLossProcess()->GetMean());
 			}
 		}
 

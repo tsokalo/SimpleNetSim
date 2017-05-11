@@ -33,13 +33,4 @@ network \
 lp-solver \
 galois-field \
 ccack \
-build/utils \
-build/traffic \
-build/test \
-build/routing-rules \
-build/network \
-build \
-build/lp-solver \
-build/galois-field \
-build/ccack \
 

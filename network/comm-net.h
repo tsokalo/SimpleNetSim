@@ -49,6 +49,8 @@ namespace ncr
     void
     PrintNet ();
 
+    void
+	Configure();
     /*
      * One cycle consists of:
      * 1. sender selection
