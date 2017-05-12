@@ -22,11 +22,7 @@
 #include "test/test.h"
 #include "utils/sim-parameters.h"
 
-// run with gdb :
-//	export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/tsokalo/workspace/tmaTool/coin-Clp/lib/
-//
 
-//
 namespace ncr {
 void CreateTriangleScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net = std::shared_ptr<CommNet>(new CommNet(3, sp));
@@ -56,6 +52,9 @@ void CreateDiamondScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net->ConnectNodes(1, 2, 0.2, 0.3);
 	net->ConnectNodes(1, 3, 0.5);
 	net->ConnectNodes(2, 3, 0.1);
+	net->SetDestination(1);
+	net->SetDestination(2);
+	net->SetDestination(3);
 	net->Configure();
 	net->PrintNet();
 }

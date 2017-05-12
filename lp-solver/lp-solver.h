@@ -20,7 +20,7 @@ namespace lps
 class LPSolver
 {
 public:
-  LPSolver (Objectives o, Constraints c, Bounds b);
+  LPSolver (Objectives o, Constraints c, Bounds b, Bounds f);
   virtual
   ~LPSolver ();
 
@@ -44,6 +44,8 @@ private:
   Objectives m_o;
   Constraints m_c;
   Bounds m_b;
+  Bounds m_f;
+
   OsiClpSolverInterface *si;
   Solution m_s;
   double m_objective;

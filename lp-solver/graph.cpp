@@ -213,7 +213,6 @@ void Graph::ConstructM() {
 
 	for (uint16_t i = 0; i < m_cutsets.size(); i++) {
 		auto cutset = m_cutsets.at(i);
-		;
 
 		for (auto e1 : cutset) {
 			double l = 1;
@@ -222,7 +221,7 @@ void Graph::ConstructM() {
 					l *= m_l[e2];
 				SIM_LOG(GRAPH_LOG, e2 << ": " << m_l[e2]);
 			}
-			m_M.at(i).at(e1.from) = 1 - l;
+			m_M.at(i).at(e1.from) = (1 - l);
 		};;
 	};;
 
@@ -232,53 +231,19 @@ void Graph::ConstructM() {
 		}
 	}
 }
-Constraints Graph::GetConstraints(uint16_t i) {
 
-	assert(i < m_M.size());
-	Constraints M(m_M.size());
+Constraints Graph::GetConstraints() {
 
-	auto m_it = M.begin(), mm_it = m_M.begin();
-	while (mm_it != m_M.end()) {
-		m_it->insert(m_it->begin(), mm_it->begin(), mm_it->end());
-		m_it++;
-		mm_it++;
-	}
-
-	SIM_LOG(GRAPH_LOG, "Constraints: ");
-	if (GRAPH_LOG) {
-		for (auto c : M) {
-			std::cout << "Cut: ";
-			for (auto o : c)
-				std::cout << o << " ";
-			std::cout << std::endl;
-		};;
-	}
-
-	for (uint16_t j = 0; j < M.size(); j++)
-		for (uint16_t k = 0; k < M.at(j).size(); k++) {
-			if (j == i)
-				continue;
-			M.at(j).at(k) -= M.at(i).at(k);
-		}
-
-	M.erase(M.begin() + i, M.begin() + i + 1);
-
-	if (GRAPH_LOG) {
-		std::cout << "Constraints: " << std::endl;
-
-		for (auto c : M) {
-			std::cout << "Cut: ";
-			for (auto o : c)
-				std::cout << o << " ";
-			std::cout << std::endl;
-		};;
-	}
-	return M;
+	return m_M;
 }
-Bounds Graph::GetBounds(uint16_t i) {
-	assert(i < m_M.size());
+Objectives Graph::GetObjectives() {
+	auto obj = Objectives (m_numNodes, 0);
+	return obj;
+}
+Bounds Graph::GetBounds() {
 
 	auto bounds = Bounds(std::vector<double>(m_M.begin()->size(), 0), std::vector<double>(m_M.begin()->size(), 1));
+
 	if (GRAPH_LOG) {
 
 		std::cout << "Lower bounds: " << std::endl;
@@ -291,7 +256,7 @@ Bounds Graph::GetBounds(uint16_t i) {
 			std::cout << u << " ";
 		std::cout << std::endl;
 	}
-	return Bounds(std::vector<double>(m_M.begin()->size(), 0), std::vector<double>(m_M.begin()->size(), 1));
+	return bounds;
 }
 
 }

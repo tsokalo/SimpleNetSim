@@ -64,6 +64,7 @@ typedef std::vector<double> Solution;
 typedef std::vector<double> Objectives;
 typedef std::pair<std::vector<double>, std::vector<double> > Bounds;
 typedef std::vector<std::vector<double> > Constraints;
+typedef std::vector<double> FreeVars;
 }
 
 #endif

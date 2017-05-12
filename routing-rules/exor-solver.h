@@ -57,43 +57,114 @@ private:
 	void DoJob() {
 
 		SIM_LOG(EXOR_SOLVER_LOG, "Start job");
-		graph_ptr graph = ConstructGraph();
-		graph->Evaluate();
 
-		auto cutsets = graph->GetAllCutSets();
-		std::vector<lps::Solution> solutions;
-		std::vector<double> objectiveValues;
-		for (uint16_t i = 0; i < cutsets.size(); i++) {
+		using namespace lps;
 
-			SIM_LOG(1, "Solving for cut " << i);
-			lps::LPSolver solver(graph->GetObjectives(i), graph->GetConstraints(i), graph->GetBounds(i));
-			solver.SolveTask();
-			solutions.push_back(solver.GetSolution());
-			objectiveValues.push_back(solver.GetObjectiveValue());
+		uint16_t numDest = 0;
+
+		//
+		// define constraints
+		//
+		std::map<uint16_t, Constraints> constraints_map;
+		auto src = std::function<UanAddress()>([this] {for (auto n : m_commNet->GetNodes())if (n->GetNodeType() == SOURCE_NODE_TYPE)return n->GetId();})();
+
+		// constraints for time variables defined by cuts
+		for (auto node : m_commNet->GetNodes()) {
+			if (node->GetNodeType() == DESTINATION_NODE_TYPE) {
+				auto dst = node->GetId();
+				graph_ptr graph = ConstructGraph(src, dst);
+				graph->Evaluate();
+				auto cutsets = graph->GetAllCutSets();
+				auto c = graph->GetConstraints();
+				constraints_map[numDest] = c;
+				numDest++;
+			}
 		}
 
-		auto i = std::distance(objectiveValues.begin(), std::max_element(objectiveValues.begin(), objectiveValues.end()));
-		;
-
-		SIM_LOG(1, "Optimal objective: " << objectiveValues.at(i));
-		m_optObjective = objectiveValues.at(i);
-
-		for (uint16_t j = 0; j < solutions.at(i).size(); j++) {
-			m_optSolution[j] = solutions.at(i).at(j);
+		// constraints for data rate variables
+		Constraints constraints;
+		for (auto constraint_d : constraints_map) {
+			for (auto constraint : constraint_d.second) {
+				constraint.insert(constraint.end(), numDest, 0);
+				constraint.at(constraint.size() - numDest + constraint_d.first) = -1;
+				constraints.push_back(constraint);
+			}
 		}
 
-		if (1) {
-			std::cout << "Optimal solution: ";
-			for (auto s : solutions.at(i))
-				std::cout << s << " ";
+		// constraints for time variables defined by cuts
+		std::vector<double> c(m_commNet->GetNodes().size(), 1);
+		c.insert(c.end(), numDest, 0);
+		constraints.push_back(c);
+
+		//
+		// define free variable of the constraints
+		//
+		Bounds cBounds(std::vector<double>(constraints.size(), 0), std::vector<double>(constraints.size(), std::numeric_limits<double>::max()));
+		cBounds.first.at(cBounds.first.size() - 1) = 1;
+		cBounds.second.at(cBounds.second.size() - 1) = 1;
+
+		//
+		// define objectives
+		//
+		Objectives objectives(m_commNet->GetNodes().size(), 0);
+		objectives.insert(objectives.end(), numDest, 1);
+
+		//
+		// define bounds
+		//
+		Bounds bounds(std::vector<double>(objectives.size() - numDest, 0), std::vector<double>(objectives.size() - numDest, 1));
+		bounds.first.insert(bounds.first.end(), numDest, 0);
+		bounds.second.insert(bounds.second.end(), numDest, std::numeric_limits<double>::max());
+
+		std::cout << "Constraints: " << std::endl;
+		for (auto constraint : constraints) {
+			for (auto c : constraint)
+				std::cout << c << " ";
 			std::cout << std::endl;
+		}
+
+		std::cout << "Objectives: " << std::endl;
+		for (auto o : objectives) {
+			std::cout << o << " ";
+		}
+		std::cout << std::endl;
+
+		std::cout << "Variable bounds: " << std::endl;
+		std::cout << "LB: ";
+		for (auto b : bounds.first) {
+			std::cout << b << " ";
+		}
+		std::cout << std::endl;
+		std::cout << "UB: ";
+		for (auto b : bounds.second) {
+			std::cout << b << " ";
+		}
+		std::cout << std::endl;
+
+		std::cout << "Constraints bounds: " << std::endl;
+		std::cout << "LB: ";
+		for (auto b : cBounds.first) {
+			std::cout << b << " ";
+		}
+		std::cout << std::endl;
+		std::cout << "UB: ";
+		for (auto b : cBounds.second) {
+			std::cout << b << " ";
+		}
+		std::cout << std::endl;
+
+		LPSolver solver(objectives, constraints, bounds, cBounds);
+		solver.SolveTask();
+		auto solution = solver.GetSolution();
+		m_optObjective = solver.GetObjectiveValue();
+		for (uint16_t j = 0; j < solution.size() - 1; j++) {
+			m_optSolution[j] = solution.at(j);
 		}
 		SIM_LOG(EXOR_SOLVER_LOG, "Job finished successfully");
 	}
 
-	graph_ptr ConstructGraph() {
+	graph_ptr ConstructGraph(UanAddress s, UanAddress d) {
 
-		UanAddress s, d;
 		for (auto node : m_commNet->GetNodes()) {
 			if (node->GetNodeType() == DESTINATION_NODE_TYPE)
 				d = node->GetId();
