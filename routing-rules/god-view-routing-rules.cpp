@@ -9,7 +9,6 @@
 #include "utils/comparison.h"
 #include "utils/log.h"
 #include "utils/utils.h"
-#include "lp-solver/graph.h"
 #include "lp-solver/lp-solver-header.h"
 
 #include <cmath>
@@ -409,15 +408,82 @@ double GodViewRoutingRules::GetOptDatarate() {
 
 double GodViewRoutingRules::GetSinglePathDatarate() {
 
-	typedef std::shared_ptr<lps::Graph> graph_ptr;
+//	auto src = std::function<UanAddress()>([this] {for (auto n : m_commNet->GetNodes())if (n->GetNodeType() == SOURCE_NODE_TYPE)return n->GetId();})();
+//
+//	std::map<UanAddress, std::map<UanAddress, TreeDesc> > m;
+//
+//	for (auto node : m_commNet->GetNodes()) {
+//		if (node->GetNodeType() == DESTINATION_NODE_TYPE) {
+//			auto dst = node->GetId();
+//			for (auto sender : m_commNet->GetNodes()) {
+//				m[sender][dst] = GetTreeDesc(sender->GetId(), dst);
+//			}
+//		}
+//	}
+//
+//	auto neighbour = [&](UanAddress sender, UanAddress dst) {
+//		return m[sender][dst].bestPath.begin()->to;
+//	};
+//
+//	auto is_edge_in_path = [](lps::Edge edge, lps::EPath path) {
+//		for(auto e : path)if(e == edge)return true;
+//		return false;
+//	};
+//
+//
+//
+//
+//	auto proceed = [&](UanAddress sender) {
+//
+//		std::vector<UanAddress> bestPath;
+//		bestPath.push_back(sender);
+//
+//		//
+//		// find the slowest connection
+//		//
+//			auto find_slowest_path = [&](std::vector<UanAddress> dsts) {
+//				TreeDesc u_desc;
+//				UanAddress slowestDst = -1;
+//				for(auto dst : dsts)
+//				{
+//					if(m[sender][dst].maxRate < u_desc.maxRate)
+//					{
+//						u_desc = m[sender][dst];
+//						slowestDst = dst;
+//					}
+//				}
+//				return u_desc;
+//			};
+//
+//			std::vector<UanAddress> dsts;
+//			for(auto desc_it : m[sender]) dsts.push_back(desc_it.first);
+//
+//			do
+//			{
+//				auto edge = *(find_slowest_path(dsts).bestPath.begin());
+//				bestPath.push_back(edge.to);
+//				//
+//				// spawn the new propagation path if the selected edge does not belong to at least one another DST
+//				//
+//				dsts.clear();
+//				for(auto desc_it : m[sender])
+//				{
+//					if(!is_edge_in_path(edge, desc_it.second.paths))
+//					{
+//						dsts.push_back(desc_it.first);
+//					}
+//				}
+//
+//
+//			}while(!dsts.empty());
+//
+//		};
 
-	UanAddress s, d;
-	for (auto node : m_commNet->GetNodes()) {
-		if (node->GetNodeType() == DESTINATION_NODE_TYPE)
-			d = node->GetId();
-		if (node->GetNodeType() == SOURCE_NODE_TYPE)
-			s = node->GetId();
-	}
+	double max_rate = 0;
+
+	return max_rate;
+}
+GodViewRoutingRules::graph_ptr GodViewRoutingRules::ConstructGraph(UanAddress s, UanAddress d) {
 
 	graph_ptr graph = graph_ptr(new lps::Graph(m_commNet->GetNodes().size(), s, d));
 
@@ -428,9 +494,36 @@ double GodViewRoutingRules::GetSinglePathDatarate() {
 		}
 	}
 
-	auto paths = graph->GetPaths();
+	return graph;
+}
 
-	auto get_loss_ratio = [this](UanAddress from, UanAddress to)
+GodViewRoutingRules::TreeDesc GodViewRoutingRules::GetTreeDesc(UanAddress s, UanAddress d) {
+
+	TreeDesc td;
+
+	auto graph = ConstructGraph(s, d);
+	td.paths = graph->GetPaths();
+
+	double max_rate = 0;
+	lps::EPath p;
+
+	for (auto path : td.paths) {
+
+		double v = GetPathCost(path);
+		if (td.maxRate < v) {
+			td.maxRate = v;
+			td.bestPath = path;
+		}
+	}
+
+	SIM_LOG(GOD_VIEW, "Optimal single-path routing data rate " << s << "->" << d << ": " << td.maxRate);
+
+	return td;
+}
+
+double GodViewRoutingRules::GetPathCost(lps::EPath path) {
+
+	auto get_loss_ratio = [this](UanAddress from, UanAddress to)->double
 	{
 		auto node = m_commNet->GetNode(from);
 		auto edges = node->GetOuts();
@@ -443,27 +536,20 @@ double GodViewRoutingRules::GetSinglePathDatarate() {
 		}
 		assert(0);
 	};
-	;
 
-	double max_rate = 0;
+	double v = 0;
+	for (auto e : path) {
 
-	for (auto path : paths) {
-		double v = 0;
-		for (auto e : path) {
-			auto l = get_loss_ratio(e.from, e.to);
-			if (eq(l, 1))
-				continue;
-			v += 1 / (1 - l) / m_commNet->GetNode(e.from)->GetDatarate();
-			if (GOD_VIEW)
-				std::cout << "Edge<" << e.from << "," << e.to << "> : " << m_commNet->GetNode(e.from)->GetDatarate() * (1 - l) << " / ";
-		}
+		auto l = get_loss_ratio(e.from, e.to);
+		if (eq(l, 1.0))
+			continue;
+		v += 1 / (1 - l) / m_commNet->GetNode(e.from)->GetDatarate();
 		if (GOD_VIEW)
-			std::cout << std::endl;
-		v = 1 / v;
-		if (max_rate < v)
-			max_rate = v;
+			std::cout << "Edge<" << e.from << "," << e.to << "> : " << m_commNet->GetNode(e.from)->GetDatarate() * (1 - l) << " / ";
 	}
+	if (GOD_VIEW)
+		std::cout << std::endl;
+	return 1 / v;
 
-	return max_rate;
 }
 }	//ncr

@@ -10,6 +10,7 @@
 
 #include "network/comm-net.h"
 #include "network/edge.h"
+#include "lp-solver/graph.h"
 #include "header.h"
 
 #include <stdint.h>
@@ -24,10 +25,33 @@ namespace ncr {
 class CommNet;
 
 class GodViewRoutingRules {
+
+	struct TreeDesc
+	{
+		TreeDesc()
+		{
+			maxRate = 0;
+		}
+		TreeDesc operator=(const TreeDesc & rhs)
+		{
+		     if(this == &rhs)
+		        return *this; // calls copy constructor SimpleCircle(*this)
+		     bestPath.clear();
+		     bestPath.insert(bestPath.begin(), rhs.bestPath.begin(), rhs.bestPath.end());
+		     paths.clear();
+		     paths.insert(paths.begin(), rhs.paths.begin(), rhs.paths.end());
+		     maxRate = rhs.maxRate;
+		     return *this; // calls copy constructor
+		}
+		lps::EPath bestPath;
+		lps::EPaths paths;
+		double maxRate;
+	};
 	typedef std::shared_ptr<CommNet> comm_net_ptr;
 	typedef std::function<void()> Action;
 	typedef std::deque<Action> ActionBuffer;
 	typedef std::vector<priority_t> priorities_t;
+	typedef std::shared_ptr<lps::Graph> graph_ptr;
 
 public:
 
@@ -67,6 +91,10 @@ private:
 	void PrintPriorities();
 	Edges SortEdges(Edges edges);
 	priority_t CalcPriority(UanAddress id, priorities_t p_old);
+
+	graph_ptr ConstructGraph(UanAddress s, UanAddress d);
+	TreeDesc GetTreeDesc(UanAddress s, UanAddress d);
+	double GetPathCost(lps::EPath path);
 
 //	void CalcTdmRecursive(UanAddress id, TdmAccessPlan &plan, std::map<UanAddress, bool> checkStatus);
 

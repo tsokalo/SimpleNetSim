@@ -22,6 +22,8 @@ Graph::Graph(uint16_t numNodes, uint16_t s, uint16_t d) {
 	this->s = s;
 	this->d = d;
 	adj = new std::list<uint16_t>[m_numNodes];
+
+	SIM_LOG(GRAPH_LOG, "Create graph. Nodes: " << numNodes << ", SRC: " << s << ", DST: " << d);
 }
 
 void Graph::AddEdge(uint16_t u, uint16_t v, double l) {
@@ -30,9 +32,13 @@ void Graph::AddEdge(uint16_t u, uint16_t v, double l) {
 	m_edges[Edge(u, v)] = 1;
 	m_l[Edge(u, v)] = l;
 	SIM_LOG(GRAPH_LOG, "Set " << Edge (u, v) << ": " << m_l[Edge (u, v)]);
+
+	if(std::find(m_nodeIds.begin(), m_nodeIds.end(), v) == m_nodeIds.end())m_nodeIds.push_back(v);
+	if(std::find(m_nodeIds.begin(), m_nodeIds.end(), u) == m_nodeIds.end())m_nodeIds.push_back(u);
 }
 void Graph::Evaluate() {
 
+//	assert(m_numNodes == m_nodeIds.size());
 	SearchCutsets();
 	ConstructM();
 }
@@ -114,7 +120,7 @@ void Graph::SearchCutsets() {
 		};;
 	}
 
-	auto get_left_side = [this](uint16_t numNodes)
+	auto get_left_side = [this]()
 	{
 		typedef std::vector<uint16_t> id_l;
 		std::vector<id_l> combs_l;
@@ -139,7 +145,7 @@ void Graph::SearchCutsets() {
 		// form left side of the cut (including the source)
 		//
 			std::vector<uint16_t> ids;
-			for(uint16_t i = 0; i < numNodes; i++)if(i !=s && i != d)ids.push_back(i);
+			for(auto id : m_nodeIds)if(id !=s && id != d)ids.push_back(id);
 
 			show(ids, std::vector<uint16_t>());
 			for(auto &comb : combs_l)comb.push_back(s);
@@ -149,14 +155,14 @@ void Graph::SearchCutsets() {
 			return combs_l;
 		};
 
-	auto get_right_side = [this](uint16_t numNodes, std::vector<std::vector<uint16_t> > combs_l)
+	auto get_right_side = [this](std::vector<std::vector<uint16_t> > combs_l)
 	{
 		std::vector<std::vector<uint16_t> > combs_r;
 		//
 		// form right side of the cut (including the destination)
 		//
 			std::vector<uint16_t> ids;
-			for(uint16_t i = 0; i < numNodes; i++)if(i !=s)ids.push_back(i);
+			for(auto id : m_nodeIds)if(id !=s)ids.push_back(id);
 			for(auto comb : combs_l)
 			{
 				std::vector<uint16_t> v;
@@ -169,7 +175,7 @@ void Graph::SearchCutsets() {
 			return combs_r;
 		};
 
-	auto combs_l = get_left_side(m_numNodes);
+	auto combs_l = get_left_side();
 
 	for (auto comb : combs_l) {
 		for (auto c : comb)
@@ -177,7 +183,7 @@ void Graph::SearchCutsets() {
 		std::cout << std::endl;
 	}
 
-	auto combs_r = get_right_side(m_numNodes, combs_l);
+	auto combs_r = get_right_side(combs_l);
 
 	auto cl_it = combs_l.begin();
 	auto cr_it = combs_r.begin();
@@ -237,7 +243,7 @@ Constraints Graph::GetConstraints() {
 	return m_M;
 }
 Objectives Graph::GetObjectives() {
-	auto obj = Objectives (m_numNodes, 0);
+	auto obj = Objectives(m_numNodes, 0);
 	return obj;
 }
 Bounds Graph::GetBounds() {
@@ -257,6 +263,11 @@ Bounds Graph::GetBounds() {
 		std::cout << std::endl;
 	}
 	return bounds;
+}
+
+uint16_t Graph::GetNumNodes()
+{
+	return m_numNodes;
 }
 
 }

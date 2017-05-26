@@ -35,6 +35,7 @@ public:
 	Constraints GetConstraints();
 	Objectives GetObjectives();
 	Bounds GetBounds();
+	uint16_t GetNumNodes();
 
 private:
 
@@ -45,6 +46,7 @@ private:
 	void
 	ConstructM();
 
+	std::vector<uint16_t> m_nodeIds;
 	uint16_t m_numNodes;
 	std::list<uint16_t> *adj;
 	uint16_t s;

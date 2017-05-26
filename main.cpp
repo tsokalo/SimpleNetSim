@@ -19,6 +19,7 @@
 #include "network/comm-net.h"
 #include "utils/utils.h"
 #include "routing-rules/exor-solver.h"
+#include "routing-rules/srp-solver.h"
 #include "test/test.h"
 #include "utils/sim-parameters.h"
 
@@ -36,12 +37,12 @@ void CreateTriangleScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 void CreateKrishnaScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
         net = std::shared_ptr<CommNet>(new CommNet(4, sp));
     	net->ConnectNodes(0, 1, 0.1);
-    	net->ConnectNodes(0, 2, 0.9);
-    	net->ConnectNodes(1, 2, 0.9, 0.9);
+    	net->ConnectNodes(0, 2, 0.5);
+//    	net->ConnectNodes(1, 2, 0.2, 0.3);
     	net->ConnectNodes(1, 3, 0.5);
     	net->ConnectNodes(2, 3, 0.1);
 //    	net->SetDestination(1);
-//    	net->SetDestination(2);
+    	net->SetDestination(2);
     	net->SetDestination(3);
         net->Configure();
         net->PrintNet();
@@ -252,8 +253,9 @@ int main(int argc, char *argv[]) {
 		//
 		// plot sending statistics; for all given nodes on one plot
 		//
-		ExOrSolver exOrSolver(net);
-		PlotSendingStatistics(without_dst, lb, subpath, godView.CalcTdmAccessPlan(), exOrSolver.CalcTdmAccessPlan());
+//		ExOrSolver exOrSolver(net);
+		SrpSolver srpSolver(net);
+//		PlotSendingStatistics(without_dst, lb, subpath, godView.CalcTdmAccessPlan(), exOrSolver.CalcTdmAccessPlan());
 
 		//
 		// plot the maximum achievable data rate, the achieved data rate and the maximum achievable data rate with RP-S

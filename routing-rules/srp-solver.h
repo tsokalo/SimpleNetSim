@@ -1,17 +1,18 @@
 /*
- * ExOrSolver.h
+ * SrpSolver.h
  *
  *  Created on: 23.11.2016
  *      Author: tsokalo
  */
 
-#ifndef EXORSOLVER_H_
-#define EXORSOLVER_H_
+#ifndef SRPSOLVER_H_
+#define SRPSOLVER_H_
 
 #include <iostream>
 #include <map>
 #include <memory>
 #include "lp-solver/graph.h"
+#include "routing-rules/exor-solver.h"
 
 #include "lp-solver/lp-solver.h"
 #include "network/comm-net.h"
@@ -19,40 +20,21 @@
 
 namespace ncr {
 
-class ExOrSolver {
+class SrpSolver: public ExOrSolver {
 
 	typedef std::shared_ptr<CommNet> comm_net_ptr;
 	typedef std::shared_ptr<lps::Graph> graph_ptr;
 
 public:
-	ExOrSolver(comm_net_ptr commNet) {
-		m_commNet = commNet;
-
+	SrpSolver(comm_net_ptr commNet) :
+			ExOrSolver(commNet) {
 		DoJob();
 	}
-	virtual ~ExOrSolver() {
+	virtual ~SrpSolver() {
 
 	}
 
-	/*
-	 * returns the channel capacity between the source and the destination
-	 *
-	 * considers single sending data rate for all senders
-	 */
-	double GetOptChannelUses() {
-		return m_optObjective;
-	}
-
-	/*
-	 * if the indivisible time slot value approaches zero, the number of optimal TDM access plans approaches infinity
-	 *
-	 * The function below gives one of them
-	 */
-	TdmAccessPlan CalcTdmAccessPlan() {
-		return m_optSolution;
-	}
-
-protected:
+private:
 
 	void DoJob() {
 
@@ -68,11 +50,13 @@ protected:
 		std::map<uint16_t, Constraints> constraints_map;
 		auto src = std::function<UanAddress()>([this] {for (auto n : m_commNet->GetNodes())if (n->GetNodeType() == SOURCE_NODE_TYPE)return n->GetId();})();
 
+		uint16_t N = 0;
 		// constraints for time variables defined by cuts
 		for (auto node : m_commNet->GetNodes()) {
 			if (node->GetNodeType() == DESTINATION_NODE_TYPE) {
 				auto dst = node->GetId();
 				graph_ptr graph = ConstructGraph(src, dst);
+				if(N < graph->GetNumNodes())N = graph->GetNumNodes();
 				graph->Evaluate();
 				auto cutsets = graph->GetAllCutSets();
 				auto c = graph->GetConstraints();
@@ -93,16 +77,16 @@ protected:
 		auto n = constraints.size();
 
 		// additional constraint for time variables: sum is equal one
-		std::vector<double> c(m_commNet->GetNodes().size(), 1);
+		std::vector<double> c(N, 1);
 		c.insert(c.end(), numDest, 0);
 		constraints.push_back(c);
 
 		// additional constraint for data rate variables: all should be equal
 		for (uint16_t i = 0; i < numDest; i++)
 			for (uint16_t j = i + 1; j < numDest; j++) {
-				std::vector<double> c(m_commNet->GetNodes().size() + numDest, 0);
-				c.at(m_commNet->GetNodes().size() + i) = 1;
-				c.at(m_commNet->GetNodes().size() + j) = -1;
+				std::vector<double> c(N + numDest, 0);
+				c.at(N + i) = 1;
+				c.at(N + j) = -1;
 				constraints.push_back(c);
 			}
 		auto k = constraints.size() - n - 1;
@@ -121,14 +105,14 @@ protected:
 		//
 		// define objectives
 		//
-		Objectives objectives(m_commNet->GetNodes().size(), 0);
+		Objectives objectives(N, 0);
 		objectives.insert(objectives.end(), numDest, 1);
 
 		//
 		// define bounds
 		//
 		// for time variables
-		Bounds bounds(std::vector<double>(m_commNet->GetNodes().size(), 0), std::vector<double>(m_commNet->GetNodes().size(), 1));
+		Bounds bounds(std::vector<double>(N, 0), std::vector<double>(N, 1));
 		// for data rates
 		bounds.first.insert(bounds.first.end(), numDest, 0);
 		bounds.second.insert(bounds.second.end(), numDest, std::numeric_limits<double>::max());
@@ -182,23 +166,81 @@ protected:
 
 	graph_ptr ConstructGraph(UanAddress s, UanAddress d) {
 
+		auto construct_full_graph = [this](UanAddress s, UanAddress d) {
+			graph_ptr graph = graph_ptr(new lps::Graph(m_commNet->GetNodes().size(), s, d));
+
+			for (auto node : m_commNet->GetNodes()) {
+				auto edges = node->GetOuts();
+				for (auto edge : edges) {
+					graph->AddEdge(node->GetId(), edge->v_, edge->GetLossProcess()->GetMean());
+				}
+			}
+			return graph;
+		};
+
+		auto get_path_cost = [this](lps::EPath path) {
+
+			auto get_loss_ratio = [this](UanAddress from, UanAddress to)->double
+			{
+				auto node = m_commNet->GetNode(from);
+				auto edges = node->GetOuts();
+				for(auto edge : edges)
+				{
+					if(edge->v_ == to)
+					{
+						return edge->GetLossProcess()->GetMean();
+					}
+				}
+				assert(0);
+			};
+
+			double v = 0;
+			for (auto e : path) {
+
+				auto l = get_loss_ratio(e.from, e.to);
+				if (eq(l, 1.0))
+				continue;
+				v += 1 / (1 - l) / m_commNet->GetNode(e.from)->GetDatarate();
+				if (GOD_VIEW)
+				std::cout << "Edge<" << e.from << "," << e.to << "> : " << m_commNet->GetNode(e.from)->GetDatarate() * (1 - l) << " / ";
+			}
+			if (GOD_VIEW)
+			std::cout << std::endl;
+			return 1 / v;
+		};
+
+		auto paths = construct_full_graph(s, d)->GetPaths();
+
+		double max_rate = 0;
+		lps::EPath p;
+
+		for (auto path : paths) {
+
+			double v = get_path_cost(path);
+			if (max_rate < v) {
+				max_rate = v;
+				p = path;
+			}
+		}
+
 		graph_ptr graph = graph_ptr(new lps::Graph(m_commNet->GetNodes().size(), s, d));
 
 		for (auto node : m_commNet->GetNodes()) {
 			auto edges = node->GetOuts();
 			for (auto edge : edges) {
-				graph->AddEdge(node->GetId(), edge->v_, edge->GetLossProcess()->GetMean());
+				for (auto ep : p) {
+					if (node->GetId() == ep.from && edge->v_ == ep.to) {
+						graph->AddEdge(node->GetId(), edge->v_, edge->GetLossProcess()->GetMean());
+						break;
+					}
+				}
 			}
 		}
 
 		return graph;
 	}
-
-	comm_net_ptr m_commNet;
-	double m_optObjective;
-	std::map<uint16_t, double> m_optSolution;
 };
 
 }
 
-#endif /* EXORSOLVER_H_ */
+#endif /* SRPSOLVER_H_ */
