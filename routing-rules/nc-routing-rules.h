@@ -104,6 +104,7 @@ public:
 	uint32_t GetAmountTxData();
 	uint16_t GetAckBacklogSize();
 	uint16_t GetCoalitionSize();
+	double GetCodingRate();
 
 private:
 

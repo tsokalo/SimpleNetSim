@@ -57,7 +57,7 @@ public:
 	 * OUTPUTS
 	 */
 	TxPlan GetTxPlan();
-	BrrHeader GetHeader(TxPlan txPlan, FeedbackInfo f);
+	BrrMHeader GetHeader(TxPlan txPlan, FeedbackInfo f);
 	FeedbackInfo GetFeedbackInfo();
 	FeedbackInfo GetRetransRequestInfo(ttl_t ttl = -2);
 	HeaderInfo GetHeaderInfo();
@@ -84,6 +84,8 @@ public:
 
 
 private:
+
+	void FindLeadingDst();
 
 	UanAddress m_lead;
 	std::map<UanAddress, routing_rules_ptr> m_brr;

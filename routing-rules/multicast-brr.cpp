@@ -6,6 +6,7 @@
  */
 
 #include "multicast-brr.h"
+#include "brrm-header.h"
 
 namespace ncr {
 
@@ -109,10 +110,64 @@ void MulticastBrr::SetSendingRate(Datarate d) {
  * OUTPUTS
  */
 TxPlan MulticastBrr::GetTxPlan() {
-	return m_brr[m_lead]->GetTxPlan();
+	TxPlan txPlan;
+	for (auto brr : m_brr) {
+		auto t = brr.second->GetTxPlan();
+		for (auto item : t) {
+			auto gid = item.first;
+			auto new_item = item.second;
+			auto old_item_it = txPlan.find(gid);
+			if (old_item_it != txPlan.end()) {
+				old_item_it->second.num_all = (new_item.num_all > old_item_it->second.num_all) ? new_item.num_all : old_item_it->second.num_all;
+				old_item_it->second.all_prev_acked = new_item.all_prev_acked ? true : old_item_it->second.all_prev_acked;
+			} else {
+				txPlan[gid] = new_item;
+			}
+		}
+	}
+	return txPlan;
 }
-BrrHeader MulticastBrr::GetHeader(TxPlan txPlan, FeedbackInfo f) {
-	return m_brr[m_lead]->GetHeader(txPlan, f);
+BrrMHeader MulticastBrr::GetHeader(TxPlan txPlan, FeedbackInfo f) {
+
+	BrrMHeader brrHeader(m_brr.begin()->second->GetHeader(txPlan, f));
+	//
+	// find the smallest coding rate
+	//
+	double cr = std::numeric_limits<double>::max();
+	UanAddress win_node = 0;
+	for (auto brr_it : m_brr) {
+		auto brr = brr_it.second;
+		auto dst = brr_it.first;
+		auto l_cr = brr->GetCodingRate();
+		cr = (cr > l_cr) ? l_cr : cr;
+		win_node = (cr > l_cr) ? dst : win_node;
+	}
+	for (auto brr_it : m_brr) {
+		auto brr = brr_it.second;
+		auto dst = brr_it.first;
+		auto bH = brr->GetHeader(txPlan, f);
+		//
+		// save the priority for each destination in the header
+		//
+		brrHeader.h.p[dst] = bH.h.p;
+		//
+		// adjust the filtering coefficients according to the actual amount of the sent information
+		//
+		for (auto pf_ : bH.h.pf)
+			brrHeader.h.pf[pf_.first] = pf_.second * brr->GetCodingRate() / cr;
+
+		brrHeader.f.p[dst] = bH.f.p;
+	}
+
+	auto brrh = m_brr[win_node]->GetHeader(txPlan, f);
+	brrHeader.f.rcvMap = brrh.f.rcvMap;
+	brrHeader.f.rrInfo = brrh.f.rrInfo;
+	brrHeader.f.netDiscovery = brrh.f.netDiscovery;
+	brrHeader.f.ttl = brrh.f.ttl;
+	brrHeader.f.ackInfo = brrh.f.ackInfo;
+	brrHeader.f.updated = true;
+
+	return brrHeader;
 }
 FeedbackInfo MulticastBrr::GetFeedbackInfo() {
 	return m_brr[m_lead]->GetFeedbackInfo();
@@ -177,5 +232,8 @@ uint16_t MulticastBrr::GetAckBacklogSize() {
 uint16_t MulticastBrr::GetCoalitionSize() {
 	return m_brr[m_lead]->GetCoalitionSize();
 }
+void MulticastBrr::FindLeadingDst()
+{
 
+}
 }

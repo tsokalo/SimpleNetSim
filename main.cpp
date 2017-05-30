@@ -175,9 +175,9 @@ int main(int argc, char *argv[]) {
 	//
 	// using default parameters
 	//
-	CreateKrishnaScenario(net, sim_par);
+//	CreateKrishnaScenario(net, sim_par);
 //	CreateStackScenario(net, 4, sim_par);
-//	CreateTriangleScenario(net, sim_par);
+	CreateTriangleScenario(net, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);

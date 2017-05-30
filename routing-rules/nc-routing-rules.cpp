@@ -824,6 +824,10 @@ uint16_t NcRoutingRules::GetAckBacklogSize() {
 uint16_t NcRoutingRules::GetCoalitionSize() {
 	return m_coalition.size();
 }
+double NcRoutingRules::GetCodingRate()
+{
+	return m_cr;
+}
 void NcRoutingRules::AddToCoalition(UanAddress addr) {
 	//
 	// forcing to use this vertex in the coalition
