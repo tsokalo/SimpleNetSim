@@ -11,10 +11,18 @@
 #include <sstream>
 #include "header.h"
 #include "utils/brr-tx-plan.h"
+#include "brr-pkt-header.h"
 
 namespace ncr {
 
 struct HeaderMInfo {
+
+	HeaderMInfo() {
+	}
+	HeaderMInfo(const HeaderInfo& other) {
+		this->addr = other.addr;
+		this->txPlan = other.txPlan;
+	}
 	HeaderMInfo& operator=(const HeaderMInfo& other) // copy assignment
 			{
 		if (this != &other) { // self-assignment check expected
@@ -28,10 +36,8 @@ struct HeaderMInfo {
 
 	HeaderMInfo& operator=(const HeaderInfo& other) // copy assignment
 			{
-		if (this != &other) { // self-assignment check expected
-			this->addr = other.addr;
-			this->txPlan = other.txPlan;
-		}
+		this->addr = other.addr;
+		this->txPlan = other.txPlan;
 		return *this;
 	}
 

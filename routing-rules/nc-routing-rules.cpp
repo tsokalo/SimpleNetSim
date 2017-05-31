@@ -758,6 +758,10 @@ uint32_t NcRoutingRules::GetMaxAmountTxData() {
 
 	return dse * m_sp.genSize;
 }
+priority_t NcRoutingRules::GetPriority()
+{
+	return m_p;
+}
 GenId NcRoutingRules::GetAckWinSize() {
 	GenId ack_win = (m_nodeType == SOURCE_NODE_TYPE) ? m_sp.numGen >> 2 : m_sp.numGen;
 	assert(ack_win < MAX_GEN_SSN);

@@ -9,6 +9,9 @@
 #define ROUTING_RULES_MULTICAST_BRR_H_
 
 #include "routing-rules/nc-routing-rules.h"
+#include "utils/brrm-header.h"
+#include "utils/brrm-pkt-header.h"
+#include "utils/brrm-feedback.h"
 
 namespace ncr {
 
@@ -40,8 +43,8 @@ public:
 	/*
 	 * INPUTS
 	 */
-	void RcvHeaderInfo(HeaderInfo l);
-	void RcvFeedbackInfo(FeedbackInfo l);
+	void RcvHeaderInfo(HeaderMInfo l);
+	void RcvFeedbackInfo(FeedbackMInfo l);
 	void UpdateSent(GenId genId, uint32_t num, bool notify_sending = false);
 	void UpdateRcvd(GenId genId, UanAddress id, bool linDep = false);
 	void UpdateRcvd(GenId genId, UanAddress id, std::vector<OrigSymbol> v);
@@ -57,13 +60,12 @@ public:
 	 * OUTPUTS
 	 */
 	TxPlan GetTxPlan();
-	BrrMHeader GetHeader(TxPlan txPlan, FeedbackInfo f);
-	FeedbackInfo GetFeedbackInfo();
-	FeedbackInfo GetRetransRequestInfo(ttl_t ttl = -2);
-	HeaderInfo GetHeaderInfo();
-	HeaderInfo GetHeaderInfo(TxPlan txPlan);
+	BrrMHeader GetHeader(TxPlan txPlan, FeedbackMInfo f);
+	FeedbackMInfo GetFeedbackInfo();
+	FeedbackMInfo GetRetransRequestInfo(ttl_t ttl = -2);
+	HeaderMInfo GetHeaderInfo();
+	HeaderMInfo GetHeaderInfo(TxPlan txPlan);
 	NetDiscoveryInfo GetNetDiscoveryInfo(ttl_t ttl = -2);
-	UanAddress GetSinkVertex();
 	//
 	bool NeedGen();
 	uint32_t GetNumGreedyGen();
@@ -72,23 +74,26 @@ public:
 	bool MaySendNetDiscovery(ttl_t ttl = -1);
 	// retransmission requests
 	bool MaySendRetransRequest(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
-	bool ProcessRetransRequest(FeedbackInfo fb);
-	bool HasRetransRequest(FeedbackInfo fb);
+	bool ProcessRetransRequest(FeedbackMInfo fb);
+	bool HasRetransRequest(FeedbackMInfo fb);
 	void ResetRetransInfo();
 	void UpdateRetransRequest();
 	//
 	uint32_t GetGenBufSize(uint32_t maxPkts);
 	uint32_t GetAmountTxData();
 	uint16_t GetAckBacklogSize();
-	uint16_t GetCoalitionSize();
+	std::map<UanAddress, uint16_t> GetCoalitionSize();
 
 
 private:
 
-	void FindLeadingDst();
-
 	UanAddress m_lead;
 	std::map<UanAddress, routing_rules_ptr> m_brr;
+
+	/*
+	 * own address
+	 */
+	UanAddress m_id;
 };
 }
 

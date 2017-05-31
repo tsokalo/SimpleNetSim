@@ -152,7 +152,7 @@ NcPacket CommNode::DoBroadcast() {
 	TxPlan planI;
 	planI[genId] = planItem;
 
-	HeaderInfo header = m_brr->GetHeaderInfo(planI);
+	auto header = m_brr->GetHeaderInfo(planI);
 
 	NcPacket pkt;
 	if (m_nodeType == SOURCE_NODE_TYPE) {

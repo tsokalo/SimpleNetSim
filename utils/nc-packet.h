@@ -14,8 +14,8 @@
 #include <tuple>
 #include <vector>
 #include "header.h"
-#include "utils/brr-pkt-header.h"
-#include "utils/brr-feedback.h"
+#include "utils/brrm-pkt-header.h"
+#include "utils/brrm-feedback.h"
 
 namespace ncr {
 
@@ -36,22 +36,22 @@ public:
 	NcSymbol GetData() {
 		return m_symb;
 	}
-	void SetHeader(HeaderInfo header) {
+	void SetHeader(HeaderMInfo header) {
 		m_header = header;
 	}
-	HeaderInfo GetHeader() {
+	HeaderMInfo GetHeader() {
 		return m_header;
 	}
 	bool IsFeedbackSymbol()
 	{
 		return m_isFeedbackSymbol;
 	}
-	void SetFeedback(FeedbackInfo fi)
+	void SetFeedback(FeedbackMInfo fi)
 	{
 		m_feedback = fi;
 		m_isFeedbackSymbol = true;
 	}
-	FeedbackInfo GetFeedback()
+	FeedbackMInfo GetFeedback()
 	{
 		return m_feedback;
 	}
@@ -59,8 +59,8 @@ public:
 private:
 
 	NcSymbol m_symb;
-	HeaderInfo m_header;
-	FeedbackInfo m_feedback;
+	HeaderMInfo m_header;
+	FeedbackMInfo m_feedback;
 	bool m_isFeedbackSymbol;
 };
 }

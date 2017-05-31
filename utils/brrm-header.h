@@ -17,6 +17,11 @@ struct BrrMHeader {
 
 	BrrMHeader() {
 	}
+	BrrMHeader(HeaderMInfo h, FeedbackMInfo f) {
+
+		this->h = h;
+		this->f = f;
+	}
 	BrrMHeader(BrrHeader brrh) {
 
 		this->h = brrh.h;

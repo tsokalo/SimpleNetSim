@@ -14,6 +14,7 @@
 #include "header.h"
 #include "utils/brr-retrans-request.h"
 #include "utils/ack-info.h"
+#include "brr-feedback.h"
 
 namespace ncr {
 
@@ -24,16 +25,8 @@ struct FeedbackMInfo {
 		ttl = 0;
 		updated = false;
 	}
-	FeedbackMInfo(const FeedbackMInfo &other) {
+	FeedbackMInfo(const FeedbackInfo &other) {
 		this->addr = other.addr;
-		this->p = other.p;
-		this->rcvMap = other.rcvMap;
-		this->rrInfo = other.rrInfo;
-		this->netDiscovery = other.netDiscovery;
-		this->ttl = other.ttl;
-		this->ackInfo = other.ackInfo;
-
-		this->updated = true;
 	}
 
 	FeedbackMInfo& operator=(const FeedbackMInfo& other) // copy assignment
@@ -53,9 +46,7 @@ struct FeedbackMInfo {
 	}
 	FeedbackMInfo& operator=(const FeedbackInfo& other) // copy assignment
 			{
-		if (this != &other) { // self-assignment check expected
-			this->addr = other.addr;
-		}
+		this->addr = other.addr;
 		return *this;
 	}
 

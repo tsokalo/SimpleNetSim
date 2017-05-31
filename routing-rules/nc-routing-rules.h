@@ -105,6 +105,8 @@ public:
 	uint16_t GetAckBacklogSize();
 	uint16_t GetCoalitionSize();
 	double GetCodingRate();
+	uint32_t GetMaxAmountTxData();
+	priority_t GetPriority();
 
 private:
 
@@ -153,7 +155,6 @@ private:
 	node_map_it LookUpOutputs(UanAddress id);
 
 	void UpdateLogItem();
-	uint32_t GetMaxAmountTxData();
 	GenId GetAckWinSize();
 	GenId GetAckWinEnd();
 	GenId GetMutualAckWinEnd();
