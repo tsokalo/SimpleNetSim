@@ -23,31 +23,31 @@
 #include "test/test.h"
 #include "utils/sim-parameters.h"
 
-
 namespace ncr {
 void CreateTriangleScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net = std::shared_ptr<CommNet>(new CommNet(3, sp));
-        net->ConnectNodes(0, 1, 0.1);
-        net->ConnectNodes(0, 2, 0.606);
-        net->ConnectNodes(1, 2, 0.3);
-        net->Configure();
-        net->PrintNet();
+	net->ConnectNodes(0, 1, 0.1);
+	net->ConnectNodes(0, 2, 0.606);
+	net->ConnectNodes(1, 2, 0.3);
+	net->SetDestination(1);
+	net->SetDestination(2);
+	net->Configure();
+	net->PrintNet();
 }
 
 void CreateKrishnaScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
-        net = std::shared_ptr<CommNet>(new CommNet(4, sp));
-    	net->ConnectNodes(0, 1, 0.1);
-    	net->ConnectNodes(0, 2, 0.5);
+	net = std::shared_ptr<CommNet>(new CommNet(4, sp));
+	net->ConnectNodes(0, 1, 0.1);
+	net->ConnectNodes(0, 2, 0.5);
 //    	net->ConnectNodes(1, 2, 0.2, 0.3);
-    	net->ConnectNodes(1, 3, 0.5);
-    	net->ConnectNodes(2, 3, 0.1);
+	net->ConnectNodes(1, 3, 0.5);
+	net->ConnectNodes(2, 3, 0.1);
 //    	net->SetDestination(1);
-    	net->SetDestination(2);
-    	net->SetDestination(3);
-        net->Configure();
-        net->PrintNet();
+	net->SetDestination(2);
+	net->SetDestination(3);
+	net->Configure();
+	net->PrintNet();
 }
-
 
 void CreateDiamondScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net = std::shared_ptr<CommNet>(new CommNet(4, sp));
@@ -156,11 +156,9 @@ int main(int argc, char *argv[]) {
 	ProgMode m;
 	if (argc < 2) {
 		m = EVAL_MODE;
-	}
-	else {
+	} else {
 		m = ProgMode(atoi(argv[1]));
-		if(m == EVAL_MODE && argc > 2)
-		{
+		if (m == EVAL_MODE && argc > 2) {
 
 			std::cout << "Using results folder " << argv[2] << std::endl;
 			folder = argv[2];
@@ -182,15 +180,13 @@ int main(int argc, char *argv[]) {
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);
 
-
 	if (m == RUN_MODE) {
 		RemoveDirectory(folder);
 		CreateDirectory(folder);
 		std::cout << folder << std::endl;
 		net->EnableLog(folder);
 		net->Run(20000);
-	}
-	else if (m == EVAL_MODE) {
+	} else if (m == EVAL_MODE) {
 		std::string f = folder + GetLogFileName();
 		std::cout << "Using file " << f << std::endl;
 		LogBank lb = ReadLogBank(f);
@@ -274,8 +270,7 @@ int main(int argc, char *argv[]) {
 		//
 		PlotOutputStability(lb, subpath, godView.GetOptChannelUses(), net->GetDst());
 
-	}
-	else if (m == TEST_MODE) {
+	} else if (m == TEST_MODE) {
 //		TestChannelCapacityStack(folder);
 		TestBitSet();
 	}
