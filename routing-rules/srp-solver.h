@@ -51,9 +51,10 @@ private:
 		auto src = std::function<UanAddress()>([this] {for (auto n : m_commNet->GetNodes())if (n->GetNodeType() == SOURCE_NODE_TYPE)return n->GetId();})();
 
 		uint16_t N = 0;
+		auto dsts = m_commNet->GetDstIds();
 		// constraints for time variables defined by cuts
 		for (auto node : m_commNet->GetNodes()) {
-			if (node->GetNodeType() == DESTINATION_NODE_TYPE) {
+			if (std::find(dsts.begin(), dsts.end(),node->GetId()) != dsts.end()) {
 				auto dst = node->GetId();
 				graph_ptr graph = ConstructGraph(src, dst);
 				if(N < graph->GetNumNodes())N = graph->GetNumNodes();

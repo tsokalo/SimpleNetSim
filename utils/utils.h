@@ -51,13 +51,14 @@ std::string GetLogFileName();
 std::string GetSimParamFileName();
 LogBank ReadLogBank(std::string path);
 
-void PlotPriorities(std::vector<UanAddress> nids, LogBank lb, std::string path, bool useSns);
-void PlotInputFilters(std::vector<UanAddress> nids, LogBank lb, std::string path);
+void PlotPriorities(uint32_t numNodes, std::vector<UanAddress> dstIds, LogBank lb, std::string path, bool useSns);
+void PlotInputFilters(uint32_t numNodes, std::vector<UanAddress> dstIds, LogBank lb, std::string path);
 void PlotLossRatios(std::vector<UanAddress> nids, LogBank lb, std::string path);
 void PlotCoalitions(std::vector<UanAddress> nids, LogBank lb, std::string path, std::string logfile, bool useSns);
 void PlotCodingRates(std::vector<UanAddress> nids, LogBank lb, std::string path, std::string logfile);
-void PlotSendingStatistics(std::vector<UanAddress> nids, LogBank lb, std::string path, TdmAccessPlan godPlan, TdmAccessPlan optPlan);
+void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan godPlan, TdmAccessPlan optPlan);
 void PlotResourceWaste(LogBank lb, std::string path, double sigma);
+void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstIds, std::map<UanAddress, Datarate> d);
 void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d);
 void PlotRetransmissionRequests(LogBank lb, std::string path);
 void PlotOutputStability(LogBank lb, std::string path, double opt, UanAddress dst);

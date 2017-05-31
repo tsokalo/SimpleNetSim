@@ -87,7 +87,6 @@ public:
 
 private:
 
-	UanAddress m_lead;
 	std::map<UanAddress, routing_rules_ptr> m_brr;
 
 	/*

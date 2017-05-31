@@ -21,7 +21,6 @@ MulticastBrr::MulticastBrr(UanAddress ownAddress, NodeType type, std::vector<Uan
 
 		assert(m_brr.find(dst) == m_brr.end());
 		m_brr[dst] = routing_rules_ptr(new NcRoutingRules(ownAddress, t, dst, sp));
-		m_lead = dst;
 	}
 }
 
@@ -88,11 +87,13 @@ void MulticastBrr::RcvFeedbackInfo(FeedbackMInfo l) {
 	f.updated = l.updated;
 
 	for (auto p : l.p) {
-		auto addr = p.first;
-		assert(m_brr.find(addr) != m_brr.end());
+		auto dst = p.first;
+		assert(m_brr.find(dst) != m_brr.end());
 		f.p = p.second;
-		m_brr.at(addr)->RcvFeedbackInfo(f);
+		SIM_LOG_N(BRR_LOG, m_id, "Feedback source " << f.addr << " with priority " << f.p << " for DST " << dst);
+		m_brr.at(dst)->RcvFeedbackInfo(f);
 	}
+
 }
 void MulticastBrr::UpdateSent(GenId genId, uint32_t num, bool notify_sending) {
 	for (auto brr : m_brr)
@@ -155,6 +156,7 @@ TxPlan MulticastBrr::GetTxPlan() {
 			}
 		}
 	}
+	SIM_LOG_N(BRR_LOG, m_id, "TX plan " << txPlan);
 	return txPlan;
 }
 BrrMHeader MulticastBrr::GetHeader(TxPlan txPlan, FeedbackMInfo f) {
@@ -275,13 +277,13 @@ uint32_t MulticastBrr::GetNumGreedyGen() {
 }
 bool MulticastBrr::MaySendData(double dr) {
 	//
-	// only if for all destination we may send data
+	// if at least for all destination we may send data
 	//
 	for (auto brr_it : m_brr)
-		if (!brr_it.second->MaySendData(dr))
-			return false;
+		if (brr_it.second->MaySendData(dr))
+			return true;
 
-	return true;
+	return false;
 }
 bool MulticastBrr::MaySendFeedback() {
 	//

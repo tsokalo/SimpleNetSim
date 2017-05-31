@@ -198,6 +198,7 @@ struct LogItem {
 		ns = 0;
 		nr = 0;
 		ssn = 0;
+		dst = 0;
 	}
 	LogItem(std::string init) {
 		std::stringstream ss(init);
@@ -206,6 +207,7 @@ struct LogItem {
 		ss >> v;
 		ss >> v;
 		ss >> v;
+		ss >> dst;
 		std::string str;
 		ss >> str;
 		d = std::stod(str);
@@ -250,13 +252,14 @@ struct LogItem {
 			this->ns = other.ns;
 			this->nr = other.nr;
 			this->ssn = other.ssn;
+			this->dst = other.dst;
 		}
 		return *this;
 	}
 
 	friend std::ostream&
 	operator<<(std::ostream& os, const LogItem& l) {
-		os << l.d << "\t" << l.p << "\t" << l.cr << "\t" << l.cs << "\t" << l.ns << "\t" << l.nr << "\t" << l.ssn << "\t" << l.fp.size() << "\t"
+		os << l.dst << "\t" << l.d << "\t" << l.p << "\t" << l.cr << "\t" << l.cs << "\t" << l.ns << "\t" << l.nr << "\t" << l.ssn << "\t" << l.fp.size() << "\t"
 				<< l.eps.size();
 
 		for (std::map<int16_t, double>::const_iterator it = l.fp.begin(); it != l.fp.end(); it++)
@@ -306,6 +309,10 @@ struct LogItem {
 	 * sequence number
 	 */
 	symb_ssn_t ssn;
+	/*
+	 * destination address
+	 */
+	UanAddress dst;
 };
 /*
  * The history of logging items for node v

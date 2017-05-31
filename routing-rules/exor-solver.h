@@ -68,9 +68,10 @@ protected:
 		std::map<uint16_t, Constraints> constraints_map;
 		auto src = std::function<UanAddress()>([this] {for (auto n : m_commNet->GetNodes())if (n->GetNodeType() == SOURCE_NODE_TYPE)return n->GetId();})();
 
+		auto dsts = m_commNet->GetDstIds();
 		// constraints for time variables defined by cuts
 		for (auto node : m_commNet->GetNodes()) {
-			if (node->GetNodeType() == DESTINATION_NODE_TYPE) {
+			if (std::find(dsts.begin(), dsts.end(),node->GetId()) != dsts.end()) {
 				auto dst = node->GetId();
 				graph_ptr graph = ConstructGraph(src, dst);
 				graph->Evaluate();

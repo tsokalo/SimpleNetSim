@@ -26,8 +26,8 @@
 namespace ncr {
 void CreateTriangleScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net = std::shared_ptr<CommNet>(new CommNet(3, sp));
-	net->ConnectNodes(0, 1, 0.1);
-	net->ConnectNodes(0, 2, 0.606);
+	net->ConnectNodes(0, 1, 0.5);
+	net->ConnectNodes(0, 2, 0.4);
 	net->ConnectNodes(1, 2, 0.3);
 	net->SetDestination(1);
 	net->SetDestination(2);
@@ -46,6 +46,25 @@ void CreateKrishnaScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net->SetDestination(2);
 	net->SetDestination(3);
 	net->Configure();
+	net->PrintNet();
+}
+
+void CreateNoCScenario(std::shared_ptr<CommNet> &net, uint16_t NbrHops, SimParameters sp) {
+	uint16_t num_nodes = pow(NbrHops + 1, 2.0);
+	net = std::shared_ptr<CommNet>(new CommNet(num_nodes, sp));
+	double e1 = 0.1;
+	double e2 = 0.2;
+/*	uint16_t ProhSet[]={NbrHops,2*NbrHops+1,3*NbrHops+2};*/
+	uint16_t m2 = 2*NbrHops+1;
+	uint16_t m3 = 3*NbrHops+2;
+		uint16_t p = num_nodes - NbrHops - 1;
+	for (uint16_t i = 0; i < num_nodes-1; i++) {
+		if (i != NbrHops && i != m2 && i != m3 )
+		net->ConnectNodes(i, i + 1, e1);
+				if (i < p)
+			net->ConnectNodes(i, i + NbrHops + 1, e2);
+	}
+    net->Configure();
 	net->PrintNet();
 }
 
@@ -176,6 +195,7 @@ int main(int argc, char *argv[]) {
 //	CreateKrishnaScenario(net, sim_par);
 //	CreateStackScenario(net, 4, sim_par);
 	CreateTriangleScenario(net, sim_par);
+//	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);
@@ -185,7 +205,7 @@ int main(int argc, char *argv[]) {
 		CreateDirectory(folder);
 		std::cout << folder << std::endl;
 		net->EnableLog(folder);
-		net->Run(20000);
+		net->Run(4000);
 	} else if (m == EVAL_MODE) {
 		std::string f = folder + GetLogFileName();
 		std::cout << "Using file " << f << std::endl;
@@ -203,20 +223,19 @@ int main(int argc, char *argv[]) {
 			if(it != ids.end())ids.erase(it, it + 1);
 			return ids;
 		};
-		;
 
 		auto without_dst = get_node_ids(net->GetDst());
 		auto without_src = get_node_ids(net->GetSrc());
 
-//		//
-//		// plot priorities; for all given nodes on one plot
-//		//
-//		PlotPriorities(without_dst, lb, subpath, useSns);
-//
-//		//
-//		// plot input filters; for each given node a plot with filters for each input edge
-//		//
-//		PlotInputFilters(without_src, lb, subpath);
+		//
+		// plot priorities; for all given nodes on one plot
+		//
+		PlotPriorities(net->GetNodes().size(), net->GetDstIds(), lb, subpath, useSns);
+
+		//
+		// plot input filters; for each given node a plot with filters for each input edge
+		//
+		PlotInputFilters(net->GetNodes().size(), net->GetDstIds(), lb, subpath);
 //
 //		//
 //		// plot loss ratios of output edges; for each given node a plot with ratios for each output edge
@@ -245,13 +264,16 @@ int main(int argc, char *argv[]) {
 		godView.GetOptChannelUses();
 		godView.CalcTdmAccessPlan();
 		PlotResourceWaste(lb, subpath, godView.GetOptChannelUses());
+
+
 //
 		//
 		// plot sending statistics; for all given nodes on one plot
 		//
 //		ExOrSolver exOrSolver(net);
 		SrpSolver srpSolver(net);
-//		PlotSendingStatistics(without_dst, lb, subpath, godView.CalcTdmAccessPlan(), exOrSolver.CalcTdmAccessPlan());
+
+		PlotSendingStatistics(lb, subpath, godView.CalcTdmAccessPlan(), srpSolver.CalcTdmAccessPlan());
 
 		//
 		// plot the maximum achievable data rate, the achieved data rate and the maximum achievable data rate with RP-S
@@ -260,6 +282,8 @@ int main(int argc, char *argv[]) {
 		for (auto node : net->GetNodes())
 			d[node->GetId()] = node->GetDatarate();
 		PlotRates(lb, subpath, godView.GetOptDatarate(), godView.GetSinglePathDatarate(), d);
+
+		PlotRatesPerDst(lb, subpath, net->GetDstIds(), d);
 
 		//
 		// analyze stability of the source priority

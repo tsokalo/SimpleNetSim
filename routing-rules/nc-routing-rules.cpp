@@ -33,6 +33,7 @@ NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress 
 	m_logItem.p = m_p;
 	m_logItem.d = m_d;
 	m_logItem.cr = m_cr;
+	m_logItem.dst = m_dst;
 	m_congControl = congestion_control_ptr(new CongestionControl(m_nodeType));
 	m_fastFeedback = false;
 
@@ -857,6 +858,7 @@ void NcRoutingRules::DoFilter() {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
+	SIM_LOG_NP(BRR_LOG, m_id, m_p, "Node Type is " << m_nodeType);
 	if (m_nodeType == DESTINATION_NODE_TYPE) return;
 
 	m_filteredPlan.clear();

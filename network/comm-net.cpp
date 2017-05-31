@@ -23,8 +23,7 @@ CommNet::CommNet(uint16_t numNodes, SimParameters sp) :
 		i = std::shared_ptr<CommNode>(new CommNode(std::distance(m_nodes.begin(), it++), m_simulator, m_sp));
 	};;
 
-//	SetSource(SRC_UANADDRESS);
-//	SetDestination(m_nodes.size() - 1);
+	SetSource(SRC_UANADDRESS);
 }
 CommNet::~CommNet() {
 
@@ -58,17 +57,19 @@ void CommNet::PrintNet() {
 }
 
 void CommNet::Configure() {
-	if (std::function<bool()>([this] {for(auto node: m_nodes)if(node->GetNodeType() == SOURCE_NODE_TYPE)return false; return true;})())
-	{
-		std::cout << "Setting default SRC " << SRC_UANADDRESS << std::endl;
-		SetSource(SRC_UANADDRESS);
-	}
 
-	if (std::function<bool()>([this] {for(auto node: m_nodes)if(node->GetNodeType() == DESTINATION_NODE_TYPE)return false; return true;})())
-	{
+	if (m_dst.empty()) {
 		std::cout << "Setting default DST " << m_nodes.size() - 1 << std::endl;
 		SetDestination(m_nodes.size() - 1);
 	}
+
+	for (uint16_t j = 0; j < m_nodes.size(); j++) {
+		if (m_nodes.at(j)->GetId() == m_src)
+			m_nodes.at(j)->Configure(SOURCE_NODE_TYPE, m_dst);
+		else
+			m_nodes.at(j)->Configure(RELAY_NODE_TYPE, m_dst);
+	}
+
 }
 void CommNet::Run(int64_t cycles) {
 
@@ -112,20 +113,12 @@ void CommNet::SetDestination(UanAddress i) {
 	assert(m_nodes.size() > (uint16_t )i);
 	assert(m_src != i);
 	m_dst.push_back(i);
-
-	for (uint16_t j = 0; j < m_nodes.size(); j++) {
-		if (m_nodes.at(j)->GetId() == m_src)
-			m_nodes.at(j)->Configure(SOURCE_NODE_TYPE, m_dst);
-		else if (std::find(m_dst.begin(), m_dst.end(), m_nodes.at(j)->GetId()) != m_dst.end())
-			m_nodes.at(j)->Configure(DESTINATION_NODE_TYPE, m_dst);
-		else
-			m_nodes.at(j)->Configure(RELAY_NODE_TYPE, m_dst);
-	}
 }
 void CommNet::DoBroadcast(node_ptr sender) {
 
 	NcPacket symb = sender->DoBroadcast();
 }
+
 void CommNet::EnableLog(std::string path) {
 	m_logger = logger_ptr(new Logger(path));
 	m_simulator->SetIncTimeCallback(std::bind(&Logger::IncTime, m_logger, std::placeholders::_1));
