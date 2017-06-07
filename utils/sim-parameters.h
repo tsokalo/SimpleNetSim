@@ -17,19 +17,27 @@ namespace ncr {
 struct SimParameters {
 
 	SimParameters() {
-		numGen = 160;
-		genSize = 64;
+		numGen = 40;
+		genSize = 100;
 		symbolSize = 10;
-		apiRate = 10000;
-		sendRate = 10000;
+		apiRate = 1000000;
+		sendRate = 1000000;
 		numGenBuffering = 2;
 		numGenRetrans = numGenBuffering + 1;
-		numGenSingleTx = 40;
+		numGenSingleTx = 20;
 		fieldSize = 8;
 		ccackLevels = 2;
 		maxCoalitionSize = 4;
 		mutualPhyLlcCoding = false;
 		per = 0.2;
+		numRr = 3;
+		crCalcWay = MINUS_DELTA_REDUNDANCY;
+		crNumSigma = 3;
+		crReducFactor = 0.0;
+		rrCanSel = HIHGEST_PRIORITY_RR_CANDIDATE_SELECTION;
+		fbCont = SEEN_DEC_RANK_FEEDBACK_ART;
+		giveRrPriorToSrc = true;
+		rrCanSend = ONE_SELECTED_LEGAL;
 	}
 
 	SimParameters(std::string path) {
@@ -56,6 +64,14 @@ struct SimParameters {
 			this->maxCoalitionSize = other.maxCoalitionSize;
 			this->mutualPhyLlcCoding = other.mutualPhyLlcCoding;
 			this->per = other.per;
+			this->numRr = other.numRr;
+			this->crCalcWay = other.crCalcWay;
+			this->crNumSigma = other.crNumSigma;
+			this->crReducFactor = other.crReducFactor;
+			this->rrCanSel = other.rrCanSel;
+			this->fbCont = other.fbCont;
+			this->giveRrPriorToSrc = other.giveRrPriorToSrc;
+			this->rrCanSend = other.rrCanSend;
 		}
 		return *this;
 	}
@@ -75,6 +91,14 @@ struct SimParameters {
 		of << maxCoalitionSize << DELIMITER;
 		of << mutualPhyLlcCoding << DELIMITER;
 		of << per << DELIMITER;
+		of << numRr << DELIMITER;
+		of << (uint16_t)crCalcWay << DELIMITER;
+		of << crNumSigma << DELIMITER;
+		of << crReducFactor << DELIMITER;
+		of << (uint16_t)rrCanSel << DELIMITER;
+		of << (uint16_t)fbCont << DELIMITER;
+		of << (uint16_t)giveRrPriorToSrc << DELIMITER;
+		of << rrCanSend << DELIMITER;
 		of.close();
 	}
 
@@ -93,13 +117,27 @@ struct SimParameters {
 		in_f >> maxCoalitionSize;
 		in_f >> mutualPhyLlcCoding;
 		in_f >> per;
+		in_f >> numRr;
+		uint16_t v;
+		in_f >> v;
+		crCalcWay = CodeRedundancyCalcWay(v);
+		in_f >> crNumSigma;
+		in_f >> crReducFactor;
+		in_f >> v;
+		rrCanSel = RrCandidateSelection(v);
+		in_f >> v;
+		fbCont = TypeOfFeedback(v);
+		in_f >> v;
+		giveRrPriorToSrc = v;
+		in_f >> v;
+		rrCanSend = WhoCanSendRr(v);
 		in_f.close();
 	}
 
 	void Print() {
 		std::cout << "Simulation parameters: [" << std::endl;
 		std::cout << "Number of generations\t\t\t" << numGen << std::endl;
-		std::cout << "Generation size\t\t\t" << genSize << std::endl;
+		std::cout << "Generation size\t\t\t\t" << genSize << std::endl;
 		std::cout << "Symbol size / bytes\t\t\t" << symbolSize << std::endl;
 		std::cout << "Application data rate / bps\t\t" << apiRate << std::endl;
 		std::cout << "Sending data rate / bps\t\t\t" << sendRate << std::endl;
@@ -111,6 +149,15 @@ struct SimParameters {
 		std::cout << "Maximum coalition size\t\t\t" << maxCoalitionSize << std::endl;
 		std::cout << "Mutual PHY and LLC coding / flag\t" << mutualPhyLlcCoding << std::endl;
 		std::cout << "Target packet loss ratio\t\t" << per << std::endl;
+		std::cout << "Maximum number of RRs\t\t\t" << numRr << std::endl;
+		std::cout << "CR calculation way\t\t\t" << (uint16_t)crCalcWay << std::endl;
+		std::cout << "Number of sigmas\t\t\t" << crNumSigma << std::endl;
+		std::cout << "CR reduction factor\t\t\t" << crReducFactor << std::endl;
+		std::cout << "RR candidate selection way\t\t" << (uint16_t)rrCanSel << std::endl;
+		std::cout << "Type of the feedback contents\t\t" << (uint16_t)fbCont << std::endl;
+		std::cout << "Give RR priority to SRC\t\t\t" << (uint16_t)giveRrPriorToSrc << std::endl;
+		std::cout << "Who can forward RR\t\t\t" << rrCanSend << std::endl;
+
 		std::cout << "]" << std::endl;
 	}
 
@@ -166,6 +213,38 @@ struct SimParameters {
 	 * number of generations that should be buffered before the retransmissions can be requested
 	 */
 	uint16_t numGenRetrans;
+	/*
+	 * maximum number of retransmission requests
+	 */
+	uint16_t numRr;
+	/*
+	 * selecting the way of coding redundancy calculation
+	 */
+	CodeRedundancyCalcWay crCalcWay;
+	/*
+	 * number of sigma for the coding redundancy calculation (only if selecting crCalcWay = 1)
+	 */
+	uint16_t crNumSigma;
+	/*
+	 * reduction factor for the coding redundancy calculation (only if selecting crCalcWay = 2)
+	 */
+	double crReducFactor;
+	/*
+	 * selection type of the retransmission request forwarding candidate
+	 */
+	RrCandidateSelection rrCanSel;
+	/*
+	 * contents of the feedback
+	 */
+	TypeOfFeedback fbCont;
+	/*
+	 * selecting the source for answering the retransmission request
+	 */
+	bool giveRrPriorToSrc;
+	/*
+	 * legimitation of forwarding the retransmission request
+	 */
+	WhoCanSendRr rrCanSend;
 };
 }
 

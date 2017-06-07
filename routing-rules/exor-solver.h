@@ -28,7 +28,6 @@ public:
 	ExOrSolver(comm_net_ptr commNet) {
 		m_commNet = commNet;
 
-		DoJob();
 	}
 	virtual ~ExOrSolver() {
 
@@ -49,7 +48,13 @@ public:
 	 * The function below gives one of them
 	 */
 	TdmAccessPlan CalcTdmAccessPlan() {
-		return m_optSolution;
+
+		DoJob();
+
+		TdmAccessPlan plan;
+		for(uint16_t i = 0; i < m_commNet->GetNodes().size(); i++)
+			plan[i] = m_optSolution[i];
+		return plan;
 	}
 
 protected:

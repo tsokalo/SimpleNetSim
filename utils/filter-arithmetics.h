@@ -19,6 +19,7 @@ namespace ncr {
 
 typedef AveBinaryFilter<CODER_INFO_FILTER_DEPTH> RcvMap;
 typedef AveBinaryFilter<LIN_DEP_FILTER_DEPTH> LinDepMap;
+typedef AveBinaryFilter<50> TrafficLoadFilter;
 
 class FilterArithmetics {
 

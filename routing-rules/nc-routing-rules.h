@@ -32,6 +32,7 @@
 #include "utils/ack-backlog.h"
 #include "utils/retrans-gen-id.h"
 #include "utils/coding-vector.h"
+#include "utils/retrans-request-counter.h"
 #include "ccack/ccack.h"
 
 namespace ncr {
@@ -46,6 +47,7 @@ class NcRoutingRules {
 	typedef std::shared_ptr<CongestionControl> congestion_control_ptr;
 	typedef std::shared_ptr<Ccack> ccack_ptr;
 	typedef std::shared_ptr<HashMatrixSet> hash_matrix_set_ptr;
+	typedef std::shared_ptr<RetransRequestCounter> rr_counter_ptr;
 
 public:
 	NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress destAddress, SimParameters sp);
@@ -303,6 +305,10 @@ private:
 	 * the newest generation ID
 	 */
 	GenId m_newestRcvGenId;
+	/*
+	 * counter of retransmission requests per generation
+	 */
+	rr_counter_ptr m_numRr;
 
 	NodeType m_nodeType;
 

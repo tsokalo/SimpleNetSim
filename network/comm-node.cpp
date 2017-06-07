@@ -100,16 +100,14 @@ Edge_ptr CommNode::GetEdge(int16_t src_id, int16_t dst_id) {
 }
 
 void CommNode::PrintEdges() {
-	if (COMM_NODE_LOG) {
-		std::cout << "Ins: ";
-		for (auto i : m_ins)
-			std::cout << "(" << i->v_ << " -> " << m_id << " : " << i->GetLossProcess()->GetMean() << " , " << i->GetLossProcess()->IsLost() << ") ";
-		std::cout << std::endl;
-		std::cout << "Out: ";
-		for (auto i : m_outs)
-			std::cout << "(" << i->v_ << " <- " << m_id << " : " << i->GetLossProcess()->GetMean() << " , " << i->GetLossProcess()->IsLost() << ") ";
-		std::cout << std::endl;
-	}
+	std::cout << "Ins: ";
+	for (auto i : m_ins)
+		std::cout << "(" << i->v_ << " -> " << m_id << " : " << i->GetLossProcess()->GetMean() << ") ";
+	std::cout << std::endl;
+	std::cout << "Out: ";
+	for (auto i : m_outs)
+		std::cout << "(" << i->v_ << " <- " << m_id << " : " << i->GetLossProcess()->GetMean() << ") ";
+	std::cout << std::endl;
 }
 
 UanAddress CommNode::GetId() {

@@ -28,10 +28,20 @@ class SrpSolver: public ExOrSolver {
 public:
 	SrpSolver(comm_net_ptr commNet) :
 			ExOrSolver(commNet) {
-		DoJob();
+
 	}
 	virtual ~SrpSolver() {
 
+	}
+
+	TdmAccessPlan CalcTdmAccessPlan() {
+
+		SrpSolver::DoJob();
+
+		TdmAccessPlan plan;
+		for (uint16_t i = 0; i < m_commNet->GetNodes().size(); i++)
+			plan[i] = m_optSolution[i];
+		return plan;
 	}
 
 private:
@@ -54,10 +64,12 @@ private:
 		auto dsts = m_commNet->GetDstIds();
 		// constraints for time variables defined by cuts
 		for (auto node : m_commNet->GetNodes()) {
-			if (std::find(dsts.begin(), dsts.end(),node->GetId()) != dsts.end()) {
+			if (std::find(dsts.begin(), dsts.end(), node->GetId()) != dsts.end()) {
 				auto dst = node->GetId();
+				std::cout << "Constructing the graph using destination " << dst << std::endl;
 				graph_ptr graph = ConstructGraph(src, dst);
-				if(N < graph->GetNumNodes())N = graph->GetNumNodes();
+				if (N < graph->GetNumNodes())
+					N = graph->GetNumNodes();
 				graph->Evaluate();
 				auto cutsets = graph->GetAllCutSets();
 				auto c = graph->GetConstraints();

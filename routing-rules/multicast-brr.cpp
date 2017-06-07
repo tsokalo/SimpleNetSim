@@ -90,7 +90,7 @@ void MulticastBrr::RcvFeedbackInfo(FeedbackMInfo l) {
 		auto dst = p.first;
 		assert(m_brr.find(dst) != m_brr.end());
 		f.p = p.second;
-		SIM_LOG_N(BRR_LOG, m_id, "Feedback source " << f.addr << " with priority " << f.p << " for DST " << dst);
+		SIM_LOG_N(BRRM_LOG, m_id, "Feedback source " << f.addr << " with priority " << f.p << " for DST " << dst);
 		m_brr.at(dst)->RcvFeedbackInfo(f);
 	}
 
@@ -137,16 +137,23 @@ void MulticastBrr::SetSendingRate(Datarate d) {
  */
 TxPlan MulticastBrr::GetTxPlan() {
 
+	TxPlan txPlan;
+
+#ifdef MAX_DATA_TXPLAN
 	//
 	// 1. send the maximum number of symbols in each generation among all destinations
 	// 2. set all_prev_ack flag if it is set by at least one destination
 	//
-	TxPlan txPlan;
 	for (auto brr : m_brr) {
+		auto dst = brr.first;
 		auto t = brr.second->GetTxPlan();
+
 		for (auto item : t) {
 			auto gid = item.first;
 			auto new_item = item.second;
+
+			m_trafficLoad[dst].add(new_item.num_all);
+
 			auto old_item_it = txPlan.find(gid);
 			if (old_item_it != txPlan.end()) {
 				old_item_it->second.num_all = (new_item.num_all > old_item_it->second.num_all) ? new_item.num_all : old_item_it->second.num_all;
@@ -156,7 +163,62 @@ TxPlan MulticastBrr::GetTxPlan() {
 			}
 		}
 	}
-	SIM_LOG_N(BRR_LOG, m_id, "TX plan " << txPlan);
+#endif
+
+#ifdef MAX_TRAFFICLOAD_TXPLAN
+	//
+	// update traffic load filter
+	//
+	for (auto brr : m_brr) {
+		auto dst = brr.first;
+		auto t = brr.second->GetTxPlan();
+
+		for (auto item : t) {
+			auto gid = item.first;
+			auto new_item = item.second;
+
+			m_trafficLoad[dst].add(new_item.num_all);
+		}
+	}
+	//
+	// find the DST with the max traffic load
+	//
+	double tlmax = 0;
+	UanAddress dstmax = 0;
+	for (auto tl : m_trafficLoad) {
+		auto newdst = tl.first;
+		auto val = tl.second.val_unrel();
+		dstmax = (tlmax < val) ? newdst : dstmax;
+		tlmax = (tlmax < val) ? val : tlmax;
+	}
+	//
+	// save the corresponding TX plan
+	//
+	txPlan = m_brr.at(dstmax)->GetTxPlan();
+	//
+	// add other TX items if not already present in the plan
+	//
+	for (auto brr : m_brr) {
+		auto dst = brr.first;
+		if (dst == dstmax)
+			continue;
+
+		auto t = brr.second->GetTxPlan();
+
+		for (auto item : t) {
+			auto gid = item.first;
+			auto new_item = item.second;
+
+			auto old_item_it = txPlan.find(gid);
+			if (old_item_it == txPlan.end()) {
+				txPlan[gid] = new_item;
+			}
+		}
+	}
+
+#endif
+
+	SIM_LOG_N(BRRM_LOG, m_id, "TX plan " << txPlan);
 	return txPlan;
 }
 BrrMHeader MulticastBrr::GetHeader(TxPlan txPlan, FeedbackMInfo f) {
@@ -208,16 +270,26 @@ FeedbackMInfo MulticastBrr::GetRetransRequestInfo(ttl_t ttl) {
 HeaderMInfo MulticastBrr::GetHeaderInfo() {
 
 	HeaderMInfo header(m_brr.begin()->second->GetHeaderInfo());
-	//
-	// find the maximum coding rate (cr >= 1)
-	//
-	double cr = 1;
+
+#ifdef USE_MAX_FILTERING_COEFS
 	for (auto brr_it : m_brr) {
 		auto brr = brr_it.second;
 		auto dst = brr_it.first;
-		auto l_cr = brr->GetCodingRate();
-		cr = (cr > l_cr) ? cr : l_cr;
+		auto h = brr->GetHeaderInfo();
+		//
+		// save the priority for each destination in the header
+		//
+		header.p[dst] = h.p;
+		//
+		// adjust the filtering coefficients according to the actual amount of the sent information
+		//
+		for (auto pf_ : h.pf) {
+			header.pf[pf_.first] = (header.pf[pf_.first] < pf_.second) ? pf_.second : header.pf[pf_.first];
+		}
 	}
+#endif
+
+#ifdef USE_MIN_FILTERING_COEFS
 	for (auto brr_it : m_brr) {
 		auto brr = brr_it.second;
 		auto dst = brr_it.first;
@@ -230,8 +302,56 @@ HeaderMInfo MulticastBrr::GetHeaderInfo() {
 		// adjust the filtering coefficients according to the actual amount of the sent information
 		//
 		for (auto pf_ : h.pf)
-			header.pf[pf_.first] = pf_.second * brr->GetCodingRate() / cr;
+		{
+			header.pf[pf_.first] = (header.pf[pf_.first] > pf_.second) ? pf_.second : header.pf[pf_.first];
+		}
 	}
+#endif
+
+#ifdef NORM_REST_FILTERING_COEFS
+
+	//
+	// find the maximum traffic load
+	//
+	double tlmax = 0;
+	double cr = 1;
+
+	for (auto tl : m_trafficLoad) {
+		auto dst = tl.first;
+		auto val = tl.second.val_unrel();
+		auto newcr = m_brr.at(dst)->GetCodingRate();
+		cr = (tlmax < val) ? newcr : cr;
+		tlmax = (tlmax < val) ? val : tlmax;
+	}
+
+	for (auto brr_it : m_brr) {
+		auto brr = brr_it.second;
+		auto dst = brr_it.first;
+		auto h = brr->GetHeaderInfo();
+		//
+		// save the priority for each destination in the header
+		//
+		header.p[dst] = h.p;
+		//
+		// adjust the filtering coefficients according to the actual amount of the sent information
+		//
+		for (auto pf_ : h.pf)
+		{
+			auto v = pf_.second * brr->GetCodingRate() / cr;
+			header.pf[pf_.first] = (header.pf[pf_.first] < v) ? v : header.pf[pf_.first];
+		}
+	}
+//
+//	for (auto brr_it : m_brr) {
+//		auto brr = brr_it.second;
+//		auto dst = brr_it.first;
+//		auto h = brr->GetHeaderInfo();
+//
+//		for (auto pf_ : h.pf)
+//		header.pf[pf_.first] = pf_.second * brr->GetCodingRate() / cr;
+//	}
+
+#endif
 
 	return header;
 }
@@ -240,17 +360,24 @@ HeaderMInfo MulticastBrr::GetHeaderInfo(TxPlan txPlan) {
 	header.txPlan = txPlan;
 	return header;
 }
-NetDiscoveryInfo MulticastBrr::GetNetDiscoveryInfo(ttl_t ttl) {
+NetDiscoveryMInfo MulticastBrr::GetNetDiscoveryInfo(ttl_t ttl) {
 
-	NetDiscoveryInfo ndi;
-	priority_t p(0);
+	NetDiscoveryMInfo ndi(m_brr.begin()->second->GetNetDiscoveryInfo(ttl));
+
 	for (auto brr_it : m_brr) {
-		auto p_l = brr_it.second->GetPriority();
-		if (p_l > p) {
-			p = p_l;
-			ndi = brr_it.second->GetNetDiscoveryInfo(ttl);
-		}
+		auto brr = brr_it.second;
+		auto dst = brr_it.first;
+		ndi.p[dst] = brr->GetNetDiscoveryInfo(ttl).p;
 	}
+
+	auto f = m_brr.begin()->second->GetNetDiscoveryInfo(ttl);
+	ndi.rcvMap = f.rcvMap;
+	ndi.rrInfo = f.rrInfo;
+	ndi.netDiscovery = f.netDiscovery;
+	ndi.ttl = f.ttl;
+	ndi.ackInfo = f.ackInfo;
+	ndi.updated = true;
+
 	return ndi;
 }
 bool MulticastBrr::NeedGen() {
@@ -405,7 +532,7 @@ uint32_t MulticastBrr::GetAmountTxData() {
 
 	uint32_t act_tx = sum_tx;
 
-	SIM_LOG_N(BRR_LOG, m_id,
+	SIM_LOG_N(BRRM_LOG, m_id,
 			"[sum_tx " << sum_tx << "],[max_el_brr " << max_el_brr << "],[act_tx " << act_tx << "],[res " << ((act_tx > max_el_brr) ? max_el_brr : act_tx) << "]");
 
 	return (act_tx > max_el_brr) ? max_el_brr : act_tx;

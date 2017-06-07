@@ -17,7 +17,7 @@
 #define NC_SYMBOL_LOG           0
 #define NC_POLICY_LOG           0
 #define GOD_VIEW                0
-#define EXOR_SOLVER_LOG         1
+#define EXOR_SOLVER_LOG         0
 #define BRR_LOG                 0
 #define ARQ_LOG                 0
 #define FILTER_LOG              0
@@ -26,9 +26,10 @@
 #define CODER_LOG				0
 #define SIMULATOR_LOG			0
 #define GRAPH_LOG     			1
-#define LPSOLVER_LOG    		1
+#define LPSOLVER_LOG    		0
 #define CCACK_LOG	    		0
 #define TEMP_LOG				0
+#define BRRM_LOG				0
 
 //#define COMM_NET_LOG            1
 //#define COMM_NODE_LOG           1
@@ -49,6 +50,7 @@
 //#define LPSOLVER_LOG    		0
 //#define CCACK_LOG	    		1
 //#define TEMP_LOG				0
+//#define BRRM_LOG				1
 
 #define SIM_LOG(condition, message) \
     do { \
@@ -68,11 +70,29 @@
     } \
     } while (false)
 
+#define SIM_LOG_ND(condition, node, destination, message) \
+    do { \
+    if (condition) { \
+    std::cout << "`" #condition "`:\t" << \
+    "FUNC<" << __func__ << ">:\tNode " << node << " -> DST " << destination << " -> "  << \
+    "`" << message << "`" << std::endl; \
+    } \
+    } while (false)
+
 #define SIM_LOG_NP(condition, node, priority, message) \
     do { \
     if (condition) { \
     std::cout << "`" #condition "`:\t" << \
     "FUNC<" << __func__ << ">:\tNode " << node << " -> p " << priority << " -> "  << \
+    "`" << message << "`" << std::endl; \
+    } \
+    } while (false)
+
+#define SIM_LOG_NPD(condition, node, priority, destination, message) \
+    do { \
+    if (condition) { \
+    std::cout << "`" #condition "`:\t" << \
+    "FUNC<" << __func__ << ">:\tNode " << node << " -> p " << priority << " -> DST " << destination << " -> "  << \
     "`" << message << "`" << std::endl; \
     } \
     } while (false)

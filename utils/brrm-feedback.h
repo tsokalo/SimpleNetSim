@@ -44,11 +44,6 @@ struct FeedbackMInfo {
 		}
 		return *this;
 	}
-	FeedbackMInfo& operator=(const FeedbackInfo& other) // copy assignment
-			{
-		this->addr = other.addr;
-		return *this;
-	}
 
 	void Reset() {
 		this->rcvMap.clear();

@@ -29,22 +29,58 @@ void CreateTriangleScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net->ConnectNodes(0, 1, 0.5);
 	net->ConnectNodes(0, 2, 0.4);
 	net->ConnectNodes(1, 2, 0.3);
-	net->SetDestination(1);
+//	net->SetDestination(1);
 	net->SetDestination(2);
 	net->Configure();
 	net->PrintNet();
 }
 
-void CreateKrishnaScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
+void CreateSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net = std::shared_ptr<CommNet>(new CommNet(4, sp));
 	net->ConnectNodes(0, 1, 0.1);
-	net->ConnectNodes(0, 2, 0.5);
-//    	net->ConnectNodes(1, 2, 0.2, 0.3);
-	net->ConnectNodes(1, 3, 0.5);
+	net->ConnectNodes(0, 2, 0.2);
+	net->ConnectNodes(1, 3, 0.2);
 	net->ConnectNodes(2, 3, 0.1);
-//    	net->SetDestination(1);
-	net->SetDestination(2);
 	net->SetDestination(3);
+	net->Configure();
+	net->PrintNet();
+}
+
+void CreateBigSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
+	net = std::shared_ptr<CommNet>(new CommNet(9, sp));
+	net->ConnectNodes(0, 1, 0.2);
+	net->ConnectNodes(0, 3, 0.1);
+	net->ConnectNodes(1, 2, 0.1);
+	net->ConnectNodes(1, 4, 0.1);
+	net->ConnectNodes(2, 5, 0.2);
+	net->ConnectNodes(3, 4, 0.2);
+	net->ConnectNodes(3, 6, 0.2);
+	net->ConnectNodes(4, 5, 0.1);
+	net->ConnectNodes(4, 7, 0.2);
+	net->ConnectNodes(5, 8, 0.1);
+	net->ConnectNodes(6, 7, 0.2);
+	net->ConnectNodes(7, 8, 0.1);
+	net->SetDestination(8);
+	net->Configure();
+	net->PrintNet();
+}
+
+void CreateAutoSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp, uint16_t dim) {
+	net = std::shared_ptr<CommNet>(new CommNet(dim * dim, sp));
+
+	for (uint16_t i = 0; i < dim; i++) {
+		for (uint16_t j = 0; j < dim - 1; j++) {
+			net->ConnectNodes(i * dim + j, i * dim + j + 1, ((i+j)%2 == 0) ? 0.2 : 0.1);
+
+		}
+	}
+	for (uint16_t i = 0; i < dim - 1; i++) {
+		for (uint16_t j = 0; j < dim; j++) {
+			net->ConnectNodes(i * dim + j, i * dim + j + dim, ((i+j)%2 == 0) ? 0.1 : 0.2);
+		}
+	}
+	net->SetSource(0);
+	net->SetDestination(dim * dim - 1);
 	net->Configure();
 	net->PrintNet();
 }
@@ -54,17 +90,17 @@ void CreateNoCScenario(std::shared_ptr<CommNet> &net, uint16_t NbrHops, SimParam
 	net = std::shared_ptr<CommNet>(new CommNet(num_nodes, sp));
 	double e1 = 0.1;
 	double e2 = 0.2;
-/*	uint16_t ProhSet[]={NbrHops,2*NbrHops+1,3*NbrHops+2};*/
-	uint16_t m2 = 2*NbrHops+1;
-	uint16_t m3 = 3*NbrHops+2;
-		uint16_t p = num_nodes - NbrHops - 1;
-	for (uint16_t i = 0; i < num_nodes-1; i++) {
-		if (i != NbrHops && i != m2 && i != m3 )
-		net->ConnectNodes(i, i + 1, e1);
-				if (i < p)
+	/*	uint16_t ProhSet[]={NbrHops,2*NbrHops+1,3*NbrHops+2};*/
+	uint16_t m2 = 2 * NbrHops + 1;
+	uint16_t m3 = 3 * NbrHops + 2;
+	uint16_t p = num_nodes - NbrHops - 1;
+	for (uint16_t i = 0; i < num_nodes - 1; i++) {
+		if (i != NbrHops && i != m2 && i != m3)
+			net->ConnectNodes(i, i + 1, e1);
+		if (i < p)
 			net->ConnectNodes(i, i + NbrHops + 1, e2);
 	}
-    net->Configure();
+	net->Configure();
 	net->PrintNet();
 }
 
@@ -192,9 +228,11 @@ int main(int argc, char *argv[]) {
 	//
 	// using default parameters
 	//
-//	CreateKrishnaScenario(net, sim_par);
+	CreateAutoSquareScenario(net, sim_par, 3);
+//	CreateBigSquareScenario(net, sim_par);
+//	CreateSquareScenario(net, sim_par);
 //	CreateStackScenario(net, 4, sim_par);
-	CreateTriangleScenario(net, sim_par);
+//	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
@@ -205,7 +243,7 @@ int main(int argc, char *argv[]) {
 		CreateDirectory(folder);
 		std::cout << folder << std::endl;
 		net->EnableLog(folder);
-		net->Run(4000);
+		net->Run(40000);
 	} else if (m == EVAL_MODE) {
 		std::string f = folder + GetLogFileName();
 		std::cout << "Using file " << f << std::endl;
@@ -227,15 +265,15 @@ int main(int argc, char *argv[]) {
 		auto without_dst = get_node_ids(net->GetDst());
 		auto without_src = get_node_ids(net->GetSrc());
 
-		//
-		// plot priorities; for all given nodes on one plot
-		//
-		PlotPriorities(net->GetNodes().size(), net->GetDstIds(), lb, subpath, useSns);
-
-		//
-		// plot input filters; for each given node a plot with filters for each input edge
-		//
-		PlotInputFilters(net->GetNodes().size(), net->GetDstIds(), lb, subpath);
+//		//
+//		// plot priorities; for all given nodes on one plot
+//		//
+//		PlotPriorities(net->GetNodes().size(), net->GetDstIds(), lb, subpath, useSns);
+//
+//		//
+//		// plot input filters; for each given node a plot with filters for each input edge
+//		//
+//		PlotInputFilters(net->GetNodes().size(), net->GetDstIds(), lb, subpath);
 //
 //		//
 //		// plot loss ratios of output edges; for each given node a plot with ratios for each output edge
@@ -258,22 +296,23 @@ int main(int argc, char *argv[]) {
 		PlotRetransmissionRequests(lb, subpath);
 
 		//
+		// plot sending statistics; for all given nodes on one plot
+		//
+		ExOrSolver exOrSolver(net);
+//		SrpSolver srpSolver(net);
+
+		auto plan = exOrSolver.CalcTdmAccessPlan();
+
+		//
 		// plot proportion of feedback/network discovery/excessive redundant packets to all sent packets
 		//
 		GodViewRoutingRules godView(net);
 		godView.GetOptChannelUses();
 		godView.CalcTdmAccessPlan();
-		PlotResourceWaste(lb, subpath, godView.GetOptChannelUses());
+		PlotResourceWaste(lb, subpath, exOrSolver.GetOptChannelUses());
 
-
-//
-		//
-		// plot sending statistics; for all given nodes on one plot
-		//
-//		ExOrSolver exOrSolver(net);
-		SrpSolver srpSolver(net);
-
-		PlotSendingStatistics(lb, subpath, godView.CalcTdmAccessPlan(), srpSolver.CalcTdmAccessPlan());
+		std::cout << "Godview plan: " << godView.CalcTdmAccessPlan() << ", optimal plan: " << plan << std::endl;
+		PlotSendingStatistics(lb, subpath, godView.CalcTdmAccessPlan(), plan);
 
 		//
 		// plot the maximum achievable data rate, the achieved data rate and the maximum achievable data rate with RP-S
@@ -281,25 +320,25 @@ int main(int argc, char *argv[]) {
 		std::map<UanAddress, Datarate> d;
 		for (auto node : net->GetNodes())
 			d[node->GetId()] = node->GetDatarate();
-		PlotRates(lb, subpath, godView.GetOptDatarate(), godView.GetSinglePathDatarate(), d);
+		PlotRates(lb, subpath, exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), godView.GetSinglePathDatarate(), d);
 
 		PlotRatesPerDst(lb, subpath, net->GetDstIds(), d);
 
-		//
-		// analyze stability of the source priority
-		//
-		PlotSrcPriorStability(lb, subpath, godView.GetOptDatarate(), net->GetSrc());
-		//
-		// analyze stability of the reception data rate at the destination
-		//
-		PlotOutputStability(lb, subpath, godView.GetOptChannelUses(), net->GetDst());
+//		//
+//		// analyze stability of the source priority
+//		//
+//		PlotSrcPriorStability(lb, subpath, exOrSolver.GetOptChannelUses(), net->GetSrc());
+//		//
+//		// analyze stability of the reception data rate at the destination
+//		//
+//		PlotOutputStability(lb, subpath, godView.GetOptChannelUses(), net->GetDst());
 
 	} else if (m == TEST_MODE) {
 //		TestChannelCapacityStack(folder);
 		TestBitSet();
 	}
 
-	std::cout << "Finished successfully" << std::endl;
+	std::cout << std::endl << "Finished successfully" << std::endl;
 	return 0;
 }
 

@@ -34,38 +34,43 @@ namespace ncr {
 /*
  * Redundancy amount
  */
-//#define EXACT_EXPECTATION_REDANDANCY
-#define PLUS_SIGMA_REDUNDANCY
-#ifdef PLUS_SIGMA_REDUNDANCY
-#define NUM_SIGMA	3
-#endif
-//#define MINUS_DELTA_REDUNDANCY
-#ifdef MINUS_DELTA_REDUNDANCY
-#define RED_DELTA	0.0
-#endif
+enum CodeRedundancyCalcWay
+{
+	EXACT_EXPECTATION_REDANDANCY = 0,
+	PLUS_SIGMA_REDUNDANCY = 1,
+	MINUS_DELTA_REDUNDANCY = 2
+};
 
 /*
  * Selection of RR forwarders
  */
-//#define RANDOM_RETRANSMITTER_RR_CANDIDATE_SELECTION
-//#define CONNECTION_QUALITY_RR_CANDIDATE_SELECTION
-//#define LIN_DEP_FREQ_RR_CANDIDATE_SELECTION
-//#define LIN_DEP_FREQ_RAND_RR_CANDIDATE_SELECTION
-#define HIHGEST_PRIORITY_RR_CANDIDATE_SELECTION
+enum RrCandidateSelection
+{
+	RANDOM_RETRANSMITTER_RR_CANDIDATE_SELECTION,
+	CONNECTION_QUALITY_RR_CANDIDATE_SELECTION,
+	LIN_DEP_FREQ_RR_CANDIDATE_SELECTION,
+	LIN_DEP_FREQ_RAND_RR_CANDIDATE_SELECTION,
+	HIHGEST_PRIORITY_RR_CANDIDATE_SELECTION
+};
+
 /*
  * Art of feedback
  */
-//#define ALL_VECTORS_FEEDBACK_ART
-//#define HASH_VECTOR_FEEDBACK_ART
-#define SEEN_DEC_RANK_FEEDBACK_ART
-
-#define GIVE_RR_PRIORITY_TO_SOURCE
+enum TypeOfFeedback
+{
+	ALL_VECTORS_FEEDBACK_ART,
+	HASH_VECTOR_FEEDBACK_ART,
+	SEEN_DEC_RANK_FEEDBACK_ART
+};
 
 /*
  * RR legimitation
  */
-//#define ALL_WHO_HEAR_LEGAL
-#define ONE_SELECTED_LEGAL
+enum WhoCanSendRr
+{
+	ALL_WHO_HEAR_LEGAL,
+	ONE_SELECTED_LEGAL
+};
 
 //#define FULL_VECTOR
 
@@ -377,7 +382,19 @@ typedef std::function<uint32_t(GenId)> get_rank_func;
 typedef std::function<uint32_t(GenId)> get_rank_high_func;
 typedef std::function<void(LogItem item, UanAddress node_id)> add_log_func;
 
-typedef std::map<uint16_t, double> TdmAccessPlan;
+struct TdmAccessPlan : std::map<uint16_t, double>
+{
+	friend std::ostream&
+		operator<<(std::ostream& os, const TdmAccessPlan& l) {
+			os << "[";
+			for(auto i : l)
+			{
+				os << i.first << ":" << i.second << "; ";
+			}
+			os << "]";
+			return os;
+		}
+};
 
 typedef std::vector<bool> BooleanVector;
 typedef BooleanVector SeenMap;

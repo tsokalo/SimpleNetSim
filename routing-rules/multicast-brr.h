@@ -12,6 +12,15 @@
 #include "utils/brrm-header.h"
 #include "utils/brrm-pkt-header.h"
 #include "utils/brrm-feedback.h"
+#include "utils/brrm-netdiscovery.h"
+#include "utils/filter-arithmetics.h"
+
+#define USE_MAX_FILTERING_COEFS
+//#define USE_MIN_FILTERING_COEFS
+//#define NORM_REST_FILTERING_COEFS
+
+//#define MAX_DATA_TXPLAN
+#define MAX_TRAFFICLOAD_TXPLAN
 
 namespace ncr {
 
@@ -65,7 +74,7 @@ public:
 	FeedbackMInfo GetRetransRequestInfo(ttl_t ttl = -2);
 	HeaderMInfo GetHeaderInfo();
 	HeaderMInfo GetHeaderInfo(TxPlan txPlan);
-	NetDiscoveryInfo GetNetDiscoveryInfo(ttl_t ttl = -2);
+	NetDiscoveryMInfo GetNetDiscoveryInfo(ttl_t ttl = -2);
 	//
 	bool NeedGen();
 	uint32_t GetNumGreedyGen();
@@ -93,6 +102,10 @@ private:
 	 * own address
 	 */
 	UanAddress m_id;
+	/*
+	 * amount of data in TX plan per generation per destination
+	 */
+	std::map<UanAddress, TrafficLoadFilter> m_trafficLoad;
 };
 }
 

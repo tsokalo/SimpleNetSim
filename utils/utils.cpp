@@ -10,7 +10,7 @@
 
 #include "utils.h"
 
-#define WARMUP_PERIOD	3000
+#define WARMUP_PERIOD	12000
 
 namespace ncr {
 
@@ -704,7 +704,7 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 	// make data file
 	//
 	std::ofstream fd(data_file, std::ios_base::out);
-	fd << "\"Simulation (uncoded)\"\t" << (double) nru / dur / 1000000 << std::endl;
+	fd << "\"Simulation (decoded)\"\t" << (double) nru / dur / 1000000 << std::endl;
 	fd << "\"\\nSimulation (coded)\"\t" << (double) nr / dur / 1000000 << std::endl;
 	fd << "\"Maximum with ORP\"\t" << opt / 1000000 << std::endl;
 	fd << "\"\\nMaximum with CSRP\"\t" << single_opt / 1000000 << std::endl;

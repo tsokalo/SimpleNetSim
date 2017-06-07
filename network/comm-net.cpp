@@ -51,7 +51,7 @@ void CommNet::ConnectNodesDirected(UanAddress src, UanAddress dst, double e) {
 }
 void CommNet::PrintNet() {
 	for (auto i : m_nodes) {
-		SIM_LOG(COMM_NET_LOG, ">> Node " << i->GetId ());
+		std::cout << ">> Node " << i->GetId () << std::endl;
 		i->PrintEdges();
 	};;
 }
@@ -91,8 +91,8 @@ void CommNet::Run(int64_t cycles) {
 
 	int64_t i = 0;
 	while (i++ != cycles) {
-		SIM_LOG_FUNC(COMM_NET_LOG);
-//		PrintProgress(cycles, i);
+//		std::cout << "Cycle " << i << std::endl;
+		PrintProgress(cycles, i);
 		DoBroadcast(SelectSender());
 		m_simulator->Execute();
 		if (m_logger)
@@ -133,6 +133,7 @@ CommNet::node_ptr CommNet::SelectSender() {
 	std::vector<uint16_t> v;
 	uint16_t i = 0;
 	do {
+//		std::cout << "Selecting sender.." << std::endl;
 		v.clear();
 		for (std::vector<node_ptr>::iterator it = m_nodes.begin(); it != m_nodes.end(); it++) {
 //			if ((*it)->GetId() == m_dst) continue;

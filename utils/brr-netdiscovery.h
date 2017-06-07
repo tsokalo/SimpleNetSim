@@ -13,7 +13,7 @@
 namespace ncr{
 
 struct NetDiscoveryInfo: public FeedbackInfo {
-	NetDiscoveryInfo() {
+	NetDiscoveryInfo() : FeedbackInfo() {
 		netDiscovery = true;
 	}
 
