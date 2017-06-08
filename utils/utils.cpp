@@ -10,8 +10,6 @@
 
 #include "utils.h"
 
-#define WARMUP_PERIOD	12000
-
 namespace ncr {
 
 void PrintSymbol(NcSymbol sym) {
@@ -198,9 +196,9 @@ void PlotPriorities(uint32_t numNodes, std::vector<UanAddress> dstIds, LogBank l
 			if (i == dst)
 				continue;
 			if (useSns) {
-				plot_command << "\"" << data_file << "\"" << " using ($1):(($2==" << i << ") ? $3/1000000 : 1/0)";
+				plot_command << "\"" << data_file << "\" every 10" << " using ($1):(($2==" << i << ") ? $3/1000000 : 1/0)";
 			} else {
-				plot_command << "\"" << data_file << "\"" << " using ($1/1000):(($2==" << i << ") ? $3 / 1024 : 1/0)";
+				plot_command << "\"" << data_file << "\" every 10" << " using ($1/1000):(($2==" << i << ") ? $3 / 1024 : 1/0)";
 			}
 			plot_command << " with linespoints ls 1 lw 1 linecolor " << i + 1 << " pt 7 ps 0.3 title \"vertex=" << i << "\"";
 			if (i != numNodes - 1)
@@ -372,9 +370,9 @@ void PlotCoalitions(std::vector<UanAddress> nids, LogBank lb, std::string path, 
 	plot_command << "plot ";
 	for (uint16_t i = 0; i < nids.size(); i++) {
 		if (useSns) {
-			plot_command << "\"" << data_file << "\" every 2" << " using ($1):(($3==" << nids.at(i) << ") ? $7 : 1/0)";
+			plot_command << "\"" << data_file << "\" every 2" << " using ($1):(($3==" << nids.at(i) << ") ? $8 : 1/0)";
 		} else {
-			plot_command << "\"" << data_file << "\" every 2" << " using ($1/1000):(($3==" << nids.at(i) << ") ? $7 : 1/0)";
+			plot_command << "\"" << data_file << "\" every 2" << " using ($1/1000):(($3==" << nids.at(i) << ") ? $8 : 1/0)";
 		}
 		plot_command << " with linespoints ls 1 lw 1 linecolor " << nids.at(i) + 1 << " pt 7 ps 0.3 title \"vertex=" << nids.at(i) << "\"";
 		if (i != nids.size() - 1)
@@ -411,7 +409,7 @@ void PlotCodingRates(std::vector<UanAddress> nids, LogBank lb, std::string path,
 	plot_command << "set output '" << figure_file << "'" << std::endl;
 	plot_command << "plot ";
 	for (uint16_t i = 0; i < nids.size(); i++) {
-		plot_command << "\"" << data_file << "\"" << " using 1:(($3==" << nids.at(i) << ") ? $6 : 1/0)";
+		plot_command << "\"" << data_file << "\"" << " using 1:(($3==" << nids.at(i) << ") ? $7 : 1/0)";
 		plot_command << " with linespoints ls 1 lw 1 linecolor " << nids.at(i) + 1 << " pt 7 ps 0.3 title \"vertex=" << nids.at(i) << "\"";
 		if (i != nids.size() - 1)
 			plot_command << ",\\" << std::endl;
@@ -434,7 +432,7 @@ void PlotCodingRates(std::vector<UanAddress> nids, LogBank lb, std::string path,
 	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 }
 
-void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan godPlan, TdmAccessPlan optPlan) {
+void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan optPlan, uint32_t warmup_period) {
 
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
@@ -448,6 +446,8 @@ void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan godPlan, 
 	uint64_t totalSum = 0;
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
+			if (tt->t < warmup_period)
+				continue;
 			if (tt->m == DATA_MSG_TYPE)
 				sum_send[t->first] += tt->log.ns;
 			if (tt->m == DATA_MSG_TYPE)
@@ -471,20 +471,16 @@ void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan godPlan, 
 	};
 	;
 
-	add_zeros(actualPlan, godPlan);
 	add_zeros(actualPlan, optPlan);
-	add_zeros(godPlan, optPlan);
 
-	assert(actualPlan.size() == godPlan.size() && actualPlan.size() == optPlan.size());
+	assert(actualPlan.size() == optPlan.size());
 	std::ofstream fd(data_file, std::ios_base::out);
-	auto god_it = godPlan.begin();
 	auto opt_it = optPlan.begin();
 
 	fd << "Node" << "\t" << "Simulation" << "\t" << "Optimal" << std::endl;
 	for (TdmAccessPlan::iterator t = actualPlan.begin(); t != actualPlan.end(); t++) {
-		assert(god_it->first == t->first && opt_it->first == t->first);
+		assert(opt_it->first == t->first);
 		fd << t->first << "\t" << t->second << "\t" << opt_it->second << std::endl;
-		god_it++;
 		opt_it++;
 	}
 	//	fd << "Node" << "\t" << "Simulation" << "\t" << "Calculation" << "\t" << "Optimal" << std::endl;
@@ -524,7 +520,7 @@ void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan godPlan, 
 	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 }
 
-void PlotResourceWaste(LogBank lb, std::string path, double sigma) {
+void PlotResourceWaste(LogBank lb, std::string path, double sigma, uint32_t warmup_period) {
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
 	std::string data_file = gnuplot_dir + "data.txt";
@@ -537,8 +533,6 @@ void PlotResourceWaste(LogBank lb, std::string path, double sigma) {
 	// calculate total amount of sent messages by all nodes
 	//
 	uint32_t nr = 0, fb = 0, nd = 0, ns = 0, nrr = 0;
-
-	uint32_t warmup_period = WARMUP_PERIOD;
 
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
@@ -594,7 +588,7 @@ void PlotResourceWaste(LogBank lb, std::string path, double sigma) {
 	f.close();
 	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 }
-void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstIds, std::map<UanAddress, Datarate> d) {
+void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstIds, std::map<UanAddress, Datarate> d, uint32_t warmup_period) {
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
 	std::string data_file = gnuplot_dir + "data.txt";
@@ -602,8 +596,6 @@ void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstId
 
 	std::map<UanAddress, uint32_t> nr;
 	std::map<UanAddress, uint32_t> ns;
-
-	uint32_t warmup_period = WARMUP_PERIOD;
 
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
@@ -662,7 +654,7 @@ void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstId
 
 }
 
-void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d) {
+void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d, uint32_t warmup_period) {
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
 	std::string data_file = gnuplot_dir + "data.txt";
@@ -676,8 +668,6 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 	//
 	uint32_t nr = 0, nru = 0;
 	std::map<UanAddress, uint32_t> ns;
-
-	uint32_t warmup_period = WARMUP_PERIOD;
 
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
@@ -700,6 +690,8 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 		dur += n.second / d.at(n.first);
 	}
 
+	assert(!eq(dur, 0));
+
 	//
 	// make data file
 	//
@@ -707,7 +699,7 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 	fd << "\"Simulation (decoded)\"\t" << (double) nru / dur / 1000000 << std::endl;
 	fd << "\"\\nSimulation (coded)\"\t" << (double) nr / dur / 1000000 << std::endl;
 	fd << "\"Maximum with ORP\"\t" << opt / 1000000 << std::endl;
-	fd << "\"\\nMaximum with CSRP\"\t" << single_opt / 1000000 << std::endl;
+	fd << "\"\\nMaximum with SRP\"\t" << single_opt / 1000000 << std::endl;
 	fd.close();
 
 	//
@@ -737,7 +729,7 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 }
 
-void PlotRetransmissionRequests(LogBank lb, std::string path) {
+void PlotRetransmissionRequests(LogBank lb, std::string path, uint32_t warmup_period) {
 
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
@@ -749,8 +741,6 @@ void PlotRetransmissionRequests(LogBank lb, std::string path) {
 	//
 	uint32_t nrr_total = 0;
 	std::map<UanAddress, uint32_t> nrr;
-
-	uint32_t warmup_period = WARMUP_PERIOD;
 
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {

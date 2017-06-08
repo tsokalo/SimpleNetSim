@@ -30,7 +30,9 @@ class CommNet {
 	typedef std::shared_ptr<Simulator> simulator_ptr;
 	typedef std::shared_ptr<Logger> logger_ptr;
 public:
+
 	CommNet(uint16_t numNodes, SimParameters sp);
+//	CommNet(CommNet *net);
 	virtual
 	~CommNet();
 	/*
@@ -97,6 +99,12 @@ public:
 
 	void
 	EnableLog(std::string path);
+
+	SimParameters
+	GetSimParameters()
+	{
+		return m_sp;
+	}
 
 private:
 	node_ptr

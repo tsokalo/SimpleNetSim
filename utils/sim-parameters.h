@@ -38,6 +38,7 @@ struct SimParameters {
 		fbCont = SEEN_DEC_RANK_FEEDBACK_ART;
 		giveRrPriorToSrc = true;
 		rrCanSend = ONE_SELECTED_LEGAL;
+		warmup = 1000;
 	}
 
 	SimParameters(std::string path) {
@@ -72,6 +73,7 @@ struct SimParameters {
 			this->fbCont = other.fbCont;
 			this->giveRrPriorToSrc = other.giveRrPriorToSrc;
 			this->rrCanSend = other.rrCanSend;
+			this->warmup = other.warmup;
 		}
 		return *this;
 	}
@@ -99,6 +101,7 @@ struct SimParameters {
 		of << (uint16_t)fbCont << DELIMITER;
 		of << (uint16_t)giveRrPriorToSrc << DELIMITER;
 		of << rrCanSend << DELIMITER;
+		of << warmup << DELIMITER;
 		of.close();
 	}
 
@@ -131,6 +134,7 @@ struct SimParameters {
 		giveRrPriorToSrc = v;
 		in_f >> v;
 		rrCanSend = WhoCanSendRr(v);
+		in_f >> warmup;
 		in_f.close();
 	}
 
@@ -157,6 +161,7 @@ struct SimParameters {
 		std::cout << "Type of the feedback contents\t\t" << (uint16_t)fbCont << std::endl;
 		std::cout << "Give RR priority to SRC\t\t\t" << (uint16_t)giveRrPriorToSrc << std::endl;
 		std::cout << "Who can forward RR\t\t\t" << rrCanSend << std::endl;
+		std::cout << "Warm-up period\t\t\t\t" << warmup << std::endl;
 
 		std::cout << "]" << std::endl;
 	}
@@ -245,6 +250,10 @@ struct SimParameters {
 	 * legimitation of forwarding the retransmission request
 	 */
 	WhoCanSendRr rrCanSend;
+	/*
+	 * warm-up period; considered in the evaluation mode
+	 */
+	uint32_t warmup;
 };
 }
 

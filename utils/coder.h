@@ -45,7 +45,7 @@
 
 namespace ncr {
 
-typedef fifi::binary4 fifi_field;
+typedef fifi::binary8 fifi_field;
 
 #ifdef FULL_VECTOR
 typedef kodo_rlnc::full_vector_encoder<fifi_field> encoder;

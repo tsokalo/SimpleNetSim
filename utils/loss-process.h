@@ -43,6 +43,9 @@ public:
   virtual double
   GetMean () = 0;
 
+  virtual void
+  SetMean (double e) = 0;
+
 protected:
 
   bool m_lost;
@@ -80,6 +83,12 @@ public:
   GetMean ()
   {
     return m_e;
+  }
+
+  void
+  SetMean(double e)
+  {
+	  m_e = e;
   }
 
 private:

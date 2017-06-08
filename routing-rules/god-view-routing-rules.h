@@ -11,6 +11,7 @@
 #include "network/comm-net.h"
 #include "network/edge.h"
 #include "lp-solver/graph.h"
+#include "utils/comparison.h"
 #include "header.h"
 
 #include <stdint.h>
@@ -24,29 +25,43 @@ namespace ncr {
 
 class CommNet;
 
+struct TreeDesc {
+	TreeDesc() {
+		maxRate = -1 * (PRECISION_) * 10;
+	}
+	TreeDesc operator=(const TreeDesc & rhs) {
+		if (this == &rhs) return *this; // calls copy constructor SimpleCircle(*this)
+		bestPath.clear();
+		bestPath.insert(bestPath.begin(), rhs.bestPath.begin(), rhs.bestPath.end());
+		paths.clear();
+		paths.insert(paths.begin(), rhs.paths.begin(), rhs.paths.end());
+		maxRate = rhs.maxRate;
+		return *this; // calls copy constructor
+	}
+	friend bool operator<(const TreeDesc& l, const TreeDesc& r) {
+		return l.maxRate < r.maxRate;
+	}
+	friend bool operator>(const TreeDesc& l, const TreeDesc& r) {
+		return l.maxRate > r.maxRate;
+	}
+	friend std::ostream&
+	operator<<(std::ostream& os, const TreeDesc& l) {
+		os << "[";
+		for (auto i : l.bestPath) {
+			os << i.from << "->" << i.to << ", ";
+		}
+		os << l.maxRate;
+		os << "]";
+
+		return os;
+	}
+	lps::EPath bestPath;
+	lps::EPaths paths;
+	double maxRate;
+};
+
 class GodViewRoutingRules {
 
-	struct TreeDesc
-	{
-		TreeDesc()
-		{
-			maxRate = 0;
-		}
-		TreeDesc operator=(const TreeDesc & rhs)
-		{
-		     if(this == &rhs)
-		        return *this; // calls copy constructor SimpleCircle(*this)
-		     bestPath.clear();
-		     bestPath.insert(bestPath.begin(), rhs.bestPath.begin(), rhs.bestPath.end());
-		     paths.clear();
-		     paths.insert(paths.begin(), rhs.paths.begin(), rhs.paths.end());
-		     maxRate = rhs.maxRate;
-		     return *this; // calls copy constructor
-		}
-		lps::EPath bestPath;
-		lps::EPaths paths;
-		double maxRate;
-	};
 	typedef std::shared_ptr<CommNet> comm_net_ptr;
 	typedef std::function<void()> Action;
 	typedef std::deque<Action> ActionBuffer;
@@ -83,6 +98,8 @@ public:
 	 */
 	double GetSinglePathDatarate();
 
+	TreeDesc GetTreeDesc(UanAddress s, UanAddress d);
+
 private:
 
 	void UpdatePriorities();
@@ -93,7 +110,6 @@ private:
 	priority_t CalcPriority(UanAddress id, priorities_t p_old);
 
 	graph_ptr ConstructGraph(UanAddress s, UanAddress d);
-	TreeDesc GetTreeDesc(UanAddress s, UanAddress d);
 	double GetPathCost(lps::EPath path);
 
 //	void CalcTdmRecursive(UanAddress id, TdmAccessPlan &plan, std::map<UanAddress, bool> checkStatus);

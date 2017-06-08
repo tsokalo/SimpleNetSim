@@ -497,7 +497,7 @@ GodViewRoutingRules::graph_ptr GodViewRoutingRules::ConstructGraph(UanAddress s,
 	return graph;
 }
 
-GodViewRoutingRules::TreeDesc GodViewRoutingRules::GetTreeDesc(UanAddress s, UanAddress d) {
+TreeDesc GodViewRoutingRules::GetTreeDesc(UanAddress s, UanAddress d) {
 
 	TreeDesc td;
 

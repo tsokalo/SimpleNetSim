@@ -17,6 +17,15 @@ RM := rm -rf
 -include lp-solver/subdir.mk
 -include galois-field/subdir.mk
 -include ccack/subdir.mk
+-include build/utils/subdir.mk
+-include build/traffic/subdir.mk
+-include build/test/subdir.mk
+-include build/routing-rules/subdir.mk
+-include build/network/subdir.mk
+-include build/lp-solver/subdir.mk
+-include build/galois-field/subdir.mk
+-include build/ccack/subdir.mk
+-include build/subdir.mk
 -include subdir.mk
 -include objects.mk
 

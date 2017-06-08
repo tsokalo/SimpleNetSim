@@ -25,6 +25,28 @@ CommNet::CommNet(uint16_t numNodes, SimParameters sp) :
 
 	SetSource(SRC_UANADDRESS);
 }
+//CommNet::CommNet(CommNet *net) :
+//		m_gen(m_rd()) {
+//	m_simulator = simulator_ptr(new Simulator());
+//	m_sp = net->GetSimParameters();
+//
+//	m_nodes.resize(net->GetNodes().size());
+//	std::vector<std::shared_ptr<CommNode> >::iterator it = m_nodes.begin();
+//	for (auto& i : m_nodes) {
+//		i = std::shared_ptr<CommNode>(new CommNode(std::distance(m_nodes.begin(), it++), m_simulator, m_sp));
+//	};;
+//
+//	SetSource(SRC_UANADDRESS);
+//	for (auto n : net->GetNodes()) {
+//		for (auto e : n->GetOuts()) {
+//			ConnectNodes(n->GetId(), e->v_, e->GetLossProcess()->GetMean(), e->reverse_edge_->GetLossProcess()->GetMean());
+//		}
+//	}
+//	for (auto dst : net->GetDstIds()) {
+//		SetDestination(dst);
+//	}
+//	Configure();
+//}
 CommNet::~CommNet() {
 
 }
@@ -35,8 +57,7 @@ CommNet::~CommNet() {
  */
 void CommNet::ConnectNodes(UanAddress src, UanAddress dst, double e1, double e2) {
 
-	if (eq(e2, -1))
-		e2 = e1;
+	if (eq(e2, -1)) e2 = e1;
 	assert(m_nodes.size() > (uint16_t )src && m_nodes.size() > (uint16_t )dst && src != dst && m_nodes.at(src) && m_nodes.at(dst));
 
 	std::shared_ptr<Edge> fromSrc = m_nodes.at(src)->CreateOutputEdge(dst, m_nodes.at(dst)->CreateInputEdge(src, e1));
@@ -51,7 +72,7 @@ void CommNet::ConnectNodesDirected(UanAddress src, UanAddress dst, double e) {
 }
 void CommNet::PrintNet() {
 	for (auto i : m_nodes) {
-		std::cout << ">> Node " << i->GetId () << std::endl;
+		std::cout << ">> Node " << i->GetId() << std::endl;
 		i->PrintEdges();
 	};;
 }
@@ -64,10 +85,8 @@ void CommNet::Configure() {
 	}
 
 	for (uint16_t j = 0; j < m_nodes.size(); j++) {
-		if (m_nodes.at(j)->GetId() == m_src)
-			m_nodes.at(j)->Configure(SOURCE_NODE_TYPE, m_dst);
-		else
-			m_nodes.at(j)->Configure(RELAY_NODE_TYPE, m_dst);
+		if (m_nodes.at(j)->GetId() == m_src) m_nodes.at(j)->Configure(SOURCE_NODE_TYPE, m_dst);
+		else m_nodes.at(j)->Configure(RELAY_NODE_TYPE, m_dst);
 	}
 
 }
@@ -95,8 +114,7 @@ void CommNet::Run(int64_t cycles) {
 		PrintProgress(cycles, i);
 		DoBroadcast(SelectSender());
 		m_simulator->Execute();
-		if (m_logger)
-			m_logger->IncTime();
+		if (m_logger) m_logger->IncTime();
 	}
 }
 /*
@@ -137,8 +155,7 @@ CommNet::node_ptr CommNet::SelectSender() {
 		v.clear();
 		for (std::vector<node_ptr>::iterator it = m_nodes.begin(); it != m_nodes.end(); it++) {
 //			if ((*it)->GetId() == m_dst) continue;
-			if ((*it)->DoIwannaSend())
-				v.push_back(std::distance(m_nodes.begin(), it));
+			if ((*it)->DoIwannaSend()) v.push_back(std::distance(m_nodes.begin(), it));
 		}
 		assert(i++ < 1000);
 	} while (v.empty());

@@ -25,7 +25,7 @@
 #define TRAF_GEN_LOG            0
 #define CODER_LOG				0
 #define SIMULATOR_LOG			0
-#define GRAPH_LOG     			1
+#define GRAPH_LOG     			0
 #define LPSOLVER_LOG    		0
 #define CCACK_LOG	    		0
 #define TEMP_LOG				0

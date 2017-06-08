@@ -27,8 +27,7 @@ NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress 
 	m_inF[m_id] = 0;
 	m_cr = 1;
 	m_p = m_thresholdP;
-	if (m_id == m_dst)
-		m_p = DESTINATION_PRIORITY;
+	if (m_id == m_dst) m_p = DESTINATION_PRIORITY;
 	m_h.p = m_p;
 	m_f.p = m_p;
 	m_logItem.p = m_p;
@@ -91,8 +90,7 @@ void NcRoutingRules::RcvHeaderInfo(HeaderInfo l) {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "save input filter: " << l.pf.at(m_id));
 		m_inF[l.addr] = l.pf.at(m_id);
 		m_logItem.fp[l.addr] = m_inF[l.addr];
-		if (m_addLog)
-			m_addLog(m_logItem, m_id);
+		if (m_addLog) m_addLog(m_logItem, m_id);
 	}
 }
 void NcRoutingRules::RcvFeedbackInfo(FeedbackInfo l) {
@@ -104,8 +102,7 @@ void NcRoutingRules::RcvFeedbackInfo(FeedbackInfo l) {
 	if (l.rcvMap.find(m_id) != l.rcvMap.end()) {
 		m_outRcvMap[l.addr] = l.rcvMap.at(m_id);
 		m_logItem.eps[l.addr] = m_outRcvMap[l.addr].val_unrel();
-		if (m_addLog)
-			m_addLog(m_logItem, m_id);
+		if (m_addLog) m_addLog(m_logItem, m_id);
 	} else {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "feedback has no receive map for me");
 	}
@@ -130,8 +127,7 @@ void NcRoutingRules::UpdateSent(GenId genId, uint32_t num, bool notify_sending) 
 
 	if (notify_sending) {
 		m_logItem.ns = num;
-		if (m_addLog)
-			m_addLog(m_logItem, m_id);
+		if (m_addLog) m_addLog(m_logItem, m_id);
 		m_logItem.ns = 0;
 	}
 
@@ -140,8 +136,7 @@ void NcRoutingRules::UpdateSent(GenId genId, uint32_t num, bool notify_sending) 
 void NcRoutingRules::NotifySending() {
 
 	m_logItem.ns = 1;
-	if (m_addLog)
-		m_addLog(m_logItem, m_id);
+	if (m_addLog) m_addLog(m_logItem, m_id);
 	m_logItem.ns = 0;
 }
 void NcRoutingRules::AddSentCcack(GenId genId, CodingVector cv) {
@@ -174,8 +169,7 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, std::vector<OrigSymb
 				m_logItem.ssn = m_rcvApp(s);
 				SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "Decoding original symbol with SSN " << m_logItem.ssn);
 			}
-			if (m_addLog)
-				m_addLog(m_logItem, m_id);
+			if (m_addLog) m_addLog(m_logItem, m_id);
 		}
 		m_logItem.ssn = 0;
 	}
@@ -209,8 +203,7 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, bool linDep) {
 
 		m_rcvNum[genId][id] += num;
 		m_logItem.nr = num;
-		if (m_addLog)
-			m_addLog(m_logItem, m_id);
+		if (m_addLog) m_addLog(m_logItem, m_id);
 		m_logItem.nr = 0;
 
 		DoForgetGeneration();
@@ -326,15 +319,12 @@ bool NcRoutingRules::MaySendData(double dr) {
 		//
 		// if I do not have anything requested for the retransmission then I should say NO
 		//
-		if (!HaveDataForRetransmissions())
-			return false;
+		if (!HaveDataForRetransmissions()) return false;
 	}
 
-	if (m_rcvNum.empty())
-		return false;
+	if (m_rcvNum.empty()) return false;
 
-	if (GetMaxAmountTxData() == 0)
-		Overshoot(m_rcvNum.begin_orig_order()->first);
+	if (GetMaxAmountTxData() == 0) Overshoot(m_rcvNum.begin_orig_order()->first);
 
 	auto txData = GetAmountTxData();
 	if (txData == 0) {
@@ -411,8 +401,7 @@ bool NcRoutingRules::MaySendFeedback() {
 	//
 	// source never sends the feedback
 	//
-	if (m_nodeType == SOURCE_NODE_TYPE)
-		return false;
+	if (m_nodeType == SOURCE_NODE_TYPE) return false;
 
 	if (m_fastFeedback) {
 		m_fastFeedback = false;
@@ -422,11 +411,9 @@ bool NcRoutingRules::MaySendFeedback() {
 	// the coalition of the destination is always empty; the nodes without coalition cannot help the sender
 	// So, they do not have to inform the sender about their presence sending the feedback
 	//
-	if (m_coalition.empty() && m_id != m_dst)
-		return false;
+	if (m_coalition.empty() && m_id != m_dst) return false;
 
-	if (AreNewAcksPresent())
-		return true;
+	if (AreNewAcksPresent()) return true;
 
 	return (m_dis(m_gen) < m_feedbackP);
 }
@@ -447,10 +434,8 @@ bool NcRoutingRules::MaySendRetransRequest(std::map<GenId, uint32_t> ranks, UanA
 	// check necessity in retransmission request; only the destination can originate RR;
 	// other nodes can just forward or replicate it (see ProcessRetransRequest())
 	//
-	if (m_nodeType == DESTINATION_NODE_TYPE)
-		return MayOriginateRetransRequest(ranks, genId);
-	if (m_nodeType == RELAY_NODE_TYPE)
-		return MayReplicateRetransRequest(id, genId);
+	if (m_nodeType == DESTINATION_NODE_TYPE) return MayOriginateRetransRequest(ranks, genId);
+	if (m_nodeType == RELAY_NODE_TYPE) return MayReplicateRetransRequest(id, genId);
 
 	return false;
 
@@ -518,29 +503,25 @@ bool NcRoutingRules::MaySendNetDiscovery(ttl_t ttl) {
 	//
 	// source never sends the network discovery messages
 	//
-	if (m_nodeType == SOURCE_NODE_TYPE)
-		return false;
+	if (m_nodeType == SOURCE_NODE_TYPE) return false;
 	//
 	// if TTL is equal or above zero then the current node retransmits the network discovery message
 	// upon the reception of the network discovery message
 	//
-	if (ttl >= 0)
-		return true;
+	if (ttl >= 0) return true;
 	//
 	// if the current node has at least anybody in its coalition, it does not need explore the network
 	// by sending the network discovery message; instead it has an opportunity to send the data packets
 	// and can receive the feedback for them, which gives to the current node the same information as the
 	// response on the network discovery message
 	//
-	if (!m_coalition.empty())
-		return false;
+	if (!m_coalition.empty()) return false;
 	//
 	// the destination does not need to explore the network itself; it should only respond on the
 	// network discovery messages; "ttl < 0" means that the current function is called when
 	// not a network discovery message was received
 	//
-	if (m_id == m_dst && ttl < 0)
-		return false;
+	if (m_id == m_dst && ttl < 0) return false;
 
 	return (m_dis(m_gen) < m_netDiscP);
 }
@@ -559,8 +540,7 @@ bool NcRoutingRules::ProcessRetransRequest(FeedbackInfo fb) {
 		//
 		// check if the request is old
 		//
-		if (IsRetransRequestOld(fb))
-			SetFastAck();
+		if (IsRetransRequestOld(fb)) SetFastAck();
 		return false;
 	}
 
@@ -569,8 +549,7 @@ bool NcRoutingRules::ProcessRetransRequest(FeedbackInfo fb) {
 		//
 		// check if the request is old
 		//
-		if (IsRetransRequestOld(fb))
-			SetFastAck();
+		if (IsRetransRequestOld(fb)) SetFastAck();
 		return false;
 	}
 
@@ -582,8 +561,7 @@ bool NcRoutingRules::ProcessRetransRequest(FeedbackInfo fb) {
 	//
 	RefineFeedback(fb);
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Remaining feedback is" << (fb.rrInfo.empty() ? "" : " NOT") << " empty");
-	if (fb.rrInfo.empty())
-		return false;
+	if (fb.rrInfo.empty()) return false;
 
 	//
 	// calculate the difference between the achievable rank
@@ -765,8 +743,7 @@ uint32_t NcRoutingRules::GetMaxAmountTxData() {
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Before: [e_ack " << e_ack << "],[s_f " << s_f << "],[dse " << dse << "],[res " << dse * m_sp.genSize << "]");
 
 	for (auto rcvNum : m_rcvNum) {
-		if (gen_ssn_t(rcvNum.first) >= gen_ssn_t(e_ack) || s_f == MAX_GEN_SSN)
-			continue;
+		if (gen_ssn_t(rcvNum.first) >= gen_ssn_t(e_ack) || s_f == MAX_GEN_SSN) continue;
 		if (gen_ssn_t(rcvNum.first) > gen_ssn_t(s_f + m_sp.numGenBuffering)) {
 			if (m_forwardPlan.find(rcvNum.first) == m_forwardPlan.end()) {
 				assert(dse > 1);
@@ -815,8 +792,7 @@ GenId NcRoutingRules::GetMutualAckWinEnd() {
 		if (m_lastInTx.find(addr) != m_lastInTx.end()) {
 			auto cg = m_lastInTx.at(addr);
 			assert(cg != MAX_GEN_SSN);
-			if (gen_ssn_t(cg) > gen_ssn_t(e_ack) || e_ack == MAX_GEN_SSN)
-				e_ack = m_lastInTx.at(addr);
+			if (gen_ssn_t(cg) > gen_ssn_t(e_ack) || e_ack == MAX_GEN_SSN) e_ack = m_lastInTx.at(addr);
 		}
 	}
 	//
@@ -837,8 +813,7 @@ void NcRoutingRules::SetSendingRate(Datarate d) {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Significant change in data rate: " << m_d << "<->" << d);
 		m_d = d;
 		m_logItem.d = m_d;
-		if (m_addLog)
-			m_addLog(m_logItem, m_id);
+		if (m_addLog) m_addLog(m_logItem, m_id);
 		Reset();
 		UpdateCoalition();
 	}
@@ -871,8 +846,7 @@ void NcRoutingRules::UpdateCoalition() {
 	DoUpdateCoalition();
 
 	m_logItem.cs = m_coalition.size();
-	if (m_addLog)
-		m_addLog(m_logItem, m_id);
+	if (m_addLog) m_addLog(m_logItem, m_id);
 }
 //////////////////////////////////////////////////////////////////////
 void NcRoutingRules::DoFilter() {
@@ -880,8 +854,7 @@ void NcRoutingRules::DoFilter() {
 	SIM_LOG_FUNC(BRR_LOG);
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Node Type is " << m_nodeType);
-	if (m_nodeType == DESTINATION_NODE_TYPE)
-		return;
+	if (m_nodeType == DESTINATION_NODE_TYPE) return;
 
 	m_filteredPlan.clear();
 	//
@@ -979,16 +952,14 @@ void NcRoutingRules::DoUpdateFilter() {
 		//
 		// e is always zero for the sink node of the first edge in the coalition
 		//
-		if (arith.check_sync())
-			e = arith.do_and().val_unrel();
+		if (arith.check_sync()) e = arith.do_and().val_unrel();
 		m_outF[it->first] = 1 - e;
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Address " << it->first << ", filter probability " << m_outF[it->first]);
 		//
 		// if no receiving map is present consider the link without losses
 		// which means that the remaining nodes have to drop all received data
 		//
-		if (m_outRcvMap.find(it->first) == m_outRcvMap.end())
-			break;
+		if (m_outRcvMap.find(it->first) == m_outRcvMap.end()) break;
 		arith.add(m_outRcvMap.at(it->first));
 	}
 	m_h.pf = m_outF;
@@ -1039,16 +1010,14 @@ void NcRoutingRules::DoCalcRedundancy() {
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "coding rate " << m_cr);
 
 	m_logItem.cr = m_cr;
-	if (m_addLog)
-		m_addLog(m_logItem, m_id);
+	if (m_addLog) m_addLog(m_logItem, m_id);
 
 }
 void NcRoutingRules::DoUpdateTxPlan() {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	if (m_nodeType == DESTINATION_NODE_TYPE)
-		return;
+	if (m_nodeType == DESTINATION_NODE_TYPE) return;
 
 	m_txPlan.clear();
 
@@ -1095,11 +1064,10 @@ void NcRoutingRules::DoUpdateTxPlan() {
 	for (auto r : m_rcvNum) {
 		auto genId = r.first;
 
-		if (m_txPlan.find(genId) == m_txPlan.end())
-			if (!m_ackBacklog.is_in(genId)) {
-				v = false;
-				break;
-			}
+		if (m_txPlan.find(genId) == m_txPlan.end()) if (!m_ackBacklog.is_in(genId)) {
+			v = false;
+			break;
+		}
 	};;
 	if (v) {
 		for (auto &t : m_txPlan)
@@ -1202,8 +1170,7 @@ void NcRoutingRules::DoUpdatePriority(node_map_t outputs) {
 	m_h.p = m_p;
 	m_f.p = m_p;
 	m_logItem.p = m_p;
-	if (m_addLog)
-		m_addLog(m_logItem, m_id);
+	if (m_addLog) m_addLog(m_logItem, m_id);
 }
 void NcRoutingRules::DoUpdateCoalition() {
 
@@ -1291,7 +1258,7 @@ void NcRoutingRules::DoUpdateCoalition() {
 //		}
 //	}
 
-	//	m_coalition.resize(m_sp.maxCoalitionSize);
+	if (m_coalition.size() > m_sp.maxCoalitionSize) m_coalition.resize(m_sp.maxCoalitionSize);
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Coalition " << m_coalition);
 }
@@ -1323,8 +1290,7 @@ void NcRoutingRules::DoUpdateForwardPlan() {
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, s.first, "Already sent " << s.second << " coding rate " << m_cr);
 		m_forwardPlan[genId] = (s_t >= m_forwardPlan[genId]) ? 0 : (m_forwardPlan[genId] - s_t);
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "To forward " << m_forwardPlan[genId]);
-		if (eq(m_forwardPlan[genId], 0))
-			m_forwardPlan.erase(genId);
+		if (eq(m_forwardPlan[genId], 0)) m_forwardPlan.erase(genId);
 	};;
 
 #ifdef BUFFERING_AT_HELPERS
@@ -1400,28 +1366,23 @@ UanAddress NcRoutingRules::SelectRetransRequestForwarder() {
 
 	for (auto v : m_inRcvMap) {
 		auto id = v.first;
-		if (m_id == id)
-			continue;
+		if (m_id == id) continue;
 		//		assert(m_outputs.find(id) != m_outputs.end());
-		if (m_outputs.find(id) == m_outputs.end())
-			continue;
-		if (m_outputs.at(id) > m_p)
-			continue;
+		if (m_outputs.find(id) == m_outputs.end()) continue;
+		if (m_outputs.at(id) > m_p) continue;
 
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Adding forwarder candidate " << id);
 		candidates.push_back(id);
 		costs.push_back(v.second.val_unrel());
 	};;
 
-	if (candidates.empty())
-		return 0;
+	if (candidates.empty()) return 0;
 
 	if (m_sp.giveRrPriorToSrc) {
 		//
 		// select no forwarder if the source is in the list of candidates
 		//
-		if (std::find(candidates.begin(), candidates.end(), SRC_UANADDRESS) != candidates.end())
-			return SRC_UANADDRESS;
+		if (std::find(candidates.begin(), candidates.end(), SRC_UANADDRESS) != candidates.end()) return SRC_UANADDRESS;
 	}
 
 	UanAddress id = *(candidates.begin());
@@ -1561,8 +1522,7 @@ void NcRoutingRules::GetAchievableRank(FeedbackInfo fb, std::map<GenId, CoderHel
 				helpInfo[genId].origRank = m_ccack[genId]->GetHeardSymbNum();
 				m_ccack[genId]->RcvHashVector(fb.rrInfo[genId].hashVector);
 				helpInfo[genId].finRank = m_ccack[genId]->GetHeardSymbNum();
-				if (m_nodeType == SOURCE_NODE_TYPE)
-					helpInfo[genId].finRank = m_sp.genSize;
+				if (m_nodeType == SOURCE_NODE_TYPE) helpInfo[genId].finRank = m_sp.genSize;
 				m_ccack[genId]->Reset();
 			}
 		}
@@ -1587,8 +1547,7 @@ void NcRoutingRules::DoUpdateRetransPlan(std::map<GenId, CoderHelpInfo> helpInfo
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	if (helpInfo.empty())
-		return;
+	if (helpInfo.empty()) return;
 
 	for (auto inf : helpInfo) {
 		auto genId = inf.first;
@@ -1598,8 +1557,7 @@ void NcRoutingRules::DoUpdateRetransPlan(std::map<GenId, CoderHelpInfo> helpInfo
 			// do nothing
 			break;
 		}
-		case ONE_SELECTED_LEGAL:
-		{
+		case ONE_SELECTED_LEGAL: {
 			m_retransPlan[genId] = (inf.second.finRank - inf.second.origRank);
 			break;
 		}
@@ -1607,13 +1565,11 @@ void NcRoutingRules::DoUpdateRetransPlan(std::map<GenId, CoderHelpInfo> helpInfo
 			assert(0);
 		}
 		}
-		if (m_rcvNum.find(genId) != m_rcvNum.end())
-			for (auto &r : m_rcvNum[genId])
-				r.second = 0;
+		if (m_rcvNum.find(genId) != m_rcvNum.end()) for (auto &r : m_rcvNum[genId])
+			r.second = 0;
 		m_sentNum[genId] = 0;
 		m_filteredPlan[genId] = 0;
-		if (m_forwardPlan.find(genId) != m_forwardPlan.end())
-			m_forwardPlan.erase(genId);
+		if (m_forwardPlan.find(genId) != m_forwardPlan.end()) m_forwardPlan.erase(genId);
 		assert(!m_ackBacklog.is_in(genId));
 
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId,
@@ -1675,8 +1631,7 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 	for (auto id : ids)
 		DoForgetGeneration(id);
 
-	if (l.ackInfo.ackWinEnd != MAX_GEN_SSN)
-		m_lastInTx[l.addr] = l.ackInfo.ackWinEnd;
+	if (l.ackInfo.ackWinEnd != MAX_GEN_SSN) m_lastInTx[l.addr] = l.ackInfo.ackWinEnd;
 
 	//
 	// 2. RECOVER BIG GROUP LOSSES
@@ -1703,8 +1658,7 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 			oldest_nacked = a.first;
 			break;
 		}
-		if (--s == 0)
-			break;
+		if (--s == 0) break;
 	}
 
 	//
@@ -1757,8 +1711,7 @@ void NcRoutingRules::SetAcks() {
 
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Set ACKs of rcvd+fwrd+bckl " << m_f.ackInfo);
 	}
-	if (m_nodeType == DESTINATION_NODE_TYPE)
-		DoForgetGeneration();
+	if (m_nodeType == DESTINATION_NODE_TYPE) DoForgetGeneration();
 	m_f.ackInfo.ackWinEnd = GetAckWinEnd();
 }
 
@@ -1821,8 +1774,7 @@ bool NcRoutingRules::IsRetransRequestOld(FeedbackInfo fb) {
 	//
 	GenId ogid = fb.rrInfo.begin()->first;
 	for (auto r : fb.rrInfo) {
-		if (gen_ssn_t(ogid) < gen_ssn_t(r.first))
-			ogid = r.first;
+		if (gen_ssn_t(ogid) < gen_ssn_t(r.first)) ogid = r.first;
 	};;
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Newest generation in RR: " << ogid);
 	//
@@ -1830,8 +1782,7 @@ bool NcRoutingRules::IsRetransRequestOld(FeedbackInfo fb) {
 	//
 	bool older = true;
 	for (auto r : m_rcvNum) {
-		if (gen_ssn_t(ogid) > gen_ssn_t(r.first))
-			older = false;
+		if (gen_ssn_t(ogid) > gen_ssn_t(r.first)) older = false;
 	};;
 	if (!older) {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "It is NOT older than generation locally");
@@ -1840,9 +1791,7 @@ bool NcRoutingRules::IsRetransRequestOld(FeedbackInfo fb) {
 		//
 		bool acked = true;
 		for (auto r : m_rcvNum) {
-			if (gen_ssn_t(ogid) > gen_ssn_t(r.first))
-				if (!m_ackBacklog.is_in(r.first))
-					acked = false;
+			if (gen_ssn_t(ogid) > gen_ssn_t(r.first)) if (!m_ackBacklog.is_in(r.first)) acked = false;
 		};;
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, (acked ? "All" : "Not all")<< " older local generations are ACKed");
 		return acked;
@@ -1904,8 +1853,7 @@ void NcRoutingRules::RefineCoderHelpInfo(std::map<GenId, CoderHelpInfo> &helpInf
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	if (helpInfo.empty())
-		return;
+	if (helpInfo.empty()) return;
 
 	std::vector<GenId> ids;
 	for (auto inf : helpInfo) {
@@ -1966,16 +1914,13 @@ void NcRoutingRules::UpdateRetransRequest() {
 	std::map<GenId, uint32_t> ranks;
 	for (auto r : m_rcvNum) {
 		auto rank = m_getRank(r.first);
-		if (rank != 0)
-			ranks[r.first] = rank;
+		if (rank != 0) ranks[r.first] = rank;
 	}
 
-	if (m_rcvNum.empty())
-		return;
+	if (m_rcvNum.empty()) return;
 
 	auto r_it = m_rcvNum.last_orig_order();
-	if (r_it == m_rcvNum.end())
-		return;
+	if (r_it == m_rcvNum.end()) return;
 	GenId genId = r_it->first;
 
 	CreateRetransRequest(ranks, genId);
@@ -1991,8 +1936,7 @@ bool NcRoutingRules::CreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId
 	//
 	// no retransmission if only one or no generations a present
 	//
-	if (ranks.size() <= 1)
-		return false;
+	if (ranks.size() <= 1) return false;
 
 	//
 	// all generations with zero rank should be automatically removed
@@ -2009,8 +1953,7 @@ bool NcRoutingRules::CreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId
 	//
 	uint16_t checkGenNum = (ranks.size() > m_sp.numGenRetrans) ? ranks.size() - m_sp.numGenRetrans : 0;
 
-	if (checkGenNum == 0)
-		return false;
+	if (checkGenNum == 0) return false;
 
 	uint16_t sumRank = 0;
 
@@ -2070,8 +2013,7 @@ bool NcRoutingRules::CreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId
 					SIM_LOG_NPG(BRR_LOG, m_id, m_p, l_genId, "Hash vector " << m_f.rrInfo[l_genId].hashVector);
 					break;
 				}
-				case SEEN_DEC_RANK_FEEDBACK_ART:
-				{
+				case SEEN_DEC_RANK_FEEDBACK_ART: {
 					m_f.rrInfo[l_genId].coderInfo = m_getCoderInfo(l_genId);
 					break;
 				}
@@ -2112,8 +2054,7 @@ void NcRoutingRules::CheckBuffering() {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	if (m_rcvNum.empty())
-		return;
+	if (m_rcvNum.empty()) return;
 	//
 	// get the ID of the newest generation currently in buffer
 	//

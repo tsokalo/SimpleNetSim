@@ -26,11 +26,16 @@ class ExOrSolver {
 
 public:
 	ExOrSolver(comm_net_ptr commNet) {
+//		m_commNet = comm_net_ptr(new CommNet(commNet.get()));
 		m_commNet = commNet;
 
 	}
 	virtual ~ExOrSolver() {
 
+	}
+
+	void Calc() {
+		DoJob();
 	}
 
 	/*
@@ -49,11 +54,9 @@ public:
 	 */
 	TdmAccessPlan CalcTdmAccessPlan() {
 
-		DoJob();
-
 		TdmAccessPlan plan;
-		for(uint16_t i = 0; i < m_commNet->GetNodes().size(); i++)
-			plan[i] = m_optSolution[i];
+		for (auto n : m_commNet->GetNodes())
+			plan[n->GetId()] = m_optSolution[n->GetId()];
 		return plan;
 	}
 
@@ -76,7 +79,7 @@ protected:
 		auto dsts = m_commNet->GetDstIds();
 		// constraints for time variables defined by cuts
 		for (auto node : m_commNet->GetNodes()) {
-			if (std::find(dsts.begin(), dsts.end(),node->GetId()) != dsts.end()) {
+			if (std::find(dsts.begin(), dsts.end(), node->GetId()) != dsts.end()) {
 				auto dst = node->GetId();
 				graph_ptr graph = ConstructGraph(src, dst);
 				graph->Evaluate();

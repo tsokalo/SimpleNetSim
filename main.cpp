@@ -11,6 +11,7 @@
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <math.h>
 
 #include <storage/storage.hpp>
 #include <kodo_rlnc/full_vector_codes.hpp>
@@ -26,8 +27,8 @@
 namespace ncr {
 void CreateTriangleScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net = std::shared_ptr<CommNet>(new CommNet(3, sp));
-	net->ConnectNodes(0, 1, 0.5);
-	net->ConnectNodes(0, 2, 0.4);
+	net->ConnectNodes(0, 1, 0.2);
+	net->ConnectNodes(0, 2, 0.9);
 	net->ConnectNodes(1, 2, 0.3);
 //	net->SetDestination(1);
 	net->SetDestination(2);
@@ -68,15 +69,38 @@ void CreateBigSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 void CreateAutoSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp, uint16_t dim) {
 	net = std::shared_ptr<CommNet>(new CommNet(dim * dim, sp));
 
+	double e1 = 0.5, e2 = 0.7;
 	for (uint16_t i = 0; i < dim; i++) {
 		for (uint16_t j = 0; j < dim - 1; j++) {
-			net->ConnectNodes(i * dim + j, i * dim + j + 1, ((i+j)%2 == 0) ? 0.2 : 0.1);
+			net->ConnectNodes(i * dim + j, i * dim + j + 1, ((i + j) % 2 == 0) ? e2 : e1);
 
 		}
 	}
 	for (uint16_t i = 0; i < dim - 1; i++) {
 		for (uint16_t j = 0; j < dim; j++) {
-			net->ConnectNodes(i * dim + j, i * dim + j + dim, ((i+j)%2 == 0) ? 0.1 : 0.2);
+			net->ConnectNodes(i * dim + j, i * dim + j + dim, ((i + j) % 2 == 0) ? e1 : e2);
+		}
+	}
+	net->SetSource(0);
+	net->SetDestination(dim * dim - 1);
+	net->Configure();
+	net->PrintNet();
+}
+
+
+void CreateBetaSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp, uint16_t dim) {
+	net = std::shared_ptr<CommNet>(new CommNet(dim * dim, sp));
+
+	double e1 = 0.1, e2 = 0.3;
+	for (uint16_t i = 0; i < dim; i++) {
+		for (uint16_t j = 0; j < dim - 1; j++) {
+			net->ConnectNodes(i * dim + j, i * dim + j + 1, e1 + e2 * (1 - (float)std::abs(j - i) / (float)dim));
+
+		}
+	}
+	for (uint16_t i = 0; i < dim - 1; i++) {
+		for (uint16_t j = 0; j < dim; j++) {
+			net->ConnectNodes(i * dim + j, i * dim + j + dim, e1 + e2 * (1 - (float)std::abs(j - i) / (float)dim));
 		}
 	}
 	net->SetSource(0);
@@ -95,10 +119,8 @@ void CreateNoCScenario(std::shared_ptr<CommNet> &net, uint16_t NbrHops, SimParam
 	uint16_t m3 = 3 * NbrHops + 2;
 	uint16_t p = num_nodes - NbrHops - 1;
 	for (uint16_t i = 0; i < num_nodes - 1; i++) {
-		if (i != NbrHops && i != m2 && i != m3)
-			net->ConnectNodes(i, i + 1, e1);
-		if (i < p)
-			net->ConnectNodes(i, i + NbrHops + 1, e2);
+		if (i != NbrHops && i != m2 && i != m3) net->ConnectNodes(i, i + 1, e1);
+		if (i < p) net->ConnectNodes(i, i + NbrHops + 1, e2);
 	}
 	net->Configure();
 	net->PrintNet();
@@ -228,7 +250,7 @@ int main(int argc, char *argv[]) {
 	//
 	// using default parameters
 	//
-	CreateAutoSquareScenario(net, sim_par, 3);
+	CreateBetaSquareScenario(net, sim_par, 3);
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
 //	CreateStackScenario(net, 4, sim_par);
@@ -265,20 +287,20 @@ int main(int argc, char *argv[]) {
 		auto without_dst = get_node_ids(net->GetDst());
 		auto without_src = get_node_ids(net->GetSrc());
 
-//		//
-//		// plot priorities; for all given nodes on one plot
-//		//
-//		PlotPriorities(net->GetNodes().size(), net->GetDstIds(), lb, subpath, useSns);
-//
-//		//
-//		// plot input filters; for each given node a plot with filters for each input edge
-//		//
-//		PlotInputFilters(net->GetNodes().size(), net->GetDstIds(), lb, subpath);
-//
-//		//
-//		// plot loss ratios of output edges; for each given node a plot with ratios for each output edge
-//		//
-//		PlotLossRatios(without_dst, lb, subpath);
+		//
+		// plot priorities; for all given nodes on one plot
+		//
+		PlotPriorities(net->GetNodes().size(), net->GetDstIds(), lb, subpath, useSns);
+
+		//
+		// plot input filters; for each given node a plot with filters for each input edge
+		//
+		PlotInputFilters(net->GetNodes().size(), net->GetDstIds(), lb, subpath);
+
+		//
+		// plot loss ratios of output edges; for each given node a plot with ratios for each output edge
+		//
+		PlotLossRatios(without_dst, lb, subpath);
 //
 //		//
 //		// plot coalition sizes; for all given nodes on one plot
@@ -293,26 +315,30 @@ int main(int argc, char *argv[]) {
 		//
 		// plot retransmission requests; for all given nodes on one plot
 		//
-		PlotRetransmissionRequests(lb, subpath);
+		PlotRetransmissionRequests(lb, subpath, sim_par.warmup);
 
 		//
 		// plot sending statistics; for all given nodes on one plot
 		//
 		ExOrSolver exOrSolver(net);
-//		SrpSolver srpSolver(net);
+		exOrSolver.Calc();
+		SrpSolver srpSolver(net);
+		srpSolver.Calc();
 
-		auto plan = exOrSolver.CalcTdmAccessPlan();
+		auto plan_orp = exOrSolver.CalcTdmAccessPlan();
+		auto plan_srp = srpSolver.CalcTdmAccessPlan();
+
+		std::cout << "I am here" << std::endl;
 
 		//
 		// plot proportion of feedback/network discovery/excessive redundant packets to all sent packets
 		//
-		GodViewRoutingRules godView(net);
-		godView.GetOptChannelUses();
-		godView.CalcTdmAccessPlan();
-		PlotResourceWaste(lb, subpath, exOrSolver.GetOptChannelUses());
+		PlotResourceWaste(lb, subpath, exOrSolver.GetOptChannelUses(), sim_par.warmup);
 
-		std::cout << "Godview plan: " << godView.CalcTdmAccessPlan() << ", optimal plan: " << plan << std::endl;
-		PlotSendingStatistics(lb, subpath, godView.CalcTdmAccessPlan(), plan);
+		std::cout << "Optimal plan: " << plan_orp << ", SRP plan" << plan_srp << std::endl;
+		std::cout << "Optimal d: " << exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate()
+				<< ", SRP d: " << srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate() << std::endl;
+		PlotSendingStatistics(lb, subpath, plan_orp, sim_par.warmup);
 
 		//
 		// plot the maximum achievable data rate, the achieved data rate and the maximum achievable data rate with RP-S
@@ -320,18 +346,19 @@ int main(int argc, char *argv[]) {
 		std::map<UanAddress, Datarate> d;
 		for (auto node : net->GetNodes())
 			d[node->GetId()] = node->GetDatarate();
-		PlotRates(lb, subpath, exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), godView.GetSinglePathDatarate(), d);
+		PlotRates(lb, subpath, exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(),
+				srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), d, sim_par.warmup);
 
-		PlotRatesPerDst(lb, subpath, net->GetDstIds(), d);
+		PlotRatesPerDst(lb, subpath, net->GetDstIds(), d, sim_par.warmup);
 
-//		//
-//		// analyze stability of the source priority
-//		//
-//		PlotSrcPriorStability(lb, subpath, exOrSolver.GetOptChannelUses(), net->GetSrc());
-//		//
-//		// analyze stability of the reception data rate at the destination
-//		//
-//		PlotOutputStability(lb, subpath, godView.GetOptChannelUses(), net->GetDst());
+		//
+		// analyze stability of the source priority
+		//
+		PlotSrcPriorStability(lb, subpath, exOrSolver.GetOptChannelUses(), net->GetSrc());
+		//
+		// analyze stability of the reception data rate at the destination
+		//
+		PlotOutputStability(lb, subpath, exOrSolver.GetOptChannelUses(), net->GetDst());
 
 	} else if (m == TEST_MODE) {
 //		TestChannelCapacityStack(folder);

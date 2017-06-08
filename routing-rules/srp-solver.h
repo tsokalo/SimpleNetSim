@@ -11,12 +11,17 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <algorithm>
+
 #include "lp-solver/graph.h"
+#include "lp-solver/lp-solver-header.h"
 #include "routing-rules/exor-solver.h"
+#include "routing-rules/god-view-routing-rules.h"
 
 #include "lp-solver/lp-solver.h"
 #include "network/comm-net.h"
 #include "utils/log.h"
+#include "utils/comparison.h"
 
 namespace ncr {
 
@@ -24,6 +29,69 @@ class SrpSolver: public ExOrSolver {
 
 	typedef std::shared_ptr<CommNet> comm_net_ptr;
 	typedef std::shared_ptr<lps::Graph> graph_ptr;
+
+	struct node_set: public std::vector<UanAddress> {
+		void add(UanAddress v) {
+			if (std::find(this->begin(), this->end(), v) == this->end()) this->push_back(v);
+		}
+
+		void add(lps::EPath p) {
+			for (auto e : p) {
+				add(e.from);
+				add(e.to);
+			}
+		}
+
+		friend std::ostream&
+		operator<<(std::ostream& os, const node_set& l) {
+			os << "[";
+			for (auto i : l)
+				os << i << ", ";
+			os << "]";
+			return os;
+		}
+		node_set&
+		operator=(const std::vector<UanAddress>& other) // copy assignment
+				{
+			this->clear();
+			for (auto v : other)
+				this->push_back(v);
+			return *this;
+		}
+	};
+	struct edge_set: public std::vector<lps::Edge> {
+		void add(lps::Edge e) {
+			for (auto e_ : *this)
+				if (e_ == e) return;
+			this->push_back(e);
+		}
+		void add(lps::EPath p) {
+			for (auto e : p)
+				add(e);
+		}
+		friend std::ostream&
+		operator<<(std::ostream& os, const edge_set& l) {
+			os << "[";
+			for (auto i : l) {
+				os << i.from << "->" << i.to << " | ";
+			}
+			os << "]";
+			return os;
+		}
+	};
+	struct weight_set: public std::map<UanAddress, std::map<UanAddress, double> > {
+		friend std::ostream&
+		operator<<(std::ostream& os, const weight_set& l) {
+			os << "[";
+			for (auto i : l) {
+				for (auto j : i.second) {
+					os << i.first << "->" << j.first << ":" << j.second << " | ";
+				}
+			}
+			os << "]";
+			return os;
+		}
+	};
 
 public:
 	SrpSolver(comm_net_ptr commNet) :
@@ -34,13 +102,15 @@ public:
 
 	}
 
+	void Calc() {
+		SrpSolver::DoJob();
+	}
+
 	TdmAccessPlan CalcTdmAccessPlan() {
 
-		SrpSolver::DoJob();
-
 		TdmAccessPlan plan;
-		for (uint16_t i = 0; i < m_commNet->GetNodes().size(); i++)
-			plan[i] = m_optSolution[i];
+		for(auto n : m_commNet->GetNodes())
+			plan[n->GetId()] = m_optSolution[n->GetId()];
 		return plan;
 	}
 
@@ -52,206 +122,103 @@ private:
 
 		using namespace lps;
 
-		uint16_t numDest = 0;
-
+		ConstructGraph();
+		std::cout << "Initial weights: " << m_w << std::endl;
+		m_dst = m_commNet->GetDstIds();
+		std::cout << "Initial DSTs: " << m_dst << std::endl;
 		//
-		// define constraints
+		// resultant graph will consist of node vt and edges et
 		//
-		std::map<uint16_t, Constraints> constraints_map;
-		auto src = std::function<UanAddress()>([this] {for (auto n : m_commNet->GetNodes())if (n->GetNodeType() == SOURCE_NODE_TYPE)return n->GetId();})();
-
-		uint16_t N = 0;
-		auto dsts = m_commNet->GetDstIds();
-		// constraints for time variables defined by cuts
+		node_set vt;
+		edge_set et;
 		for (auto node : m_commNet->GetNodes()) {
-			if (std::find(dsts.begin(), dsts.end(), node->GetId()) != dsts.end()) {
-				auto dst = node->GetId();
-				std::cout << "Constructing the graph using destination " << dst << std::endl;
-				graph_ptr graph = ConstructGraph(src, dst);
-				if (N < graph->GetNumNodes())
-					N = graph->GetNumNodes();
-				graph->Evaluate();
-				auto cutsets = graph->GetAllCutSets();
-				auto c = graph->GetConstraints();
-				constraints_map[numDest] = c;
-				numDest++;
+			if (node->GetNodeType() == SOURCE_NODE_TYPE) vt.add(node->GetId());
+		}
+		assert(vt.size() == 1);
+
+
+		while (!m_dst.empty())		//-----> start main cycle
+		{
+			//
+			// find shortest path between vt and m_dst
+			//
+			TreeDesc solution;
+			UanAddress dst;
+			GodViewRoutingRules gvrr(m_commNet);
+			for (auto v : vt) {
+				for (auto d : m_dst) {
+					auto solution_ = gvrr.GetTreeDesc(v, d);
+					std::cout << "Solution between " << v << " and " << d << ": " << solution_ << std::endl;
+					if (solution_ > solution) {
+						solution = solution_;
+						dst = d;
+					}
+				}
 			}
-		}
 
-		// constraints for data rate variables
-		Constraints constraints;
-		for (auto constraint_d : constraints_map) {
-			for (auto constraint : constraint_d.second) {
-				constraint.insert(constraint.end(), numDest, 0);
-				constraint.at(constraint.size() - numDest + constraint_d.first) = -1;
-				constraints.push_back(constraint);
+			std::cout << "Found solution: " << solution << std::endl;
+			//
+			// save the intermediate result
+			//
+			vt.add(solution.bestPath);
+			et.add(solution.bestPath);
+
+			m_dst.erase(std::remove(m_dst.begin(), m_dst.end(), dst), m_dst.end());
+			//
+			// update weights considering the broadcast channel
+			//
+			for (auto e : solution.bestPath) {
+				//
+				// for all sinks of e.from
+				//
+				for (auto &r : m_w[e.from]) {
+					auto sink = r.first;
+					if (sink == e.to) continue;
+					if(std::find(vt.begin(), vt.end(), sink) != vt.end())continue;
+					r.second = (r.second > m_w[e.from][e.to]) ? r.second - m_w[e.from][e.to] : PRECISION_;
+					std::cout << "Change the loss ratio on (" << e.from << "," << sink << ") (old) "
+							<< m_commNet->GetNode(e.from)->GetEdge(e.from, sink)->GetLossProcess()->GetMean() << " get " << 1 - 1 / r.second << std::endl;
+					m_commNet->GetNode(e.from)->GetEdge(e.from, sink)->GetLossProcess()->SetMean(1 - 1 / r.second);
+				}
 			}
-		}
-		auto n = constraints.size();
+			std::cout << "Updated weights " << m_w << std::endl;
 
-		// additional constraint for time variables: sum is equal one
-		std::vector<double> c(N, 1);
-		c.insert(c.end(), numDest, 0);
-		constraints.push_back(c);
+		}			//-----> finish main cycle
 
-		// additional constraint for data rate variables: all should be equal
-		for (uint16_t i = 0; i < numDest; i++)
-			for (uint16_t j = i + 1; j < numDest; j++) {
-				std::vector<double> c(N + numDest, 0);
-				c.at(N + i) = 1;
-				c.at(N + j) = -1;
-				constraints.push_back(c);
-			}
-		auto k = constraints.size() - n - 1;
-
+		std::cout << "Using the set of edges " << et << std::endl;
 		//
-		// define free variable of the constraints
+		// do final evaluation
 		//
-		Bounds cBounds(std::vector<double>(n, 0), std::vector<double>(n, std::numeric_limits<double>::max()));
-		// for the sum of all ts
-		cBounds.first.insert(cBounds.first.end(), 1, 1);
-		cBounds.second.insert(cBounds.second.end(), 1, 1);
-		// for difference of all rates
-		cBounds.first.insert(cBounds.first.end(), k, 0);
-		cBounds.second.insert(cBounds.second.end(), k, 0);
-
-		//
-		// define objectives
-		//
-		Objectives objectives(N, 0);
-		objectives.insert(objectives.end(), numDest, 1);
-
-		//
-		// define bounds
-		//
-		// for time variables
-		Bounds bounds(std::vector<double>(N, 0), std::vector<double>(N, 1));
-		// for data rates
-		bounds.first.insert(bounds.first.end(), numDest, 0);
-		bounds.second.insert(bounds.second.end(), numDest, std::numeric_limits<double>::max());
-
-		std::cout << "Constraints: " << std::endl;
-		for (auto constraint : constraints) {
-			for (auto c : constraint)
-				std::cout << c << " ";
-			std::cout << std::endl;
+		m_optObjective = 0;
+		m_optSolution.clear();
+		for (auto e : et) {
+			m_optObjective += m_w[e.from][e.to];
+			m_optSolution[e.from] += m_w[e.from][e.to];
 		}
 
-		std::cout << "Objectives: " << std::endl;
-		for (auto o : objectives) {
-			std::cout << o << " ";
-		}
-		std::cout << std::endl;
+		for (auto &os : m_optSolution)
+			os.second /= m_optObjective;
+		m_optObjective = 1 / m_optObjective * m_commNet->GetDstIds().size();
 
-		std::cout << "Variable bounds: " << std::endl;
-		std::cout << "LB: ";
-		for (auto b : bounds.first) {
-			std::cout << b << " ";
-		}
-		std::cout << std::endl;
-		std::cout << "UB: ";
-		for (auto b : bounds.second) {
-			std::cout << b << " ";
-		}
-		std::cout << std::endl;
-
-		std::cout << "Constraints bounds: " << std::endl;
-		std::cout << "LB: ";
-		for (auto b : cBounds.first) {
-			std::cout << b << " ";
-		}
-		std::cout << std::endl;
-		std::cout << "UB: ";
-		for (auto b : cBounds.second) {
-			std::cout << b << " ";
-		}
-		std::cout << std::endl;
-
-		LPSolver solver(objectives, constraints, bounds, cBounds);
-		solver.SolveTask();
-		auto solution = solver.GetSolution();
-		m_optObjective = solver.GetObjectiveValue();
-		for (uint16_t j = 0; j < solution.size() - 1; j++) {
-			m_optSolution[j] = solution.at(j);
-		}
 		SIM_LOG(EXOR_SOLVER_LOG, "Job finished successfully");
 	}
 
-	graph_ptr ConstructGraph(UanAddress s, UanAddress d) {
-
-		auto construct_full_graph = [this](UanAddress s, UanAddress d) {
-			graph_ptr graph = graph_ptr(new lps::Graph(m_commNet->GetNodes().size(), s, d));
-
-			for (auto node : m_commNet->GetNodes()) {
-				auto edges = node->GetOuts();
-				for (auto edge : edges) {
-					graph->AddEdge(node->GetId(), edge->v_, edge->GetLossProcess()->GetMean());
-				}
-			}
-			return graph;
-		};
-
-		auto get_path_cost = [this](lps::EPath path) {
-
-			auto get_loss_ratio = [this](UanAddress from, UanAddress to)->double
-			{
-				auto node = m_commNet->GetNode(from);
-				auto edges = node->GetOuts();
-				for(auto edge : edges)
-				{
-					if(edge->v_ == to)
-					{
-						return edge->GetLossProcess()->GetMean();
-					}
-				}
-				assert(0);
-			};
-
-			double v = 0;
-			for (auto e : path) {
-
-				auto l = get_loss_ratio(e.from, e.to);
-				if (eq(l, 1.0))
-				continue;
-				v += 1 / (1 - l) / m_commNet->GetNode(e.from)->GetDatarate();
-				if (GOD_VIEW)
-				std::cout << "Edge<" << e.from << "," << e.to << "> : " << m_commNet->GetNode(e.from)->GetDatarate() * (1 - l) << " / ";
-			}
-			if (GOD_VIEW)
-			std::cout << std::endl;
-			return 1 / v;
-		};
-
-		auto paths = construct_full_graph(s, d)->GetPaths();
-
-		double max_rate = 0;
-		lps::EPath p;
-
-		for (auto path : paths) {
-
-			double v = get_path_cost(path);
-			if (max_rate < v) {
-				max_rate = v;
-				p = path;
-			}
-		}
-
-		graph_ptr graph = graph_ptr(new lps::Graph(m_commNet->GetNodes().size(), s, d));
+	void ConstructGraph() {
 
 		for (auto node : m_commNet->GetNodes()) {
 			auto edges = node->GetOuts();
+			auto s = node->GetId();
 			for (auto edge : edges) {
-				for (auto ep : p) {
-					if (node->GetId() == ep.from && edge->v_ == ep.to) {
-						graph->AddEdge(node->GetId(), edge->v_, edge->GetLossProcess()->GetMean());
-						break;
-					}
-				}
+				auto r = edge->v_;
+				auto w = edge->GetLossProcess()->GetMean();
+				assert(!eq(w, 1));
+				m_w[s][r] = 1 / (1 - w);
 			}
 		}
-
-		return graph;
 	}
+
+	weight_set m_w;
+	node_set m_dst;
 };
 
 }
