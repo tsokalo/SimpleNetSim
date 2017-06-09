@@ -25,6 +25,13 @@
 
 namespace ncr {
 
+/*
+ * This impelementation uses the algorithm from:
+ * Hoang Lan Nguyen, Uyen Trang Nguyen,
+ * "Algorithms for Bandwidth Efficient Multicast Routing in Multi-channel Multi-radio Wireless Mesh Networks",
+ * IEEE WCNC 2011 - Network Algorithms
+ */
+
 class SrpSolver: public ExOrSolver {
 
 	typedef std::shared_ptr<CommNet> comm_net_ptr;
