@@ -251,6 +251,7 @@ int main(int argc, char *argv[]) {
 	// using default parameters
 	//
 	CreateBetaSquareScenario(net, sim_par, 3);
+
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
 //	CreateStackScenario(net, 4, sim_par);
