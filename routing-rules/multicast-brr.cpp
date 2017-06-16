@@ -201,7 +201,7 @@ TxPlan MulticastBrr::GetTxPlan() {
 	for (auto brr : m_brr) {
 		auto dst = brr.first;
 		if (dst == dstmax)
-			continue;
+		continue;
 
 		auto t = brr.second->GetTxPlan();
 
@@ -353,6 +353,49 @@ HeaderMInfo MulticastBrr::GetHeaderInfo() {
 
 #endif
 
+#ifdef DEST_AWARE_FILTERING_COEFS
+
+	double cr = 1;
+
+	for (auto brr_it : m_brr) {
+		auto brr = brr_it.second;
+		auto dst = brr_it.first;
+
+		auto newcr = brr->GetCodingRate();
+		cr = (newcr > cr) ? newcr : cr;
+	}
+	cr = 1 / cr;
+
+	for (auto brr_it : m_brr) {
+		auto brr = brr_it.second;
+		auto dst = brr_it.first;
+		auto a = brr->GetInfoOnDsts();
+		assert(leq(a,1));
+		auto cr_ = 1 / brr->GetCodingRate();
+		assert(leq(a,cr_));
+		std::cout << cr_ << "\t" << a << "\t" << cr << std::endl;
+		assert(leq(cr_ - a , cr));
+		auto h = brr->GetHeaderInfo();
+		//
+		// save the priority for each destination in the header
+		//
+		header.p[dst] = h.p;
+		//
+		// adjust the filtering coefficients according to the actual amount of the sent information
+		//
+		for (auto pf_ : h.pf)
+		{
+			auto v = (1 - (1 - pf_.second) * (cr_ - a) / cr);
+			header.pf[pf_.first] = (header.pf[pf_.first] < v) ? v : header.pf[pf_.first];
+			std::cout << m_id << "\tSink: " << pf_.first << "\tDST: " << dst << "\tcr_: " << cr_ << "\ta: " << a << "\tcr: " << cr << "\tpfi: " << pf_.second << "\tv: " << v << "\thpfi: " << header.pf[pf_.first] << std::endl;
+		}
+		std::cout << std::endl;
+	}
+	std::cout << std::endl;
+	std::cout << std::endl;
+
+#endif
+
 	return header;
 }
 HeaderMInfo MulticastBrr::GetHeaderInfo(TxPlan txPlan) {
@@ -385,8 +428,7 @@ bool MulticastBrr::NeedGen() {
 	// only if for all destination new data has to be generated
 	//
 	for (auto brr_it : m_brr)
-		if (!brr_it.second->NeedGen())
-			return false;
+		if (!brr_it.second->NeedGen()) return false;
 
 	return true;
 }
@@ -407,8 +449,7 @@ bool MulticastBrr::MaySendData(double dr) {
 	// if at least for all destination we may send data
 	//
 	for (auto brr_it : m_brr)
-		if (brr_it.second->MaySendData(dr))
-			return true;
+		if (brr_it.second->MaySendData(dr)) return true;
 
 	return false;
 }
@@ -417,8 +458,7 @@ bool MulticastBrr::MaySendFeedback() {
 	// only if for all destination we may send the feedback
 	//
 	for (auto brr_it : m_brr)
-		if (!brr_it.second->MaySendFeedback())
-			return false;
+		if (!brr_it.second->MaySendFeedback()) return false;
 
 	return true;
 }
@@ -427,8 +467,7 @@ bool MulticastBrr::MaySendNetDiscovery(ttl_t ttl) {
 	// only if for all destination we may send the network discovery
 	//
 	for (auto brr_it : m_brr)
-		if (!brr_it.second->MaySendNetDiscovery(ttl))
-			return false;
+		if (!brr_it.second->MaySendNetDiscovery(ttl)) return false;
 
 	return true;
 }
@@ -438,8 +477,7 @@ bool MulticastBrr::MaySendRetransRequest(std::map<GenId, uint32_t> ranks, UanAdd
 	// if at least for all destination we may send the retransmission request
 	//
 	for (auto brr_it : m_brr)
-		if (brr_it.second->MaySendRetransRequest(ranks, id, genId, all_prev_acked))
-			return true;
+		if (brr_it.second->MaySendRetransRequest(ranks, id, genId, all_prev_acked)) return true;
 
 	return false;
 }

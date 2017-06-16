@@ -759,6 +759,18 @@ uint32_t NcRoutingRules::GetMaxAmountTxData() {
 priority_t NcRoutingRules::GetPriority() {
 	return m_p;
 }
+
+double NcRoutingRules::GetInfoOnDsts() {
+
+	FilterArithmetics arith;
+	for (auto rm : m_outRcvMap) {
+		if (m_outputs.at(rm.first) == DESTINATION_PRIORITY) arith.add(rm.second);
+	}
+	double a = 0;
+	if (arith.check_sync()) a = 1 - arith.do_and().val_unrel();
+
+	return a;
+}
 GenId NcRoutingRules::GetAckWinSize() {
 	GenId ack_win = (m_nodeType == SOURCE_NODE_TYPE) ? m_sp.numGen >> 2 : m_sp.numGen;
 	assert(ack_win < MAX_GEN_SSN);

@@ -109,6 +109,8 @@ public:
 	double GetCodingRate();
 	uint32_t GetMaxAmountTxData();
 	priority_t GetPriority();
+	//
+	double GetInfoOnDsts();
 
 private:
 

@@ -5,7 +5,7 @@ set border 4095 front linetype -1 linewidth 1.000
 set ticslevel 0
 
 set ylabel "Coding rate"  offset 0
-set yrange [1:*]
+set yrange [0:1]
 set format y '%0.2f'
 
 

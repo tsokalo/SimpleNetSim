@@ -422,19 +422,19 @@ void PlotCodingRates(uint32_t numNodes, std::vector<UanAddress> dstIds, LogBank 
 		//
 		// make data file
 		//
-		typedef std::map<UanAddress, std::map<uint64_t, uint16_t> > csizes_t;
-		csizes_t csizes;
+		typedef std::map<UanAddress, std::map<uint64_t, double> > crs_t;
+		crs_t crs;
 		for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 			for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
 				if (tt->log.dst == dst) {
 					if (dst == t->first) continue;
-					csizes[t->first][tt->t] = tt->log.cs;
+					crs[t->first][tt->t] = 1 / tt->log.cr;
 				}
 			}
 		}
 		std::ofstream fd(data_file, std::ios_base::out);
-		for (csizes_t::iterator t = csizes.begin(); t != csizes.end(); t++) {
-			for (std::map<uint64_t, uint16_t>::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
+		for (crs_t::iterator t = crs.begin(); t != crs.end(); t++) {
+			for (std::map<uint64_t, double>::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
 				fd << tt->first << "\t" << t->first << "\t" << tt->second << std::endl;
 			}
 		}

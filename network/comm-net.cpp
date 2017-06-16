@@ -111,7 +111,7 @@ void CommNet::Run(int64_t cycles) {
 	int64_t i = 0;
 	while (i++ != cycles) {
 //		std::cout << "Cycle " << i << std::endl;
-		PrintProgress(cycles, i);
+//		PrintProgress(cycles, i);
 		DoBroadcast(SelectSender());
 		m_simulator->Execute();
 		if (m_logger) m_logger->IncTime();
