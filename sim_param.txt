@@ -1,1 +1,22 @@
-40	100	10	1000000	1000000	2	3	20	8	2	4	0	0.2	3	1	1	0.6	4	2	1	1	35000	
+Number of generations					40
+Generation size							100
+Symbol size / bytes						10
+Application data rate / bps				1e+06
+Sending data rate / bps					1e+06
+Number of buffering generations (Tx)	2
+Number of buffering generations (RR)	3
+Number of generataions in single MPDU	20
+Field size / power of 2					8
+CCACK levels							2
+Maximum coalition size					4
+Mutual PHY and LLC coding / flag		0
+Target packet loss ratio				0.2
+Maximum number of RRs					3
+CR calculation way						2
+Number of sigmas						3
+CR reduction factor						0
+RR candidate selection way				4
+Type of the feedback contents			2
+Give RR priority to SRC					1
+Who can forward RR						1
+Warm-up period							1000

@@ -28,9 +28,9 @@ namespace ncr {
 void CreateTriangleScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net = std::shared_ptr<CommNet>(new CommNet(3, sp));
 	net->ConnectNodes(0, 1, 0.2);
-	net->ConnectNodes(0, 2, 0.9);
+	net->ConnectNodes(0, 2, 0.6);
 	net->ConnectNodes(1, 2, 0.3);
-//	net->SetDestination(1);
+	net->SetDestination(1);
 	net->SetDestination(2);
 	net->Configure();
 	net->PrintNet();
@@ -250,12 +250,12 @@ int main(int argc, char *argv[]) {
 	//
 	// using default parameters
 	//
-	CreateBetaSquareScenario(net, sim_par, 3);
+//	CreateBetaSquareScenario(net, sim_par, 3);
 
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
 //	CreateStackScenario(net, 4, sim_par);
-//	CreateTriangleScenario(net, sim_par);
+	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
@@ -266,7 +266,7 @@ int main(int argc, char *argv[]) {
 		CreateDirectory(folder);
 		std::cout << folder << std::endl;
 		net->EnableLog(folder);
-		net->Run(40000);
+		net->Run(4000);
 	} else if (m == EVAL_MODE) {
 		std::string f = folder + GetLogFileName();
 		std::cout << "Using file " << f << std::endl;
@@ -302,16 +302,16 @@ int main(int argc, char *argv[]) {
 		// plot loss ratios of output edges; for each given node a plot with ratios for each output edge
 		//
 		PlotLossRatios(without_dst, lb, subpath);
-//
-//		//
-//		// plot coalition sizes; for all given nodes on one plot
-//		//
-//		PlotCoalitions(without_dst, lb, subpath, f, useSns);
-//
-//		//
-//		// plot coding rates; for all given nodes on one plot
-//		//
-//		PlotCodingRates(without_dst, lb, subpath, f);
+
+		//
+		// plot coalition sizes; for all given nodes on one plot
+		//
+		PlotCoalitions(net->GetNodes().size(), net->GetDstIds(), lb, subpath, f, useSns);
+
+		//
+		// plot coding rates; for all given nodes on one plot
+		//
+		PlotCodingRates(net->GetNodes().size(), net->GetDstIds(), lb, subpath, f);
 
 		//
 		// plot retransmission requests; for all given nodes on one plot

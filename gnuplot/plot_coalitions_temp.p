@@ -18,12 +18,6 @@ set grid xtics ytics back lw 1 lc rgb "#AFAFAF"
 set key right bottom
 
 
-set output './Results/coalitions.svg'
-plot "./Results/log.txt" every 2 using ($1):(($3==0) ? $8 : 1/0) with linespoints ls 1 lw 1 linecolor 1 pt 7 ps 0.3 title "vertex=0",\
-"./Results/log.txt" every 2 using ($1):(($3==1) ? $8 : 1/0) with linespoints ls 1 lw 1 linecolor 2 pt 7 ps 0.3 title "vertex=1",\
-"./Results/log.txt" every 2 using ($1):(($3==2) ? $8 : 1/0) with linespoints ls 1 lw 1 linecolor 3 pt 7 ps 0.3 title "vertex=2",\
-"./Results/log.txt" every 2 using ($1):(($3==3) ? $8 : 1/0) with linespoints ls 1 lw 1 linecolor 4 pt 7 ps 0.3 title "vertex=3",\
-"./Results/log.txt" every 2 using ($1):(($3==4) ? $8 : 1/0) with linespoints ls 1 lw 1 linecolor 5 pt 7 ps 0.3 title "vertex=4",\
-"./Results/log.txt" every 2 using ($1):(($3==5) ? $8 : 1/0) with linespoints ls 1 lw 1 linecolor 6 pt 7 ps 0.3 title "vertex=5",\
-"./Results/log.txt" every 2 using ($1):(($3==6) ? $8 : 1/0) with linespoints ls 1 lw 1 linecolor 7 pt 7 ps 0.3 title "vertex=6",\
-"./Results/log.txt" every 2 using ($1):(($3==7) ? $8 : 1/0) with linespoints ls 1 lw 1 linecolor 8 pt 7 ps 0.3 title "vertex=7"
+set output './Results/coalitions_2.svg'
+plot "./gnuplot/data.txt" every 10 using ($1):(($2==0) ? $3 : 1/0) with linespoints ls 1 lw 1 linecolor 1 pt 7 ps 0.3 title "vertex=0",\
+"./gnuplot/data.txt" every 10 using ($1):(($2==1) ? $3 : 1/0) with linespoints ls 1 lw 1 linecolor 2 pt 7 ps 0.3 title "vertex=1",\
