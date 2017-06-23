@@ -30,7 +30,7 @@ void CreateTriangleScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net->ConnectNodes(0, 1, 0.2);
 	net->ConnectNodes(0, 2, 0.6);
 	net->ConnectNodes(1, 2, 0.3);
-	net->SetDestination(1);
+//	net->SetDestination(1);
 	net->SetDestination(2);
 	net->Configure();
 	net->PrintNet();
@@ -348,7 +348,7 @@ int main(int argc, char *argv[]) {
 		for (auto node : net->GetNodes())
 			d[node->GetId()] = node->GetDatarate();
 		PlotRates(lb, subpath, exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(),
-				srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), d, sim_par.warmup);
+				srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), d, sim_par.warmup, sim_par.GetInLine());
 
 		PlotRatesPerDst(lb, subpath, net->GetDstIds(), d, sim_par.warmup);
 

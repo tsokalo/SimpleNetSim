@@ -59,7 +59,7 @@ void PlotCodingRates(uint32_t numNodes, std::vector<UanAddress> dstIds, LogBank 
 void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan optPlan, uint32_t warmup);
 void PlotResourceWaste(LogBank lb, std::string path, double sigma, uint32_t warmup_period);
 void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstIds, std::map<UanAddress, Datarate> d, uint32_t warmup_period);
-void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d, uint32_t warmup_period);
+void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d, uint32_t warmup_period, std::string sim_par);
 void PlotRetransmissionRequests(LogBank lb, std::string path, uint32_t warmup_period);
 void PlotOutputStability(LogBank lb, std::string path, double opt, UanAddress dst);
 void PlotSrcPriorStability(LogBank lb, std::string path, double opt, UanAddress src);

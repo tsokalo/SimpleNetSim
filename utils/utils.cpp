@@ -685,7 +685,7 @@ void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstId
 
 }
 
-void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d, uint32_t warmup_period) {
+void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d, uint32_t warmup_period, std::string sim_par) {
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
 	std::string data_file = gnuplot_dir + "data.txt";
@@ -723,12 +723,20 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 	//
 	// make data file
 	//
-	std::ofstream fd(data_file, std::ios_base::out);
-	fd << "\"Simulation (decoded)\"\t" << (double) nru / dur / 1000000 << std::endl;
-	fd << "\"\\nSimulation (coded)\"\t" << (double) nr / dur / 1000000 << std::endl;
-	fd << "\"Maximum with ORP\"\t" << opt / 1000000 << std::endl;
-	fd << "\"\\nMaximum with SRP\"\t" << single_opt / 1000000 << std::endl;
-	fd.close();
+	{
+		std::ofstream fd(data_file, std::ios_base::out);
+		fd << "\"Simulation (decoded)\"\t" << (double) nru / dur / 1000000 << std::endl;
+		fd << "\"\\nSimulation (coded)\"\t" << (double) nr / dur / 1000000 << std::endl;
+		fd << "\"Maximum with ORP\"\t" << opt / 1000000 << std::endl;
+		fd << "\"\\nMaximum with SRP\"\t" << single_opt / 1000000 << std::endl;
+		fd.close();
+	}
+	{
+		std::ofstream fd(path + "noc_sim_res.txt", std::ios_base::out|std::ios_base::app);
+		fd << sim_par << "\t" << (double) nru / dur / 1000000 << "\t" << (double) nr / dur / 1000000 << "\t" << opt / 1000000 << "\t" << single_opt / 1000000 << std::endl;
+		fd.close();
+
+	}
 
 	//
 	// make plot command

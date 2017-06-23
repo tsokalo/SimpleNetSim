@@ -142,6 +142,33 @@ struct SimParameters {
 		os << "Who can forward RR\t\t\t" << rrCanSend << std::endl;
 		os << "Warm-up period\t\t\t\t" << warmup << std::endl;
 	}
+
+	std::string GetInLine() {
+		std::stringstream os;
+		os << numGen << '\t';
+		os << genSize << '\t';
+		os << symbolSize << '\t';
+		os << apiRate << '\t';
+		os << sendRate << '\t';
+		os << numGenBuffering << '\t';
+		os << numGenRetrans << '\t';
+		os << numGenSingleTx << '\t';
+		os << fieldSize << '\t';
+		os << ccackLevels << '\t';
+		os << maxCoalitionSize << '\t';
+		os << mutualPhyLlcCoding << '\t';
+		os << per << '\t';
+		os << numRr << '\t';
+		os << (uint16_t) crCalcWay << '\t';
+		os << crNumSigma << '\t';
+		os << crReducFactor << '\t';
+		os << (uint16_t) rrCanSel << '\t';
+		os << (uint16_t) fbCont << '\t';
+		os << (uint16_t) giveRrPriorToSrc << '\t';
+		os << rrCanSend << '\t';
+		os << warmup;
+		return os.str();
+	}
 	template<typename T>
 	T ReadVal(std::ifstream &fs) {
 		std::string line;

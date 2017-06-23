@@ -373,7 +373,7 @@ HeaderMInfo MulticastBrr::GetHeaderInfo() {
 		assert(leq(a,1));
 		auto cr_ = 1 / brr->GetCodingRate();
 		assert(leq(a,cr_));
-		std::cout << cr_ << "\t" << a << "\t" << cr << std::endl;
+//		std::cout << cr_ << "\t" << a << "\t" << cr << std::endl;
 		assert(leq(cr_ - a , cr));
 		auto h = brr->GetHeaderInfo();
 		//
@@ -387,12 +387,12 @@ HeaderMInfo MulticastBrr::GetHeaderInfo() {
 		{
 			auto v = (1 - (1 - pf_.second) * (cr_ - a) / cr);
 			header.pf[pf_.first] = (header.pf[pf_.first] < v) ? v : header.pf[pf_.first];
-			std::cout << m_id << "\tSink: " << pf_.first << "\tDST: " << dst << "\tcr_: " << cr_ << "\ta: " << a << "\tcr: " << cr << "\tpfi: " << pf_.second << "\tv: " << v << "\thpfi: " << header.pf[pf_.first] << std::endl;
+//			std::cout << m_id << "\tSink: " << pf_.first << "\tDST: " << dst << "\tcr_: " << cr_ << "\ta: " << a << "\tcr: " << cr << "\tpfi: " << pf_.second << "\tv: " << v << "\thpfi: " << header.pf[pf_.first] << std::endl;
 		}
-		std::cout << std::endl;
+//		std::cout << std::endl;
 	}
-	std::cout << std::endl;
-	std::cout << std::endl;
+//	std::cout << std::endl;
+//	std::cout << std::endl;
 
 #endif
 
