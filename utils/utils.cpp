@@ -738,6 +738,7 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 
 	}
 
+
 	//
 	// make plot command
 	//
