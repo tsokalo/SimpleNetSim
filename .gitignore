@@ -236,5 +236,9 @@ changelog.txt
 IEEEtran.log
 .gitconfig*
 Results
+log.txt
+test.mps.gz
+noc_sim_res.txt
+gnuplot/data.txt
 
 
