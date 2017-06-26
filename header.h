@@ -34,18 +34,14 @@ namespace ncr {
 /*
  * Redundancy amount
  */
-enum CodeRedundancyCalcWay
-{
-	EXACT_EXPECTATION_REDANDANCY = 0,
-	PLUS_SIGMA_REDUNDANCY = 1,
-	MINUS_DELTA_REDUNDANCY = 2
+enum CodeRedundancyCalcWay {
+	EXACT_EXPECTATION_REDANDANCY = 0, PLUS_SIGMA_REDUNDANCY = 1, MINUS_DELTA_REDUNDANCY = 2
 };
 
 /*
  * Selection of RR forwarders
  */
-enum RrCandidateSelection
-{
+enum RrCandidateSelection {
 	RANDOM_RETRANSMITTER_RR_CANDIDATE_SELECTION,
 	CONNECTION_QUALITY_RR_CANDIDATE_SELECTION,
 	LIN_DEP_FREQ_RR_CANDIDATE_SELECTION,
@@ -56,20 +52,15 @@ enum RrCandidateSelection
 /*
  * Art of feedback
  */
-enum TypeOfFeedback
-{
-	ALL_VECTORS_FEEDBACK_ART,
-	HASH_VECTOR_FEEDBACK_ART,
-	SEEN_DEC_RANK_FEEDBACK_ART
+enum TypeOfFeedback {
+	ALL_VECTORS_FEEDBACK_ART, HASH_VECTOR_FEEDBACK_ART, SEEN_DEC_RANK_FEEDBACK_ART
 };
 
 /*
  * RR legimitation
  */
-enum WhoCanSendRr
-{
-	ALL_WHO_HEAR_LEGAL,
-	ONE_SELECTED_LEGAL
+enum WhoCanSendRr {
+	ALL_WHO_HEAR_LEGAL, ONE_SELECTED_LEGAL
 };
 
 //#define FULL_VECTOR
@@ -203,6 +194,7 @@ struct LogItem {
 		ns = 0;
 		nr = 0;
 		ssn = 0;
+		gsn = 0;
 		dst = 0;
 	}
 	LogItem(std::string init) {
@@ -225,6 +217,7 @@ struct LogItem {
 		ss >> ns;
 		ss >> nr;
 		ss >> ssn;
+		ss >> gsn;
 		uint16_t s_fp = 0, s_eps = 0;
 		ss >> s_fp;
 		ss >> s_eps;
@@ -257,6 +250,7 @@ struct LogItem {
 			this->ns = other.ns;
 			this->nr = other.nr;
 			this->ssn = other.ssn;
+			this->gsn = other.gsn;
 			this->dst = other.dst;
 		}
 		return *this;
@@ -264,8 +258,8 @@ struct LogItem {
 
 	friend std::ostream&
 	operator<<(std::ostream& os, const LogItem& l) {
-		os << l.dst << "\t" << l.d << "\t" << l.p << "\t" << l.cr << "\t" << l.cs << "\t" << l.ns << "\t" << l.nr << "\t" << l.ssn << "\t" << l.fp.size() << "\t"
-				<< l.eps.size();
+		os << l.dst << "\t" << l.d << "\t" << l.p << "\t" << l.cr << "\t" << l.cs << "\t" << l.ns << "\t" << l.nr << "\t" << l.ssn << "\t" << l.gsn << "\t"
+				<< l.fp.size() << "\t" << l.eps.size();
 
 		for (std::map<int16_t, double>::const_iterator it = l.fp.begin(); it != l.fp.end(); it++)
 			os << "\t" << it->first << "\t" << it->second;
@@ -315,6 +309,10 @@ struct LogItem {
 	 */
 	symb_ssn_t ssn;
 	/*
+	 * generation sequence number
+	 */
+	gen_ssn_t gsn;
+	/*
 	 * destination address
 	 */
 	UanAddress dst;
@@ -346,7 +344,6 @@ typedef std::map<UanAddress, LogHistory> LogBank;
 typedef double Dof;
 
 typedef std::unordered_map<UanAddress, double> pf_t;
-
 
 //struct CodingMatrix: public std::vector<CodingVector> {
 //
@@ -382,18 +379,16 @@ typedef std::function<uint32_t(GenId)> get_rank_func;
 typedef std::function<uint32_t(GenId)> get_rank_high_func;
 typedef std::function<void(LogItem item, UanAddress node_id)> add_log_func;
 
-struct TdmAccessPlan : std::map<uint16_t, double>
-{
+struct TdmAccessPlan: std::map<uint16_t, double> {
 	friend std::ostream&
-		operator<<(std::ostream& os, const TdmAccessPlan& l) {
-			os << "[";
-			for(auto i : l)
-			{
-				os << i.first << ":" << i.second << "; ";
-			}
-			os << "]";
-			return os;
+	operator<<(std::ostream& os, const TdmAccessPlan& l) {
+		os << "[";
+		for (auto i : l) {
+			os << i.first << ":" << i.second << "; ";
 		}
+		os << "]";
+		return os;
+	}
 };
 
 typedef std::vector<bool> BooleanVector;

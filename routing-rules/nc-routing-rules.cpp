@@ -127,6 +127,7 @@ void NcRoutingRules::UpdateSent(GenId genId, uint32_t num, bool notify_sending) 
 
 	if (notify_sending) {
 		m_logItem.ns = num;
+		m_logItem.gsn = genId;
 		if (m_addLog) m_addLog(m_logItem, m_id);
 		m_logItem.ns = 0;
 	}
@@ -167,6 +168,7 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, std::vector<OrigSymb
 		for (auto s : v) {
 			if (m_rcvApp) {
 				m_logItem.ssn = m_rcvApp(s);
+				m_logItem.gsn = genId;
 				SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "Decoding original symbol with SSN " << m_logItem.ssn);
 			}
 			if (m_addLog) m_addLog(m_logItem, m_id);
@@ -203,6 +205,7 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, bool linDep) {
 
 		m_rcvNum[genId][id] += num;
 		m_logItem.nr = num;
+		m_logItem.gsn = genId;
 		if (m_addLog) m_addLog(m_logItem, m_id);
 		m_logItem.nr = 0;
 
@@ -1359,9 +1362,9 @@ void NcRoutingRules::DoForgetGeneration(GenId genId) {
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Erasing generation " << genId);
 
-//	if (m_id == m_dst && m_getRank(genId) != 0) {
-//		SIM_ASSERT_MSG(m_getRank(genId) == m_sp.genSize, "Erasing generation " << genId << " with rank " << m_getRank(genId));
-//	}
+	if (m_id == m_dst && m_getRank(genId) != 0) {
+		SIM_ASSERT_MSG(m_getRank(genId) == m_sp.genSize, "Erasing generation " << genId << " with rank " << m_getRank(genId));
+	}
 
 	m_forwardPlan.erase(genId);
 	if (m_txPlan.find(genId) != m_txPlan.end()) {

@@ -143,9 +143,9 @@
 	<g id="gnuplot_plot_1" ><title>gnuplot_plot_1</title>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">
 	<g stroke='none' shape-rendering='crispEdges'>
-		<polygon fill = 'rgb( 86, 180, 233)' points = '451.3,444.0 451.4,444.0 451.4,47.0 451.3,47.0 '/>
+		<polygon fill = 'rgb( 86, 180, 233)' points = '451.3,444.0 451.4,444.0 451.4,54.8 451.3,54.8 '/>
 	</g>
-	<path stroke='rgb( 86, 180, 233)'  d='M451.3,444.0 L451.3,47.1 L451.3,444.0 Z  '/></g>
+	<path stroke='rgb( 86, 180, 233)'  d='M451.3,444.0 L451.3,54.9 L451.3,444.0 Z  '/></g>
 	</g>
 <g fill="none" color="white" stroke="rgb( 86, 180, 233)" stroke-width="2.00" stroke-linecap="butt" stroke-linejoin="miter">
 </g>

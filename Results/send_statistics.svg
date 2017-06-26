@@ -192,12 +192,12 @@
 		</pattern>
 	</defs>
 	<g stroke='none' shape-rendering='crispEdges'>
-		<polygon  fill = 'url(#gpPat2)' points = '249.8,475.2 283.0,475.2 283.0,60.8 249.8,60.8 '/>
+		<polygon  fill = 'url(#gpPat2)' points = '249.8,475.2 283.0,475.2 283.0,50.8 249.8,50.8 '/>
 	</g>
-	<path stroke='rgb(148,   0, 211)'  d='M249.8,475.2 L249.8,60.9 L282.9,60.9 L282.9,475.2 L249.8,475.2 Z  '/>	<g stroke='none' shape-rendering='crispEdges'>
-		<polygon  fill = 'url(#gpPat2)' points = '397.1,475.2 430.4,475.2 430.4,262.6 397.1,262.6 '/>
+	<path stroke='rgb(148,   0, 211)'  d='M249.8,475.2 L249.8,50.9 L282.9,50.9 L282.9,475.2 L249.8,475.2 Z  '/>	<g stroke='none' shape-rendering='crispEdges'>
+		<polygon  fill = 'url(#gpPat2)' points = '397.1,475.2 430.4,475.2 430.4,272.7 397.1,272.7 '/>
 	</g>
-	<path stroke='rgb(148,   0, 211)'  d='M397.1,475.2 L397.1,262.7 L430.3,262.7 L430.3,475.2 L397.1,475.2 Z  '/></g>
+	<path stroke='rgb(148,   0, 211)'  d='M397.1,475.2 L397.1,272.8 L430.3,272.8 L430.3,475.2 L397.1,475.2 Z  '/></g>
 	</g>
 	<g id="gnuplot_plot_2" ><title>Optimal</title>
 <g fill="none" color="black" stroke="currentColor" stroke-width="1.00" stroke-linecap="butt" stroke-linejoin="miter">

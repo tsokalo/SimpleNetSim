@@ -690,85 +690,201 @@ void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstId
 
 void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d, uint32_t warmup, uint32_t warmdown,
 		std::string sim_par) {
-	std::string gnuplot_dir = path + "gnuplot/";
-	std::string res_dir = path + "Results/";
-	std::string data_file = gnuplot_dir + "data.txt";
-	std::string figure_file = res_dir + "rates.svg";
 
-	//
-	// calculate total amount of linear independent packets received by the destination
-	// calculate total amount of feedback messages sent by all nodes
-	// calculate total amount of network discovery messages sent by all nodes
-	// calculate total amount of sent messages by all nodes
-	//
-	uint32_t nr = 0, nru = 0;
-	std::map<UanAddress, uint32_t> ns;
-
+	gen_ssn_t gsn = 0;
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
-		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
-			if (tt->t < warmup) continue;
-			if (tt->t > warmdown) break;
-			if (tt->log.p == DESTINATION_PRIORITY) nr += tt->log.nr;
-			if (tt->log.p == DESTINATION_PRIORITY && tt->m == ORIG_MSG_TYPE && tt->log.ssn != 0) nru++;
-			ns[t->first] += tt->log.ns;
+		for (LogHistory::reverse_iterator tt = t->second.rbegin(); tt != t->second.rend(); tt++) {
+			if (tt->t <= warmdown) {
+				gsn = tt->log.gsn;
+				break;
+			}
 		}
 	}
 
-	//
-	// unit [packet per bit per second]
-	//
-	double dur = 0;
-	for (auto n : ns) {
-		assert(d.find(n.first) != d.end());
-		dur += n.second / d.at(n.first);
-	}
-
-	assert(!eq(dur, 0));
-
-	//
-	// make data file
-	//
 	{
-		std::ofstream fd(data_file, std::ios_base::out);
-		fd << "\"Simulation (decoded)\"\t" << (double) nru / dur / 1000000 << std::endl;
-		fd << "\"\\nSimulation (coded)\"\t" << (double) nr / dur / 1000000 << std::endl;
-		fd << "\"Maximum with ORP\"\t" << opt / 1000000 << std::endl;
-		fd << "\"\\nMaximum with SRP\"\t" << single_opt / 1000000 << std::endl;
-		fd.close();
+		//
+		// average values
+		//
+
+		std::string gnuplot_dir = path + "gnuplot/";
+		std::string res_dir = path + "Results/";
+		std::string data_file = gnuplot_dir + "data.txt";
+		std::string figure_file = res_dir + "rates.svg";
+
+		//
+		// calculate total amount of linear independent packets received by the destination
+		// calculate total amount of feedback messages sent by all nodes
+		// calculate total amount of network discovery messages sent by all nodes
+		// calculate total amount of sent messages by all nodes
+		//
+		uint32_t nr = 0, nru = 0;
+		std::map<UanAddress, uint32_t> ns;
+
+		for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+			for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
+				if (tt->t < warmup) continue;
+				if (tt->log.gsn > gsn) continue;
+				if (tt->log.p == DESTINATION_PRIORITY && tt->m != ORIG_MSG_TYPE) nr += tt->log.nr;
+				if (tt->log.p == DESTINATION_PRIORITY && tt->m == ORIG_MSG_TYPE && tt->log.ssn != 0) nru++;
+				ns[t->first] += tt->log.ns;
+			}
+		}
+
+		//
+		// unit [packet per bit per second]
+		//
+		double dur = 0;
+		for (auto n : ns) {
+			assert(d.find(n.first) != d.end());
+			dur += n.second / d.at(n.first);
+		}
+
+		assert(!eq(dur, 0));
+
+		//
+		// make data file
+		//
+		{
+			std::ofstream fd(data_file, std::ios_base::out);
+			fd << "\"Simulation (decoded)\"\t" << (double) nru / dur / 1000000 << std::endl;
+			fd << "\"\\nSimulation (coded)\"\t" << (double) nr / dur / 1000000 << std::endl;
+			fd << "\"Maximum with ORP\"\t" << opt / 1000000 << std::endl;
+			fd << "\"\\nMaximum with SRP\"\t" << single_opt / 1000000 << std::endl;
+			fd.close();
+		}
+		{
+			std::ofstream fd(path + "noc_sim_res.txt", std::ios_base::out | std::ios_base::app);
+			fd << sim_par << "\t" << (double) nru / dur / 1000000 << "\t" << (double) nr / dur / 1000000 << "\t" << opt / 1000000 << "\t"
+					<< single_opt / 1000000 << std::endl;
+			fd.close();
+
+		}
+
+		//
+		// make plot command
+		//
+		std::stringstream plot_command;
+
+		plot_command << "set output '" << figure_file << "'" << std::endl;
+		plot_command << "plot ";
+		plot_command << "\"" << data_file << "\"" << " using 2:xticlabels(1)";
+		plot_command << " with boxes ls 1 lw 1 linecolor 3 notitle";
+
+		auto str_to_const_char = [](std::string str)
+		{
+			return str.c_str();
+		};
+		;
+		//
+		// make plot
+		//
+		std::string gnuplot_filename = gnuplot_dir + "plot_rates.p";
+		std::string gnuplot_filename_temp = gnuplot_dir + "plot_rates_temp.p";
+		ExecuteCommand(str_to_const_char("cp " + gnuplot_filename + " " + gnuplot_filename_temp));
+		std::ofstream f(gnuplot_filename_temp, std::ios_base::out | std::ios_base::app);
+		f << plot_command.str();
+		f.close();
+		ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 	}
+	//////////////////////////////////////////////////////////////////////////////////
+
 	{
-		std::ofstream fd(path + "noc_sim_res.txt", std::ios_base::out | std::ios_base::app);
-		fd << sim_par << "\t" << (double) nru / dur / 1000000 << "\t" << (double) nr / dur / 1000000 << "\t" << opt / 1000000 << "\t" << single_opt / 1000000
-				<< std::endl;
-		fd.close();
+		//
+		// time series
+		//
+
+		std::string gnuplot_dir = path + "gnuplot/";
+		std::string res_dir = path + "Results/";
+		std::string data_file = gnuplot_dir + "data.txt";
+		std::string figure_file = res_dir + "rates_time_series.svg";
+
+		//
+		// calculate total amount of linear independent packets received by the destination
+		// calculate total amount of feedback messages sent by all nodes
+		// calculate total amount of network discovery messages sent by all nodes
+		// calculate total amount of sent messages by all nodes
+		//
+		struct slot {
+
+			//
+			// unit [packet per bit per second]
+			//
+			double dur;
+			double nr;
+			double nru;
+		};
+
+		uint32_t ave_win = 100;
+		std::map<uint32_t, slot> n;
+		uint32_t slot_i = 0, i = 0, iii = 0;
+
+		for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+			std::map<UanAddress, uint32_t> j;
+			uint64_t prev_t = 0;
+			for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
+				if (tt->t > warmup && tt->log.gsn < gsn) {
+					if (tt->log.p == DESTINATION_PRIORITY && tt->m != ORIG_MSG_TYPE) n[slot_i].nr += tt->log.nr;
+					if (tt->log.p == DESTINATION_PRIORITY && tt->m == ORIG_MSG_TYPE && tt->log.ssn != 0) n[slot_i].nru++;
+				}
+				if (prev_t < tt->t) {
+					prev_t = tt->t;
+					j[t->first]++;
+					iii++;
+				}
+				if (i++ >= ave_win) {
+					for (auto k : j)
+						n[slot_i].dur += (double) k.second / d.at(k.first);
+					i = 0;
+					j.clear();
+					slot_i++;
+				}
+			}
+		}
+		std::cout << "iii: " << iii << std::endl;
+
+		//
+		// make data file
+		//
+		{
+			std::ofstream fd(data_file, std::ios_base::out);
+
+			double t = 0;
+			for (auto i : n) {
+				t += i.second.dur;
+				fd << t * 1000 << "\t" << i.second.nr / i.second.dur / 1000000 << "\t" << i.second.nru / i.second.dur / 1000000 << std::endl;
+			}
+			fd.close();
+		}
+
+		//
+		// make plot command
+		//
+		std::stringstream plot_command;
+
+		plot_command << "set output '" << figure_file << "'" << std::endl;
+		plot_command << "plot ";
+		plot_command << "\"" << data_file << "\"" << " using 1:2";
+		plot_command << " with linespoints ls 1 lw 1 pt 7 ps 0.3 linecolor 1 title \"Simulation (coded)\",\\" << std::endl;
+		plot_command << "\"" << data_file << "\"" << " using 1:3";
+		plot_command << " with linespoints ls 1 lw 1 pt 5 ps 0.3 linecolor 2 title \"Simulation (decoded)\"";
+
+		auto str_to_const_char = [](std::string str)
+		{
+			return str.c_str();
+		};
+		;
+		//
+		// make plot
+		//
+		std::string gnuplot_filename = gnuplot_dir + "plot_rates_time_series.p";
+		std::string gnuplot_filename_temp = gnuplot_dir + "plot_rates_time_series_temp.p";
+		ExecuteCommand(str_to_const_char("cp " + gnuplot_filename + " " + gnuplot_filename_temp));
+		std::ofstream f(gnuplot_filename_temp, std::ios_base::out | std::ios_base::app);
+		f << plot_command.str();
+		f.close();
+		ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 
 	}
-
-	//
-	// make plot command
-	//
-	std::stringstream plot_command;
-
-	plot_command << "set output '" << figure_file << "'" << std::endl;
-	plot_command << "plot ";
-	plot_command << "\"" << data_file << "\"" << " using 2:xticlabels(1)";
-	plot_command << " with boxes ls 1 lw 1 linecolor 3 notitle";
-
-	auto str_to_const_char = [](std::string str)
-	{
-		return str.c_str();
-	};
-	;
-	//
-	// make plot
-	//
-	std::string gnuplot_filename = gnuplot_dir + "plot_rates.p";
-	std::string gnuplot_filename_temp = gnuplot_dir + "plot_rates_temp.p";
-	ExecuteCommand(str_to_const_char("cp " + gnuplot_filename + " " + gnuplot_filename_temp));
-	std::ofstream f(gnuplot_filename_temp, std::ios_base::out | std::ios_base::app);
-	f << plot_command.str();
-	f.close();
-	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 }
 
 void PlotRetransmissionRequests(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown) {
