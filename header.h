@@ -78,7 +78,7 @@ enum WhoCanSendRr
  * unit [bps]
  */
 #define SMALLEST_SENDER_PHY_DATA_RATE		500
-#define PRIORITY_HYSTERESIS_WIDTH 	(50000)
+#define PRIORITY_HYSTERESIS_WIDTH 	(15000)
 #define PHW							PRIORITY_HYSTERESIS_WIDTH
 
 typedef Priority<PHW> priority_t;

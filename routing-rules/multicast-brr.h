@@ -15,9 +15,9 @@
 #include "utils/brrm-netdiscovery.h"
 #include "utils/filter-arithmetics.h"
 
-//#define USE_MAX_FILTERING_COEFS
+#define USE_MAX_FILTERING_COEFS
 //#define USE_MIN_FILTERING_COEFS
-#define NORM_REST_FILTERING_COEFS
+//#define NORM_REST_FILTERING_COEFS
 //#define DEST_AWARE_FILTERING_COEFS
 
 #define MAX_DATA_TXPLAN

@@ -23,18 +23,41 @@ struct node_map_t {
 	typedef node_map_base_t::iterator node_map_it;
 
 	//
-	// adds the new node ordered in the map by the priority value
+	// adds the new node ordered in the map by the priority value (descending order)
 	//
 	void add(UanAddress addr, priority_t p) {
 
 		auto it_o = find(addr);
+		// if already have
 		if (it_o != v.end()) {
-			v.erase(it_o, it_o + 1);
+			// check if the new priority value changes the sequence
+			bool b = false, e = false;
+
+			if (it_o == v.begin()) {
+				b = true;
+			} else if ((it_o - 1)->second >= p) {
+				b = true;
+			}
+
+			if (it_o == v.end()) {
+				e = true;
+			} else if (p >= (it_o + 1)->second) {
+				e = true;
+			}
+
+			if (b && e) {
+				// just update the priority
+				it_o->second = p;
+				return;
+			} else {
+				// erase the entry and find the new position
+				v.erase(it_o, it_o + 1);
+			}
 		}
 
 		auto s = v.size();
 		for (node_map_it it = v.begin(); it != v.end(); it++) {
-			if (it->second < p) {
+			if (p >= it->second) {
 				v.emplace(it, addr, p);
 				break;
 			}
@@ -105,6 +128,6 @@ private:
 	node_map_base_t v;
 
 };
-}//ncr
+}	//ncr
 
 #endif /* NODEMAP_H_ */

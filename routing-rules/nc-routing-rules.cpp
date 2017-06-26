@@ -42,7 +42,7 @@ NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress 
 	m_ttl = 10;
 	SIM_LOG_NP(BRR_LOG || TEMP_LOG, m_id, m_p, "Using TTL " << m_ttl);
 	SIM_ASSERT_MSG(m_ttl >= m_id, "TTL and addressing problem. TTL " << m_ttl << ", own ID " << m_id);
-	m_b = 0.05;
+	m_b = 0.1;
 	m_numRr = rr_counter_ptr(new RetransRequestCounter(sp.numRr));
 
 	assert(m_sp.numGenRetrans > m_sp.numGenBuffering);
@@ -1188,6 +1188,9 @@ void NcRoutingRules::DoUpdateCoalition() {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
+	auto p_temp = m_p;
+	auto coalition_temp = m_coalition;
+
 	m_coalition.clear();
 	if (m_dst == m_id) {
 		return;
@@ -1243,6 +1246,12 @@ void NcRoutingRules::DoUpdateCoalition() {
 		}
 	}
 	////////////////////////////////////////
+//
+//	if(m_p.val() - p_temp.val() < m_b * m_p.val())
+//	{
+//		m_p = p_temp;
+//		m_coalition = coalition_temp;
+//	}
 
 //	//
 //	// do the job

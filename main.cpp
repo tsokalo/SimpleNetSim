@@ -69,7 +69,7 @@ void CreateBigSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 void CreateAutoSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp, uint16_t dim) {
 	net = std::shared_ptr<CommNet>(new CommNet(dim * dim, sp));
 
-	double e1 = 0.5, e2 = 0.7;
+	double e1 = 0.6, e2 = 0.6;
 	for (uint16_t i = 0; i < dim; i++) {
 		for (uint16_t j = 0; j < dim - 1; j++) {
 			net->ConnectNodes(i * dim + j, i * dim + j + 1, ((i + j) % 2 == 0) ? e2 : e1);
@@ -91,7 +91,7 @@ void CreateAutoSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp, u
 void CreateBetaSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp, uint16_t dim) {
 	net = std::shared_ptr<CommNet>(new CommNet(dim * dim, sp));
 
-	double e1 = 0.1, e2 = 0.3;
+	double e1 = 0.1, e2 = 0.6;
 	for (uint16_t i = 0; i < dim; i++) {
 		for (uint16_t j = 0; j < dim - 1; j++) {
 			net->ConnectNodes(i * dim + j, i * dim + j + 1, e1 + e2 * (1 - (float)std::abs(j - i) / (float)dim));
@@ -250,12 +250,13 @@ int main(int argc, char *argv[]) {
 	//
 	// using default parameters
 	//
+	CreateAutoSquareScenario(net, sim_par, 3);
 //	CreateBetaSquareScenario(net, sim_par, 3);
 
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
-//	CreateStackScenario(net, 4, sim_par);
-	CreateTriangleScenario(net, sim_par);
+//	CreateStackScenario(net, 8, sim_par);
+//	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
@@ -266,7 +267,7 @@ int main(int argc, char *argv[]) {
 		CreateDirectory(folder);
 		std::cout << folder << std::endl;
 		net->EnableLog(folder);
-		net->Run(4000);
+		net->Run(30000);
 	} else if (m == EVAL_MODE) {
 		std::string f = folder + GetLogFileName();
 		std::cout << "Using file " << f << std::endl;
