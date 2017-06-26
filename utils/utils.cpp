@@ -473,7 +473,7 @@ void PlotCodingRates(uint32_t numNodes, std::vector<UanAddress> dstIds, LogBank 
 	}
 }
 
-void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan optPlan, uint32_t warmup_period) {
+void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan optPlan, uint32_t warmup, uint32_t warmdown) {
 
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
@@ -487,7 +487,8 @@ void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan optPlan, 
 	uint64_t totalSum = 0;
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
-			if (tt->t < warmup_period) continue;
+			if (tt->t < warmup) continue;
+			if (tt->t > warmdown) break;
 			if (tt->m == DATA_MSG_TYPE) sum_send[t->first] += tt->log.ns;
 			if (tt->m == DATA_MSG_TYPE) totalSum += tt->log.ns;
 		}
@@ -558,7 +559,7 @@ void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan optPlan, 
 	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 }
 
-void PlotResourceWaste(LogBank lb, std::string path, double sigma, uint32_t warmup_period) {
+void PlotResourceWaste(LogBank lb, std::string path, double sigma, uint32_t warmup, uint32_t warmdown) {
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
 	std::string data_file = gnuplot_dir + "data.txt";
@@ -574,7 +575,8 @@ void PlotResourceWaste(LogBank lb, std::string path, double sigma, uint32_t warm
 
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
-			if (tt->t < warmup_period) continue;
+			if (tt->t < warmup) continue;
+			if (tt->t > warmdown) break;
 			if (tt->m == FEEDBACK_MSG_TYPE) fb += tt->log.ns;
 			if (tt->m == NETDISC_MSG_TYPE) nd += tt->log.ns;
 			if (tt->m == RETRANS_REQUEST_MSG_TYPE) nrr += tt->log.ns;
@@ -620,7 +622,7 @@ void PlotResourceWaste(LogBank lb, std::string path, double sigma, uint32_t warm
 	f.close();
 	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 }
-void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstIds, std::map<UanAddress, Datarate> d, uint32_t warmup_period) {
+void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstIds, std::map<UanAddress, Datarate> d, uint32_t warmup, uint32_t warmdown) {
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
 	std::string data_file = gnuplot_dir + "data.txt";
@@ -631,7 +633,8 @@ void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstId
 
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
-			if (tt->t < warmup_period) continue;
+			if (tt->t < warmup) continue;
+			if (tt->t > warmdown) break;
 			if (tt->log.p == DESTINATION_PRIORITY) {
 				nr[tt->log.dst] += tt->log.nr;
 			}
@@ -685,7 +688,8 @@ void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstId
 
 }
 
-void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d, uint32_t warmup_period, std::string sim_par) {
+void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d, uint32_t warmup, uint32_t warmdown,
+		std::string sim_par) {
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
 	std::string data_file = gnuplot_dir + "data.txt";
@@ -702,7 +706,8 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
-			if (tt->t < warmup_period) continue;
+			if (tt->t < warmup) continue;
+			if (tt->t > warmdown) break;
 			if (tt->log.p == DESTINATION_PRIORITY) nr += tt->log.nr;
 			if (tt->log.p == DESTINATION_PRIORITY && tt->m == ORIG_MSG_TYPE && tt->log.ssn != 0) nru++;
 			ns[t->first] += tt->log.ns;
@@ -732,12 +737,12 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 		fd.close();
 	}
 	{
-		std::ofstream fd(path + "noc_sim_res.txt", std::ios_base::out|std::ios_base::app);
-		fd << sim_par << "\t" << (double) nru / dur / 1000000 << "\t" << (double) nr / dur / 1000000 << "\t" << opt / 1000000 << "\t" << single_opt / 1000000 << std::endl;
+		std::ofstream fd(path + "noc_sim_res.txt", std::ios_base::out | std::ios_base::app);
+		fd << sim_par << "\t" << (double) nru / dur / 1000000 << "\t" << (double) nr / dur / 1000000 << "\t" << opt / 1000000 << "\t" << single_opt / 1000000
+				<< std::endl;
 		fd.close();
 
 	}
-
 
 	//
 	// make plot command
@@ -766,7 +771,7 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 }
 
-void PlotRetransmissionRequests(LogBank lb, std::string path, uint32_t warmup_period) {
+void PlotRetransmissionRequests(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown) {
 
 	std::string gnuplot_dir = path + "gnuplot/";
 	std::string res_dir = path + "Results/";
@@ -781,7 +786,8 @@ void PlotRetransmissionRequests(LogBank lb, std::string path, uint32_t warmup_pe
 
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
-			if (tt->t < warmup_period) continue;
+			if (tt->t < warmup) continue;
+			if (tt->t > warmdown) break;
 			if (tt->m == RETRANS_REQUEST_MSG_TYPE) {
 				nrr[t->first] += tt->log.ns;
 				nrr_total += tt->log.ns;

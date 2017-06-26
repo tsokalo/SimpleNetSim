@@ -50,6 +50,10 @@ public:
 	void SetMessType(MessType t) {
 		m_msgType = t;
 	}
+	uint64_t GetLogCounter()
+	{
+		return m_t;
+	}
 
 private:
 

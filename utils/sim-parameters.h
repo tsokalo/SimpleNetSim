@@ -39,6 +39,8 @@ struct SimParameters {
 		giveRrPriorToSrc = true;
 		rrCanSend = ONE_SELECTED_LEGAL;
 		warmup = 1000;
+		warmdown= 1000;
+		simDuration = 10000;
 	}
 
 	SimParameters(std::string path) {
@@ -74,6 +76,8 @@ struct SimParameters {
 			this->giveRrPriorToSrc = other.giveRrPriorToSrc;
 			this->rrCanSend = other.rrCanSend;
 			this->warmup = other.warmup;
+			this->warmdown = other.warmdown;
+			this->simDuration = other.simDuration;
 		}
 		return *this;
 	}
@@ -109,6 +113,8 @@ struct SimParameters {
 		giveRrPriorToSrc = ReadVal<bool>(in_f);
 		rrCanSend = WhoCanSendRr(ReadVal<uint16_t>(in_f));
 		warmup = ReadVal<uint32_t>(in_f);
+		warmdown = ReadVal<uint32_t>(in_f);
+		simDuration = ReadVal<uint64_t>(in_f);
 		in_f.close();
 	}
 
@@ -141,6 +147,8 @@ struct SimParameters {
 		os << "Give RR priority to SRC\t\t\t" << (uint16_t) giveRrPriorToSrc << std::endl;
 		os << "Who can forward RR\t\t\t" << rrCanSend << std::endl;
 		os << "Warm-up period\t\t\t\t" << warmup << std::endl;
+		os << "Warm-down period\t\t\t" << warmup << std::endl;
+		os << "Simulation duration\t\t\t" << simDuration << std::endl;
 	}
 
 	std::string GetInLine() {
@@ -166,7 +174,9 @@ struct SimParameters {
 		os << (uint16_t) fbCont << '\t';
 		os << (uint16_t) giveRrPriorToSrc << '\t';
 		os << rrCanSend << '\t';
-		os << warmup;
+		os << warmup << '\t';
+		os << warmdown << '\t';
+		os << simDuration;
 		return os.str();
 	}
 	template<typename T>
@@ -268,6 +278,14 @@ struct SimParameters {
 	 * warm-up period; considered in the evaluation mode
 	 */
 	uint32_t warmup;
+	/*
+	 * warm-down period; considered in the evaluation mode
+	 */
+	uint32_t warmdown;
+	/*
+	 * simulation duration
+	 */
+	uint64_t simDuration;
 };
 }
 

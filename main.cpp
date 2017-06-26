@@ -250,13 +250,13 @@ int main(int argc, char *argv[]) {
 	//
 	// using default parameters
 	//
-	CreateAutoSquareScenario(net, sim_par, 3);
+//	CreateAutoSquareScenario(net, sim_par, 3);
 //	CreateBetaSquareScenario(net, sim_par, 3);
 
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
 //	CreateStackScenario(net, 8, sim_par);
-//	CreateTriangleScenario(net, sim_par);
+	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
@@ -267,7 +267,7 @@ int main(int argc, char *argv[]) {
 		CreateDirectory(folder);
 		std::cout << folder << std::endl;
 		net->EnableLog(folder);
-		net->Run(30000);
+		net->Run(sim_par.simDuration);
 	} else if (m == EVAL_MODE) {
 		std::string f = folder + GetLogFileName();
 		std::cout << "Using file " << f << std::endl;
@@ -317,7 +317,7 @@ int main(int argc, char *argv[]) {
 		//
 		// plot retransmission requests; for all given nodes on one plot
 		//
-		PlotRetransmissionRequests(lb, subpath, sim_par.warmup);
+		PlotRetransmissionRequests(lb, subpath, sim_par.warmup, sim_par.simDuration - sim_par.warmdown);
 
 		//
 		// plot sending statistics; for all given nodes on one plot
@@ -335,12 +335,12 @@ int main(int argc, char *argv[]) {
 		//
 		// plot proportion of feedback/network discovery/excessive redundant packets to all sent packets
 		//
-		PlotResourceWaste(lb, subpath, exOrSolver.GetOptChannelUses(), sim_par.warmup);
+		PlotResourceWaste(lb, subpath, exOrSolver.GetOptChannelUses(), sim_par.warmup, sim_par.simDuration - sim_par.warmdown);
 
 		std::cout << "Optimal plan: " << plan_orp << ", SRP plan" << plan_srp << std::endl;
 		std::cout << "Optimal d: " << exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate()
 				<< ", SRP d: " << srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate() << std::endl;
-		PlotSendingStatistics(lb, subpath, plan_orp, sim_par.warmup);
+		PlotSendingStatistics(lb, subpath, plan_orp, sim_par.warmup, sim_par.simDuration - sim_par.warmdown);
 
 		//
 		// plot the maximum achievable data rate, the achieved data rate and the maximum achievable data rate with RP-S
@@ -349,9 +349,9 @@ int main(int argc, char *argv[]) {
 		for (auto node : net->GetNodes())
 			d[node->GetId()] = node->GetDatarate();
 		PlotRates(lb, subpath, exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(),
-				srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), d, sim_par.warmup, sim_par.GetInLine());
+				srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), d, sim_par.warmup, sim_par.simDuration - sim_par.warmdown, sim_par.GetInLine());
 
-		PlotRatesPerDst(lb, subpath, net->GetDstIds(), d, sim_par.warmup);
+		PlotRatesPerDst(lb, subpath, net->GetDstIds(), d, sim_par.warmup, sim_par.simDuration - sim_par.warmdown);
 
 		//
 		// analyze stability of the source priority
