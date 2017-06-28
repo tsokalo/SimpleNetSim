@@ -11,7 +11,7 @@ set format y '%0.2f'
 
 set xlabel "Time / milliseconds"
 set xrange [0:*]
-set format x '%0.3f'
+set format x '%0.0f'
 
 set grid xtics ytics back lw 1 lc rgb "#AFAFAF"
 set key below left

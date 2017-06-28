@@ -1139,6 +1139,39 @@ void PlotOutputStability(LogBank lb, std::string path, double opt, UanAddress ds
 	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 }
 
+double GetLinkLossValue(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown, uint16_t genSize)
+{
+	gen_ssn_t gsn = 0;
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::reverse_iterator tt = t->second.rbegin(); tt != t->second.rend(); tt++) {
+			if (tt->t <= warmdown) {
+				gsn = tt->log.gsn;
+				break;
+			}
+		}
+	}
+	std::map<uint32_t, uint16_t> decoded;
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+
+		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
+
+			if (tt->t > warmup && tt->log.gsn < gsn) {
+				if (tt->log.p == DESTINATION_PRIORITY && tt->m == ORIG_MSG_TYPE && tt->log.ssn != 0) decoded[tt->log.gsn.val()]++;
+			}
+		}
+	}
+
+	for(auto d : decoded)
+		{
+//		std::cout << "In " << d.first << " decoded " << d.second << std::endl;
+		assert(d.second <= genSize);
+		}
+	uint64_t sum_decoded = 0;
+	for(auto d : decoded) sum_decoded += d.second;
+
+	return 1 - (long double) sum_decoded / (long double) (genSize * decoded.size());
+}
+
 void PlotSrcPriorStability(LogBank lb, std::string path, double opt, UanAddress src) {
 
 	std::string gnuplot_dir = path + "gnuplot/";

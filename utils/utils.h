@@ -65,6 +65,8 @@ void PlotRetransmissionRequests(LogBank lb, std::string path, uint32_t warmup, u
 void PlotOutputStability(LogBank lb, std::string path, double opt, UanAddress dst);
 void PlotSrcPriorStability(LogBank lb, std::string path, double opt, UanAddress src);
 
+double GetLinkLossValue(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown, uint16_t genSize);
+
 void ExecuteCommand(const char * cmd);
 CodingVector ExtractCodingVector(std::vector<uint8_t> payload, uint16_t genSize);
 void PrintProgress(uint32_t m, uint32_t c);

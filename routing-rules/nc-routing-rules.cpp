@@ -8,6 +8,7 @@
 #include "utils/comparison.h"
 #include "utils/ssn.h"
 #include <assert.h>
+#include <iterator>
 
 namespace ncr {
 
@@ -1970,7 +1971,7 @@ bool NcRoutingRules::CreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId
 		assert(rank.second != 0);
 	};;
 
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Actual number of generaitons " << ranks.size() << ", maximum number " << m_sp.numGen);
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Actual number of generaitons " << ranks.size() << ", maximum number to retransmit " << m_sp.numGenRetrans);
 
 	//
 	// the first generation in the map is the oldest one;
@@ -1978,91 +1979,73 @@ bool NcRoutingRules::CreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId
 	//
 	uint16_t checkGenNum = (ranks.size() > m_sp.numGenRetrans) ? ranks.size() - m_sp.numGenRetrans : 0;
 
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Check gen num  " << checkGenNum);
+
 	if (checkGenNum == 0) return false;
 
-	uint16_t sumRank = 0;
+	//
+	// do not send RR for the generation if
+	// just received the symbol belonging to this or older generations
+	//
+	GenId oldestId = ranks.begin()->first;
+	for(auto rank : ranks)oldestId = (gen_ssn_t(rank.first) < gen_ssn_t(oldestId)) ? rank.first : oldestId;
+	if (gen_ssn_t(oldestId) >= gen_ssn_t(genId)) {
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say NO to sending of RR. Received <= symbol");
+		return false;
+	}
 
-	//
-	// find the sum rank of the first checkGenNum generations
-	//
+	assert(m_getCodingMatrix);
 	auto it = ranks.begin();
+
 	for (uint16_t i = 0; i < checkGenNum; i++) {
+
 		auto gid = it->first;
 		if (m_numRr->is_expired(gid)) {
 			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "RR counter is expired");
-			checkGenNum--;
 			it++;
 			continue;
-		}
-		sumRank += it->second;
-		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Add generation with rank " << it->second);
-		it++;
-		m_numRr->increment(gid);
-	}
-	SIM_LOG_NPD(1, m_id, m_p, m_dst, "Sum rank of the first " << checkGenNum << " generations: " << sumRank << ", generation size: " << m_sp.genSize);
-
-	//
-	// if the first checkGenNum generations are not full
-	//
-	if (sumRank < m_sp.genSize * checkGenNum) {
-		assert(m_getCodingMatrix);
-		auto it = ranks.begin();
-		;
-		for (uint16_t i = 0; i < checkGenNum; i++) {
-
-			//
-			// TODO: continue for the generations with the full rank
-			//
-			if (it->second < m_sp.genSize) {
-				//
-				// do not send RR for the generation if
-				// just received the symbol belonging to this or older generations
-				//
-				if (gen_ssn_t(it->first) >= gen_ssn_t(genId)) {
-					SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say NO to sending of RR. Received <= symbol");
-					return false;
-				}
-				auto l_genId = it->first;
-
-				m_f.rrInfo[l_genId].codingCoefs.clear();
-				m_f.rrInfo[l_genId].hashVector.clear();
-				switch (m_sp.fbCont) {
-				case ALL_VECTORS_FEEDBACK_ART: {
-					SIM_LOG_NPG(BRR_LOG, m_id, m_p, l_genId, "Adding coding matrix with rank: " << it->second);
-					m_f.rrInfo[l_genId].codingCoefs = m_getCodingMatrix(l_genId);
-					break;
-				}
-				case HASH_VECTOR_FEEDBACK_ART: {
-					assert(m_ccack.find(l_genId) != m_ccack.end());
-					m_f.rrInfo[l_genId].hashVector = m_ccack[l_genId]->GetHashVector();
-					SIM_LOG_NPG(BRR_LOG, m_id, m_p, l_genId, "Hash vector " << m_f.rrInfo[l_genId].hashVector);
-					break;
-				}
-				case SEEN_DEC_RANK_FEEDBACK_ART: {
-					m_f.rrInfo[l_genId].coderInfo = m_getCoderInfo(l_genId);
-					break;
-				}
-				default: {
-					assert(0);
-				}
-				}
-			}
-			it++;
-		}
-
-		if (!m_f.rrInfo.empty()) {
-			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say YES to sending of RR");
-			m_f.rrInfo.forwarder = SelectRetransRequestForwarder();
-			//			std::cout << "\t\t\t>>>> RR (original) from " << m_id << ": ";
-			//			for(auto r : m_f.rrInfo)std::cout << "<" << r.first << "," << m_getRank(r.first) << "> ";
-			//			std::cout << std::endl;
-			return true;
 		} else {
-			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say NO to sending of RR. I have not sufficient generations in memory");
-			return false;
+			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "RR counter is NOT expired yet");
+			m_numRr->increment(gid);
 		}
+
+		if (it->second < m_sp.genSize) {
+
+			m_f.rrInfo[gid].codingCoefs.clear();
+			m_f.rrInfo[gid].hashVector.clear();
+			switch (m_sp.fbCont) {
+			case ALL_VECTORS_FEEDBACK_ART: {
+				SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Adding coding matrix with rank: " << it->second);
+				m_f.rrInfo[gid].codingCoefs = m_getCodingMatrix(gid);
+				break;
+			}
+			case HASH_VECTOR_FEEDBACK_ART: {
+				assert(m_ccack.find(gid) != m_ccack.end());
+				m_f.rrInfo[gid].hashVector = m_ccack[gid]->GetHashVector();
+				SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Hash vector " << m_f.rrInfo[gid].hashVector);
+				break;
+			}
+			case SEEN_DEC_RANK_FEEDBACK_ART: {
+				m_f.rrInfo[gid].coderInfo = m_getCoderInfo(gid);
+				break;
+			}
+			default: {
+				assert(0);
+			}
+			}
+		}
+		it++;
+	}
+
+	if (!m_f.rrInfo.empty()) {
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say YES to sending of RR");
+		m_f.rrInfo.forwarder = SelectRetransRequestForwarder();
+		//			std::cout << "\t\t\t>>>> RR (original) from " << m_id << ": ";
+		//			for(auto r : m_f.rrInfo)std::cout << "<" << r.first << "," << m_getRank(r.first) << "> ";
+		//			std::cout << std::endl;
+		return true;
 	} else {
-		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say NO to sending of RR. I have sufficient DOF");
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say NO to sending of RR. I have not sufficient generations in memory");
 		return false;
 	}
 
