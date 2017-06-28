@@ -483,12 +483,21 @@ void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan optPlan, 
 	//
 	// make data file
 	//
+	gen_ssn_t gsn = 0;
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::reverse_iterator tt = t->second.rbegin(); tt != t->second.rend(); tt++) {
+			if (tt->t <= warmdown) {
+				gsn = tt->log.gsn;
+				break;
+			}
+		}
+	}
 	std::map<UanAddress, uint64_t> sum_send;
 	uint64_t totalSum = 0;
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
 			if (tt->t < warmup) continue;
-			if (tt->t > warmdown) break;
+			if (tt->log.gsn > gsn) continue;
 			if (tt->m == DATA_MSG_TYPE) sum_send[t->first] += tt->log.ns;
 			if (tt->m == DATA_MSG_TYPE) totalSum += tt->log.ns;
 		}
@@ -573,10 +582,19 @@ void PlotResourceWaste(LogBank lb, std::string path, double sigma, uint32_t warm
 	//
 	uint32_t nr = 0, fb = 0, nd = 0, ns = 0, nrr = 0;
 
+	gen_ssn_t gsn = 0;
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::reverse_iterator tt = t->second.rbegin(); tt != t->second.rend(); tt++) {
+			if (tt->t <= warmdown) {
+				gsn = tt->log.gsn;
+				break;
+			}
+		}
+	}
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
 			if (tt->t < warmup) continue;
-			if (tt->t > warmdown) break;
+			if (tt->log.gsn > gsn) continue;
 			if (tt->m == FEEDBACK_MSG_TYPE) fb += tt->log.ns;
 			if (tt->m == NETDISC_MSG_TYPE) nd += tt->log.ns;
 			if (tt->m == RETRANS_REQUEST_MSG_TYPE) nrr += tt->log.ns;
@@ -631,10 +649,19 @@ void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstId
 	std::map<UanAddress, uint32_t> nr;
 	std::map<UanAddress, uint32_t> ns;
 
+	gen_ssn_t gsn = 0;
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::reverse_iterator tt = t->second.rbegin(); tt != t->second.rend(); tt++) {
+			if (tt->t <= warmdown) {
+				gsn = tt->log.gsn;
+				break;
+			}
+		}
+	}
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
 			if (tt->t < warmup) continue;
-			if (tt->t > warmdown) break;
+			if (tt->log.gsn > gsn) continue;
 			if (tt->log.p == DESTINATION_PRIORITY) {
 				nr[tt->log.dst] += tt->log.nr;
 			}
@@ -689,7 +716,7 @@ void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstId
 }
 
 void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d, uint32_t warmup, uint32_t warmdown,
-		std::string sim_par) {
+		uint64_t simdur, std::string sim_par) {
 
 	gen_ssn_t gsn = 0;
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
@@ -815,32 +842,27 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 		};
 
 		uint32_t ave_win = 100;
+		auto get_win_n = [&](uint64_t t)
+		{
+			return floor((long double)t / (double)ave_win);
+		};
+
 		std::map<uint32_t, slot> n;
-		uint32_t slot_i = 0, i = 0, iii = 0;
 
 		for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
-			std::map<UanAddress, uint32_t> j;
-			uint64_t prev_t = 0;
+
 			for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
+
+				auto ti = get_win_n(tt->t);
+
 				if (tt->t > warmup && tt->log.gsn < gsn) {
-					if (tt->log.p == DESTINATION_PRIORITY && tt->m != ORIG_MSG_TYPE) n[slot_i].nr += tt->log.nr;
-					if (tt->log.p == DESTINATION_PRIORITY && tt->m == ORIG_MSG_TYPE && tt->log.ssn != 0) n[slot_i].nru++;
+					if (tt->log.p == DESTINATION_PRIORITY && tt->m != ORIG_MSG_TYPE) n[ti].nr += tt->log.nr;
+					if (tt->log.p == DESTINATION_PRIORITY && tt->m == ORIG_MSG_TYPE && tt->log.ssn != 0) n[ti].nru++;
 				}
-				if (prev_t < tt->t) {
-					prev_t = tt->t;
-					j[t->first]++;
-					iii++;
-				}
-				if (i++ >= ave_win) {
-					for (auto k : j)
-						n[slot_i].dur += (double) k.second / d.at(k.first);
-					i = 0;
-					j.clear();
-					slot_i++;
-				}
+
+				if (tt->log.ns != 0) n[ti].dur += 1 / d.at(t->first);
 			}
 		}
-		std::cout << "iii: " << iii << std::endl;
 
 		//
 		// make data file
@@ -887,6 +909,76 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 	}
 }
 
+void PlotRanks(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown) {
+	//
+	// time series
+	//
+
+	std::string gnuplot_dir = path + "gnuplot/";
+	std::string res_dir = path + "Results/";
+	std::string data_file = gnuplot_dir + "data.txt";
+	std::string figure_file = res_dir + "ranks.svg";
+
+	gen_ssn_t gsn = 0;
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::reverse_iterator tt = t->second.rbegin(); tt != t->second.rend(); tt++) {
+			if (tt->t <= warmdown) {
+				gsn = tt->log.gsn;
+				break;
+			}
+		}
+	}
+	std::map<uint32_t, uint16_t> ranks;
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+
+		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
+
+			if (tt->t > warmup && tt->log.gsn < gsn) {
+				if (tt->log.p == DESTINATION_PRIORITY && ranks[tt->log.gsn.val()] < tt->log.rank) ranks[tt->log.gsn.val()] = tt->log.rank;
+			}
+		}
+	}
+
+	//
+	// make data file
+	//
+	{
+		std::ofstream fd(data_file, std::ios_base::out);
+
+		for (auto i : ranks) {
+			fd << i.first << "\t" << i.second << std::endl;
+		}
+		fd.close();
+	}
+
+	//
+	// make plot command
+	//
+	std::stringstream plot_command;
+
+	plot_command << "set output '" << figure_file << "'" << std::endl;
+	plot_command << "plot ";
+	plot_command << "\"" << data_file << "\"" << " using 1:2";
+	plot_command << " with linespoints ls 1 lw 1 pt 7 ps 0.3 linecolor 1 notitle" << std::endl;
+
+	auto str_to_const_char = [](std::string str)
+	{
+		return str.c_str();
+	};
+	;
+	//
+	// make plot
+	//
+	std::string gnuplot_filename = gnuplot_dir + "plot_ranks.p";
+	std::string gnuplot_filename_temp = gnuplot_dir + "plot_ranks_temp.p";
+	ExecuteCommand(str_to_const_char("cp " + gnuplot_filename + " " + gnuplot_filename_temp));
+	std::ofstream f(gnuplot_filename_temp, std::ios_base::out | std::ios_base::app);
+	f << plot_command.str();
+	f.close();
+	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
+
+}
+
 void PlotRetransmissionRequests(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown) {
 
 	std::string gnuplot_dir = path + "gnuplot/";
@@ -900,10 +992,20 @@ void PlotRetransmissionRequests(LogBank lb, std::string path, uint32_t warmup, u
 	uint32_t nrr_total = 0;
 	std::map<UanAddress, uint32_t> nrr;
 
+	gen_ssn_t gsn = 0;
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::reverse_iterator tt = t->second.rbegin(); tt != t->second.rend(); tt++) {
+			if (tt->t <= warmdown) {
+				gsn = tt->log.gsn;
+				break;
+			}
+		}
+	}
+
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
 			if (tt->t < warmup) continue;
-			if (tt->t > warmdown) break;
+			if (tt->log.gsn > gsn) continue;
 			if (tt->m == RETRANS_REQUEST_MSG_TYPE) {
 				nrr[t->first] += tt->log.ns;
 				nrr_total += tt->log.ns;

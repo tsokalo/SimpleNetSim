@@ -1,5 +1,5 @@
-Number of generations					20
-Generation size							100
+Number of generations					5
+Generation size							64
 Symbol size / bytes						10
 Application data rate / bps				1e+06
 Sending data rate / bps					1e+06
@@ -11,14 +11,14 @@ CCACK levels							2
 Maximum coalition size					4
 Mutual PHY and LLC coding / flag		0
 Target packet loss ratio				0.2
-Maximum number of RRs					3
+Maximum number of RRs					0
 CR calculation way						2
 Number of sigmas						2
 CR reduction factor						0
 RR candidate selection way				4
 Type of the feedback contents			2
 Give RR priority to SRC					1
-Who can forward RR						0
-Warm-up period							3000
-Warm-down period						3000
-Simulation duration						10000
+Who can forward RR						1
+Warm-up period							1000
+Warm-down period						1000
+Simulation duration						20000

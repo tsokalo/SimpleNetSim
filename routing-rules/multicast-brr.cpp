@@ -501,7 +501,7 @@ bool MulticastBrr::ProcessRetransRequest(FeedbackMInfo l) {
 		auto addr = p.first;
 		assert(m_brr.find(addr) != m_brr.end());
 		f.p = p.second;
-		m_brr.at(addr)->RcvFeedbackInfo(f);
+//		m_brr.at(addr)->RcvFeedbackInfo(f);
 		b = (m_brr.at(addr)->ProcessRetransRequest(f)) ? true : b;
 	}
 
@@ -526,7 +526,7 @@ bool MulticastBrr::HasRetransRequest(FeedbackMInfo l) {
 		auto addr = p.first;
 		assert(m_brr.find(addr) != m_brr.end());
 		f.p = p.second;
-		m_brr.at(addr)->RcvFeedbackInfo(f);
+//		m_brr.at(addr)->RcvFeedbackInfo(f);
 		b = (m_brr.at(addr)->HasRetransRequest(f)) ? true : b;
 	}
 

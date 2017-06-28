@@ -205,6 +205,7 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, bool linDep) {
 
 		m_rcvNum[genId][id] += num;
 		m_logItem.nr = num;
+		m_logItem.rank = m_getRank(genId);
 		m_logItem.gsn = genId;
 		if (m_addLog) m_addLog(m_logItem, m_id);
 		m_logItem.nr = 0;
@@ -1362,9 +1363,9 @@ void NcRoutingRules::DoForgetGeneration(GenId genId) {
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Erasing generation " << genId);
 
-	if (m_id == m_dst && m_getRank(genId) != 0) {
-		SIM_ASSERT_MSG(m_getRank(genId) == m_sp.genSize, "Erasing generation " << genId << " with rank " << m_getRank(genId));
-	}
+//	if (m_id == m_dst && m_getRank(genId) != 0) {
+//		SIM_ASSERT_MSG(m_getRank(genId) == m_sp.genSize, "Erasing generation " << genId << " with rank " << m_getRank(genId));
+//	}
 
 	m_forwardPlan.erase(genId);
 	if (m_txPlan.find(genId) != m_txPlan.end()) {
@@ -1578,7 +1579,7 @@ void NcRoutingRules::DoUpdateRetransPlan(std::map<GenId, CoderHelpInfo> helpInfo
 
 		switch (m_sp.rrCanSend) {
 		case ALL_WHO_HEAR_LEGAL: {
-			// do nothing
+			m_retransPlan[genId] = (inf.second.finRank - inf.second.origRank);
 			break;
 		}
 		case ONE_SELECTED_LEGAL: {
@@ -1998,7 +1999,7 @@ bool NcRoutingRules::CreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId
 		it++;
 		m_numRr->increment(gid);
 	}
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Sum rank of the first " << checkGenNum << " generations: " << sumRank << ", generation size: " << m_sp.genSize);
+	SIM_LOG_NPD(1, m_id, m_p, m_dst, "Sum rank of the first " << checkGenNum << " generations: " << sumRank << ", generation size: " << m_sp.genSize);
 
 	//
 	// if the first checkGenNum generations are not full

@@ -196,6 +196,7 @@ struct LogItem {
 		ssn = 0;
 		gsn = 0;
 		dst = 0;
+		rank = 0;
 	}
 	LogItem(std::string init) {
 		std::stringstream ss(init);
@@ -218,6 +219,7 @@ struct LogItem {
 		ss >> nr;
 		ss >> ssn;
 		ss >> gsn;
+		ss >> rank;
 		uint16_t s_fp = 0, s_eps = 0;
 		ss >> s_fp;
 		ss >> s_eps;
@@ -251,6 +253,7 @@ struct LogItem {
 			this->nr = other.nr;
 			this->ssn = other.ssn;
 			this->gsn = other.gsn;
+			this->rank = other.rank;
 			this->dst = other.dst;
 		}
 		return *this;
@@ -259,7 +262,7 @@ struct LogItem {
 	friend std::ostream&
 	operator<<(std::ostream& os, const LogItem& l) {
 		os << l.dst << "\t" << l.d << "\t" << l.p << "\t" << l.cr << "\t" << l.cs << "\t" << l.ns << "\t" << l.nr << "\t" << l.ssn << "\t" << l.gsn << "\t"
-				<< l.fp.size() << "\t" << l.eps.size();
+				<< l.rank << "\t" << l.fp.size() << "\t" << l.eps.size();
 
 		for (std::map<int16_t, double>::const_iterator it = l.fp.begin(); it != l.fp.end(); it++)
 			os << "\t" << it->first << "\t" << it->second;
@@ -312,6 +315,10 @@ struct LogItem {
 	 * generation sequence number
 	 */
 	gen_ssn_t gsn;
+	/*
+	 * generation rank
+	 */
+	uint32_t rank;
 	/*
 	 * destination address
 	 */

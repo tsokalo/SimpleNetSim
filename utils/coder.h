@@ -38,6 +38,7 @@
 #include "feedback-estimator.h"
 #include "coder-help-info.h"
 #include "utils/coding-vector.h"
+#include "utils/log.h"
 
 #ifndef FULL_VECTOR
 #define ON_THE_FLY
@@ -123,6 +124,7 @@ protected:
 
 	void pop_front() {
 		if (m_coders.empty()) return;
+		SIM_LOG(CODER_LOG, "Erasing generation with ID " << *m_ids.begin() << " and rank " << m_coders.at(*m_ids.begin())->rank());
 		m_coders.erase(*m_ids.begin());
 		m_ids.pop_front();
 	}
