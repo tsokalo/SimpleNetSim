@@ -185,6 +185,39 @@ typedef double Datarate;
  * All variables below are the estimation of the current node
  */
 
+struct ArqWin {
+	ArqWin() {
+		s_rx = 0;
+		s_tx = 0;
+		e_tx = 0;
+		e_rx = 0;
+	}
+	ArqWin&
+	operator=(const ArqWin& other) // copy assignment
+			{
+		if (this != &other) { // self-assignment check expected
+
+			this->s_rx = other.s_rx;
+			this->s_tx = other.s_tx;
+			this->e_tx = other.e_tx;
+			this->e_rx = other.e_rx;
+		}
+		return *this;
+	}
+	friend bool operator==(ArqWin l, ArqWin r) // copy assignment
+			{
+		return (l.s_rx == r.s_rx && l.s_tx == r.s_tx && l.e_tx == r.e_tx && l.e_rx == r.e_rx);
+	}
+	bool is_def()
+	{
+		return (s_rx != MAX_GEN_SSN && s_tx != MAX_GEN_SSN && e_tx != MAX_GEN_SSN && e_rx != MAX_GEN_SSN);
+	}
+	GenId s_rx; //start of RX window
+	GenId s_tx; //start of TX window
+	GenId e_tx; //end of TX window
+	GenId e_rx; //end of RX window
+};
+
 struct LogItem {
 
 	LogItem() {
@@ -220,6 +253,10 @@ struct LogItem {
 		ss >> ssn;
 		ss >> gsn;
 		ss >> rank;
+		ss >> aw.s_rx;
+		ss >> aw.s_tx;
+		ss >> aw.e_tx;
+		ss >> aw.e_rx;
 		uint16_t s_fp = 0, s_eps = 0;
 		ss >> s_fp;
 		ss >> s_eps;
@@ -254,6 +291,7 @@ struct LogItem {
 			this->ssn = other.ssn;
 			this->gsn = other.gsn;
 			this->rank = other.rank;
+			this->aw = other.aw;
 			this->dst = other.dst;
 		}
 		return *this;
@@ -262,7 +300,7 @@ struct LogItem {
 	friend std::ostream&
 	operator<<(std::ostream& os, const LogItem& l) {
 		os << l.dst << "\t" << l.d << "\t" << l.p << "\t" << l.cr << "\t" << l.cs << "\t" << l.ns << "\t" << l.nr << "\t" << l.ssn << "\t" << l.gsn << "\t"
-				<< l.rank << "\t" << l.fp.size() << "\t" << l.eps.size();
+				<< l.rank << "\t" << l.aw.s_rx << "\t" << l.aw.s_rx << "\t" << l.aw.e_tx << "\t" << l.aw.e_rx << "\t" << l.fp.size() << "\t" << l.eps.size();
 
 		for (std::map<int16_t, double>::const_iterator it = l.fp.begin(); it != l.fp.end(); it++)
 			os << "\t" << it->first << "\t" << it->second;
@@ -323,6 +361,10 @@ struct LogItem {
 	 * destination address
 	 */
 	UanAddress dst;
+	/*
+	 * ARQ window
+	 */
+	ArqWin aw;
 };
 /*
  * The history of logging items for node v

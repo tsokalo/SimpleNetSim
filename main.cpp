@@ -356,6 +356,7 @@ int main(int argc, char *argv[]) {
 
 		std::cout << "LINK LOSS: " << GetLinkLossValue(lb, subpath, sim_par.warmup, sim_par.simDuration - sim_par.warmdown, sim_par.genSize) << std::endl;
 
+		CreateArqInfoCvs(lb, subpath);
 		//
 		// analyze stability of the source priority
 		//

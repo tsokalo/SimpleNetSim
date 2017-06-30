@@ -39,7 +39,7 @@ NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress 
 	m_fastFeedback = false;
 
 	m_feedbackP = 0.0;
-	m_netDiscP = 0.1;
+	m_netDiscP = 1.0;
 	m_ttl = 10;
 	SIM_LOG_NP(BRR_LOG || TEMP_LOG, m_id, m_p, "Using TTL " << m_ttl);
 	SIM_ASSERT_MSG(m_ttl >= m_id, "TTL and addressing problem. TTL " << m_ttl << ", own ID " << m_id);
@@ -340,63 +340,9 @@ bool NcRoutingRules::MaySendData(double dr) {
 		}
 		return (m_nodeType == SOURCE_NODE_TYPE);
 	}
-//	if(txData < 50)
-//	{
-//		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst,  "Prune the transmission due to the small amount of data to send: " << txData);
-//		return false;
-//	}
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Function end");
 	return true;
-
-	//	////////////////////////////////////////////////////////
-	//
-	//	//
-	//	// obtain the oldest generation ID of the last generations in the TX buffers of sink vertices
-	//	//
-	//	GenId og_rx = MAX_GEN_SSN;
-	//for	(auto i : m_coalition)
-	//	{
-	//		//
-	//		// consider that the vertices in the coalition are sorted in the descending order of their priorities
-	//		//
-	//		auto addr = i.first;
-	//		if(m_lastInTx.find(addr) != m_lastInTx.end())
-	//		{
-	//			auto cg = m_lastInTx.at(addr);
-	//			if(gen_ssn_t(cg) < gen_ssn_t(og_rx) || og_rx == MAX_GEN_SSN)og_rx = m_lastInTx.at(addr);
-	//		}
-	//	}
-	//	//
-	//	// maximum number of generations to be transmitted in one train
-	//	//
-	//	auto x = m_sp.numGenSingleTx;
-	//	//
-	//	// max ACK window on sender side (number of generations)
-	//	//
-	//	auto v = (m_nodeType == SOURCE_NODE_TYPE) ? m_sp.numGen >> 1: m_sp.numGen;
-	//	assert(v > x);
-	//	v -= x;
-	//	//
-	//	// difference in ACK window start on RX and TX sides
-	//	//
-	//	uint16_t d = 0;
-	//	if(og_rx != MAX_GEN_SSN && m_newestRcvGenId != MAX_GEN_SSN)
-	//	{
-	//		SIM_ASSERT_MSG(gen_ssn_t(m_newestRcvGenId) >= gen_ssn_t(og_rx), "Oldest TX gen.ID " << m_newestRcvGenId << ", Oldest RX gen.ID " << og_rx);
-	//		d = gen_ssn_t::get_distance(og_rx, m_newestRcvGenId);
-	//	}
-	//
-	//	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst,  "max.tx.vars: [max.TX x=" << x << "],[max.ACK.buf " << v << "],[ng_tx " << m_newestRcvGenId << "],[og_rx "
-	//			<< og_rx << "],[dist(Tx,Rx) " << d << "],[res " << (v > d) << "]");
-	//
-	//	return (v > d);
-	//
-	//	////////////////////////////////////////////////////////
-
-	//auto	b = (!m_congControl->Block(m_p, m_d));
-	//	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst,  "May send?: " << eq(dr, 0) << "\t" << b << "\t" << leq(dr, m_p.val()) << "\t" << (eq(dr, 0) ? b : leq(dr, m_p.val())));
-	//	return (eq(dr, 0) ? b : leq(dr, m_p.val()));
 }
 
 bool NcRoutingRules::MaySendFeedback() {
@@ -504,6 +450,8 @@ bool NcRoutingRules::MayReplicateRetransRequest(UanAddress id, GenId genId) {
 bool NcRoutingRules::MaySendNetDiscovery(ttl_t ttl) {
 
 	SIM_LOG_FUNC(BRR_LOG);
+
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Node type: " << m_nodeType << ", TTL: " << ttl << ", coalition size: " << m_coalition.size());
 
 	//
 	// source never sends the network discovery messages
@@ -639,16 +587,12 @@ uint32_t NcRoutingRules::GetGenBufSize(uint32_t maxPkts) {
 	//
 	// obtain the last generation ID
 	//
-	GenId s_r = (m_rcvNum.empty()) ? MAX_GEN_SSN : m_rcvNum.last_orig_order()->first;
-	if (s_r == MAX_GEN_SSN) {
-		s_r = m_ackBacklog.empty() ? MAX_GEN_SSN : *(m_ackBacklog.last());
-		s_r = (s_r == MAX_GEN_SSN) ? MAX_GEN_SSN : ((++gen_ssn_t(s_r)).val());
-	}
+	GenId s_r = GetRxAckWinStart();
 
 	//
 	// obtain the earliest end of the ACK window between the vertices in the coalition and me
 	//
-	GenId e_ack = GetMutualAckWinEnd();
+	GenId e_ack = GetTxAckWinEnd();
 
 	//
 	// distance between s_f and e_ack
@@ -672,55 +616,6 @@ uint32_t NcRoutingRules::GetGenBufSize(uint32_t maxPkts) {
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "[s_r " << s_r << "],[max_el_brr " << max_el_brr << "],[max_el_mac " << max_el_mac << "],[max_el " << max_el << "]");
 
 	return max_el;
-
-	//	//
-	//	// get the number of symbols that are already present in TX plan
-	//	//
-	//	uint32_t sum_tx = 0;
-	//	for (auto item : m_txPlan) {
-	//		sum_tx += item.second.num_all;
-	//	}
-	//	//
-	//	// get maximum eligible to be sent from the view of BRR
-	//	//
-	//	uint32_t max_el_brr = GetMaxAmountTxData() * m_cr;
-	//	//
-	//	// get maximum eligible to be sent from the view of MAC
-	//	//
-	//	uint32_t max_el_mac = maxPkts;
-	//	//
-	//	// get harder constaint
-	//	//
-	//	uint32_t max_el = (max_el_brr < max_el_mac) ? max_el_brr : max_el_mac;
-	//	//
-	//	// get remainder to be added to the TX plan
-	//	//
-	//	uint32_t rem = (max_el > sum_tx) ? (max_el - sum_tx) : 0;
-	//	//
-	//	// number of packets to be generated
-	//	//
-	//	uint32_t ng = floor((double) rem / m_cr);
-	//	//
-	//	// gen number of packets required for buffering
-	//	//
-	//	uint32_t nb = NeedGen() ? m_sp.numGenBuffering * m_sp.genSize : 0;
-	//	//	if (!(m_nodeType == SOURCE_NODE_TYPE && m_rcvNum.empty())) {
-	//	//
-	//	//		SIM_ASSERT_MSG(nb <= max_el_brr, "Number required for buffering: " << nb << ", maximum allowed by BRR: " << max_el_brr);
-	//	//	}
-	//
-	//	ng = (nb > ng) ? nb : ng;
-	//	//
-	//	// we should send to faster then our buffers allow; increase numGen if you want to increase numGenSingleTx
-	//	// numGen >= numGenSingleTx * [minimum number of hops]
-	//	//
-	//auto	max_tx = m_sp.numGenSingleTx * m_sp.genSize * m_cr;
-	//	//	ng = (ng > max_tx) ? max_tx : ng;
-	//
-	//	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst,
-	//			"[sum_tx " << sum_tx << "],[max_el_brr " << max_el_brr << "],[max_el_mac " << max_el_mac << "],[max_el " << max_el << "],[rem " << rem << "],[nb " << nb << "],[max_tx " << max_tx << "],[res " << ng << "]");
-	//
-	//	return ng;
 }
 
 uint32_t NcRoutingRules::GetMaxAmountTxData() {
@@ -728,15 +623,11 @@ uint32_t NcRoutingRules::GetMaxAmountTxData() {
 	//
 	// obtain the earliest end of the ACK window between the vertices in the coalition and me
 	//
-	GenId e_ack = GetMutualAckWinEnd();
+	GenId e_ack = GetTxAckWinEnd();
 	//
 	// actual oldest generation in the forwarding plan
 	//
-	GenId s_f = (m_forwardPlan.empty()) ? MAX_GEN_SSN : m_forwardPlan.begin_orig_order()->first;
-	if (s_f == MAX_GEN_SSN) {
-		s_f = m_ackBacklog.empty() ? MAX_GEN_SSN : *(m_ackBacklog.last());
-		s_f = (s_f == MAX_GEN_SSN) ? MAX_GEN_SSN : ((++gen_ssn_t(s_f)).val());
-	}
+	GenId s_f = GetTxAckWinStart();
 	//
 	// distance between s_f and e_ack
 	//
@@ -781,14 +672,26 @@ GenId NcRoutingRules::GetAckWinSize() {
 	assert(ack_win < MAX_GEN_SSN);
 	return ack_win;
 }
-GenId NcRoutingRules::GetAckWinEnd() {
-
+GenId NcRoutingRules::GetTxAckWinStart() {
+	GenId s_f = (m_forwardPlan.empty()) ? MAX_GEN_SSN : m_forwardPlan.begin_orig_order()->first;
+	if (s_f == MAX_GEN_SSN) {
+		s_f = m_ackBacklog.empty() ? MAX_GEN_SSN : *(m_ackBacklog.last());
+		s_f = (s_f == MAX_GEN_SSN) ? MAX_GEN_SSN : ((++gen_ssn_t(s_f)).val());
+	}
+	return s_f;
+}
+GenId NcRoutingRules::GetRxAckWinStart() {
 	GenId s_r = (m_rcvNum.empty()) ? MAX_GEN_SSN : m_rcvNum.begin_orig_order()->first;
 
 	if (s_r == MAX_GEN_SSN) {
 		s_r = m_ackBacklog.empty() ? MAX_GEN_SSN : *(m_ackBacklog.last());
 		s_r = (s_r == MAX_GEN_SSN) ? MAX_GEN_SSN : ((++gen_ssn_t(s_r)).val());
 	}
+	return s_r;
+}
+GenId NcRoutingRules::GetRxAckWinEnd() {
+
+	GenId s_r = GetRxAckWinStart();
 	GenId ack_win = GetAckWinSize();
 	GenId oe_ack = (s_r == MAX_GEN_SSN) ? MAX_GEN_SSN : gen_ssn_t::rotate(s_r, ack_win);
 
@@ -796,7 +699,7 @@ GenId NcRoutingRules::GetAckWinEnd() {
 
 	return oe_ack;
 }
-GenId NcRoutingRules::GetMutualAckWinEnd() {
+GenId NcRoutingRules::GetTxAckWinEnd() {
 	//
 	// obtain the earliest end of the ACK window between the vertices in the coalition and me
 	//
@@ -815,7 +718,7 @@ GenId NcRoutingRules::GetMutualAckWinEnd() {
 	//
 	// get own end of ACK window
 	//
-	GenId oe_ack = GetAckWinEnd();
+	GenId oe_ack = GetRxAckWinEnd();
 	e_ack = (e_ack == MAX_GEN_SSN) ? oe_ack : e_ack;
 
 	return e_ack;
@@ -1380,7 +1283,7 @@ void NcRoutingRules::DoForgetGeneration(GenId genId) {
 	m_ccack.erase(genId);
 	m_numRr->forget(genId);
 
-	m_f.ackInfo.ackWinEnd = GetAckWinEnd();
+	m_f.ackInfo.ackWinEnd = GetRxAckWinEnd();
 }
 
 UanAddress NcRoutingRules::SelectRetransRequestForwarder() {
@@ -1700,6 +1603,13 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 		Overshoot(oldest_nacked);
 	}
 
+	m_logItem.aw.s_rx = GetRxAckWinStart();
+	m_logItem.aw.s_tx = GetTxAckWinStart();
+	m_logItem.aw.e_tx = GetTxAckWinEnd();
+	m_logItem.aw.e_rx = GetRxAckWinEnd();
+
+	if (m_addLog) m_addLog(m_logItem, m_id);
+
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Receive ACK " << l.ackInfo);
 }
 
@@ -1738,7 +1648,7 @@ void NcRoutingRules::SetAcks() {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Set ACKs of rcvd+fwrd+bckl " << m_f.ackInfo);
 	}
 	if (m_nodeType == DESTINATION_NODE_TYPE) DoForgetGeneration();
-	m_f.ackInfo.ackWinEnd = GetAckWinEnd();
+	m_f.ackInfo.ackWinEnd = GetRxAckWinEnd();
 }
 
 void NcRoutingRules::ClearAcks() {
@@ -1988,7 +1898,8 @@ bool NcRoutingRules::CreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId
 	// just received the symbol belonging to this or older generations
 	//
 	GenId oldestId = ranks.begin()->first;
-	for(auto rank : ranks)oldestId = (gen_ssn_t(rank.first) < gen_ssn_t(oldestId)) ? rank.first : oldestId;
+	for (auto rank : ranks)
+		oldestId = (gen_ssn_t(rank.first) < gen_ssn_t(oldestId)) ? rank.first : oldestId;
 	if (gen_ssn_t(oldestId) >= gen_ssn_t(genId)) {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say NO to sending of RR. Received <= symbol");
 		return false;

@@ -1,5 +1,5 @@
-Number of generations					40
-Generation size							64
+Number of generations					20
+Generation size							8
 Symbol size / bytes						10
 Application data rate / bps				1e+06
 Sending data rate / bps					1e+06
@@ -21,4 +21,4 @@ Give RR priority to SRC					1
 Who can forward RR						1
 Warm-up period							0
 Warm-down period						0
-Simulation duration						60000
+Simulation duration						20000

@@ -160,8 +160,10 @@ private:
 
 	void UpdateLogItem();
 	GenId GetAckWinSize();
-	GenId GetAckWinEnd();
-	GenId GetMutualAckWinEnd();
+	GenId GetTxAckWinStart();
+	GenId GetRxAckWinStart();
+	GenId GetRxAckWinEnd();
+	GenId GetTxAckWinEnd();
 
 	void Overshoot(GenId gid);
 

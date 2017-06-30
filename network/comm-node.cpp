@@ -198,6 +198,7 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 
 	m_brr->RcvHeaderInfo(pkt.GetHeader());
 
+
 	if (!pkt.IsFeedbackSymbol()) {
 
 		auto txPlan = pkt.GetHeader().txPlan;

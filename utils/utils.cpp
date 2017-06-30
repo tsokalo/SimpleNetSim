@@ -1139,8 +1139,7 @@ void PlotOutputStability(LogBank lb, std::string path, double opt, UanAddress ds
 	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
 }
 
-double GetLinkLossValue(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown, uint16_t genSize)
-{
+double GetLinkLossValue(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown, uint16_t genSize) {
 	gen_ssn_t gsn = 0;
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 		for (LogHistory::reverse_iterator tt = t->second.rbegin(); tt != t->second.rend(); tt++) {
@@ -1161,15 +1160,90 @@ double GetLinkLossValue(LogBank lb, std::string path, uint32_t warmup, uint32_t 
 		}
 	}
 
-	for(auto d : decoded)
-		{
+	for (auto d : decoded) {
 //		std::cout << "In " << d.first << " decoded " << d.second << std::endl;
 		assert(d.second <= genSize);
-		}
+	}
 	uint64_t sum_decoded = 0;
-	for(auto d : decoded) sum_decoded += d.second;
+	for (auto d : decoded)
+		sum_decoded += d.second;
 
 	return 1 - (long double) sum_decoded / (long double) (genSize * decoded.size());
+}
+
+void CreateArqInfoCvs(LogBank lb, std::string path) {
+
+	std::string cvs_file = path + "js/arq.csv";
+
+	std::map<uint64_t, std::map<UanAddress, ArqWin> > aw;
+	std::map<UanAddress, bool> ks;
+	//
+	// read the log bank
+	//
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
+			aw[tt->t][t->first] = tt->log.aw;
+			ks[t->first] = true;
+		}
+	}
+	//
+	// filter the duplicated and undefined values
+	//
+	for (auto k : ks) {
+		ArqWin a;
+		for (auto t : aw) {
+			if (aw[t.first].find(k.first) != aw[t.first].end()) {
+				if (a == aw[t.first][k.first] || !aw[t.first][k.first].is_def()) {
+					aw[t.first].erase(k.first);
+				} else {
+					a = aw[t.first][k.first];
+				}
+			}
+		}
+	}
+	//
+	// accomplish entries
+	//
+	std::map<UanAddress, ArqWin> last_aw;
+	for (auto t : aw)
+	{
+		if(aw[t.first].empty())continue;
+
+		for (auto k : ks)
+		{
+			if (aw[t.first].find(k.first) == aw[t.first].end())
+			{
+				aw[t.first][k.first] = last_aw[k.first];
+			}
+			else
+			{
+				last_aw[k.first] = aw[t.first][k.first];
+			}
+		}
+	}
+//
+//	std::map<UanAddress, ArqWin> aw_t;
+//	std::vector<uint64_t> to_del;
+//	for (auto t : aw) {
+//		for (auto u : t.second) {
+//			if (aw_t.find(u->first) != aw_t.end()) {
+//				if (aw_t[u->first] == tt->log.aw) {
+//					to_del.push_back(t.first);
+//
+//					aw[tt->t][t->first] = tt->log.aw;
+//				}
+//			}
+//		}
+//	}
+
+	std::ofstream fd(cvs_file, std::ios_base::out);
+	fd << "ts" << "," << "node" << "," << "srx" << "," << "stx" << "," << "etx" << "," << "erx" << "\n";
+	for (auto t : aw) {
+		for (auto u : t.second) {
+			fd << t.first << "," << u.first << "," << u.second.s_rx << "," << u.second.s_tx << "," << u.second.e_tx << "," << u.second.e_rx << "\n";
+		}
+	}
+	fd.close();
 }
 
 void PlotSrcPriorStability(LogBank lb, std::string path, double opt, UanAddress src) {
