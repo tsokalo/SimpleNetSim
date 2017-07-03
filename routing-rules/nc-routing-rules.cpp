@@ -383,7 +383,16 @@ bool NcRoutingRules::MaySendRetransRequest(std::map<GenId, uint32_t> ranks, UanA
 	// the sending vertex have all previous generations acked
 	//
 	if (all_prev_acked) {
-		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say NO to sending of RR. Previous are ACKed");
+		if (m_rcvNum.size() + m_sp.numGenRetrans >= m_sp.numGen) {
+			//
+			// send some data from the oldest generations
+			//
+			assert(!m_rcvNum.empty());
+			auto gid = m_rcvNum.begin_orig_order()->first;
+			SIM_LOG_NPG(1, m_id, m_p, genId, "Relay overshoots GID: " << gid);
+			Overshoot(gid);
+		}
+		SIM_LOG_NPD(1, m_id, m_p, m_dst, "Say NO to sending of RR. Previous are ACKed");
 		return false;
 	}
 
@@ -392,16 +401,45 @@ bool NcRoutingRules::MaySendRetransRequest(std::map<GenId, uint32_t> ranks, UanA
 	// other nodes can just forward or replicate it (see ProcessRetransRequest())
 	//
 	if (m_nodeType == DESTINATION_NODE_TYPE) return MayOriginateRetransRequest(ranks, genId);
-	if (m_nodeType == RELAY_NODE_TYPE) return MayReplicateRetransRequest(id, genId);
+	if (m_nodeType == RELAY_NODE_TYPE) {
+		if (MayReplicateRetransRequest(id, genId)) {
+			return true;
+		} else {
+			return MayOriginateRetransRequest(ranks, genId);
+		}
+	}
 
+	assert(0);
 	return false;
-
 }
 bool NcRoutingRules::MayOriginateRetransRequest(std::map<GenId, uint32_t> ranks, GenId genId) {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	return CreateRetransRequest(ranks, genId);
+	if (m_nodeType == DESTINATION_NODE_TYPE) return CreateRetransRequest(ranks, genId);
+
+	if (m_nodeType == RELAY_NODE_TYPE) {
+		//
+		// if the RX buffer reaches the dangerous limit (possible data drops)
+		//
+		if (m_rcvNum.size() + m_sp.numGenRetrans >= m_sp.numGen) {
+			if (CreateRetransRequest(ranks, genId)) {
+
+//				SIM_LOG_NPG(1, m_id, m_p, genId, "Relay creates RR");
+				return true;
+			} else {
+				//
+				// send some data from the oldest generations
+				//
+				assert(!m_rcvNum.empty());
+				auto gid = m_rcvNum.begin_orig_order()->first;
+//				SIM_LOG_NPG(1, m_id, m_p, genId, "Relay overshoots GID: " << gid);
+				Overshoot(gid);
+			}
+		}
+	}
+
+	return false;
 }
 bool NcRoutingRules::MayReplicateRetransRequest(UanAddress id, GenId genId) {
 
@@ -412,7 +450,7 @@ bool NcRoutingRules::MayReplicateRetransRequest(UanAddress id, GenId genId) {
 	//
 	if (m_oldestRetransGenId.is_default()) {
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "Say NO to sending of RR. No pending request");
-		assert(m_f.rrInfo.empty());
+//		assert(m_f.rrInfo.empty());
 		return false;
 	}
 
@@ -674,7 +712,8 @@ double NcRoutingRules::GetInfoOnDsts() {
 	return a;
 }
 GenId NcRoutingRules::GetAckWinSize() {
-	GenId ack_win = (m_nodeType == SOURCE_NODE_TYPE) ? m_sp.numGen: m_sp.numGen;
+//	GenId ack_win = (m_nodeType == SOURCE_NODE_TYPE) ? m_sp.numGen << 1 : m_sp.numGen;
+	GenId ack_win = m_sp.numGen;
 	assert(ack_win < MAX_GEN_SSN);
 	return ack_win;
 }
@@ -728,7 +767,12 @@ GenId NcRoutingRules::GetTxAckWinEnd() {
 	e_ack = (e_ack == MAX_GEN_SSN) ? oe_ack : e_ack;
 
 	GenId s_ack = GetTxAckWinStart();
-	if(gen_ssn_t(e_ack) < gen_ssn_t(s_ack))e_ack = gen_ssn_t::rotate(s_ack,1);
+	if (gen_ssn_t(e_ack) < gen_ssn_t(s_ack)) e_ack = gen_ssn_t::rotate(s_ack, 1);
+	if(m_nodeType == SOURCE_NODE_TYPE)
+	{
+		auto v = gen_ssn_t::rotate(s_ack, m_sp.numGen >> 2);
+		if(gen_ssn_t(e_ack) > gen_ssn_t(v)) e_ack = v;
+	}
 
 	return e_ack;
 }
@@ -1055,7 +1099,7 @@ void NcRoutingRules::DoUpdatePriority(node_map_t outputs) {
 		{
 			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Try for node " << it->first << ", requested " << u);
 			if(it->first == u)break;
-			assert(it->second >= outputs.at(u));
+			SIM_ASSERT_MSG(it->second >= outputs.at(u), "" << it->second << " < " << outputs.at(u));
 			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Use for node " << it->first << ", requested " << u);
 			if(m_outRcvMap[it->first].is_ready())
 			{
@@ -1258,8 +1302,10 @@ void NcRoutingRules::DoForgetGeneration() {
 		}
 		it = m_rcvNum.next_orig_order(it);
 	}
-	for (auto id : ids)
+	for (auto id : ids) {
+		if (m_id == 7 || m_id == 5 || m_id == 0) std::cout << "Node " << m_id << ". Forgetting generation " << id << " after ACK " << std::endl;
 		DoForgetGeneration(id);
+	}
 
 	//
 	// remove the oldest generations if the number of generations in the receive buffer
@@ -1269,12 +1315,15 @@ void NcRoutingRules::DoForgetGeneration() {
 		auto it = m_rcvNum.begin_orig_order();
 		assert(it != m_rcvNum.end());
 
+		if (m_id == 7 || m_id == 5 || m_id == 0) std::cout << "Node " << m_id << ". Forgetting generation " << it->first << " due to overflow " << std::endl;
 		DoForgetGeneration(it->first);
 	}
 }
 void NcRoutingRules::DoForgetGeneration(GenId genId) {
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Erasing generation " << genId);
+
+//	if (m_id == 0) std::cout << "Node " << m_id << ". Forgetting generation " << genId << " after ACK " << std::endl;
 
 //	if (m_id == m_dst && m_getRank(genId) != 0) {
 //		SIM_ASSERT_MSG(m_getRank(genId) == m_sp.genSize, "Erasing generation " << genId << " with rank " << m_getRank(genId));
@@ -1522,6 +1571,7 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 	SIM_LOG_FUNC(BRR_LOG);
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Rcvd ACKs 1 " << l.ackInfo);
+//	if(m_id == 0) {SIM_LOG_NPD(1, m_id, m_p, m_dst, "Rcvd ACKs 1 " << l.ackInfo);}
 
 	//
 	// 1. SAVE ACKS & FORGET GENERATIONS
@@ -1567,7 +1617,9 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 	};;
 
 	for (auto id : ids)
+	{
 		DoForgetGeneration(id);
+	}
 
 	if (l.ackInfo.ackWinEnd != MAX_GEN_SSN) m_lastInTx[l.addr] = l.ackInfo.ackWinEnd;
 
@@ -1872,7 +1924,7 @@ void NcRoutingRules::UpdateRetransRequest() {
 bool NcRoutingRules::CreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId genId) {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Work on RR");
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Creating RR");
 
 	ResetRetransInfo();
 

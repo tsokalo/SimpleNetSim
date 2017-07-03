@@ -12,7 +12,7 @@ Maximum coalition size					4
 Mutual PHY and LLC coding / flag		0
 Target packet loss ratio				0.2
 Maximum number of RRs					50
-CR calculation way						0
+CR calculation way						2
 Number of sigmas						3
 CR reduction factor						0
 RR candidate selection way				4
@@ -21,4 +21,4 @@ Give RR priority to SRC					1
 Who can forward RR						1
 Warm-up period							5000
 Warm-down period						5000
-Simulation duration						60000
+Simulation duration						120000
