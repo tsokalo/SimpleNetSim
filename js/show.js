@@ -4,10 +4,11 @@ function readCvs() {
 	});
 }
 
+var arqwin = ['srx','stx','etx','erx']
+
 function processData(allRows) {
 
 	var csvdata = {}	
-	var arqwin = ['srx','stx','etx','erx']
 
 	for (var i=0; i<allRows.length; i++) {
 		row = allRows[i];
@@ -31,6 +32,7 @@ function processData(allRows) {
 }
 
 window.traces = {};
+window.markerSymbols = ['circle', 'diamond-wide', 'star-square', 'square-x'];
 
 function createTraces(csvdata) {
 	
@@ -54,7 +56,7 @@ function createTraces(csvdata) {
 		traces[ts] = [];
 		for (var j=0; j < xs.length; j++)
 		{
-			traces[ts].push({x: xs[j], y: ys[j], mode: 'markers', type: 'scatter', marker: { size: 12 }});
+			traces[ts].push({x: xs[j], y: ys[j], mode: 'markers', type: 'scatter', marker: { size: 12, symbol: markerSymbols[j] }, name: arqwin[j]});
 		}
 	}	
 
@@ -98,7 +100,7 @@ function createSteps(traces)
 
 function doPlot() {
 
-	Plotly.plot('myDiv', Object.values(traces)[0],
+	Plotly.newPlot('myDiv', Object.values(traces)[0],
  	{
 	  updatemenus: [{
 		direction: 'left',
@@ -116,7 +118,7 @@ function doPlot() {
 									transition: {duration: 300, easing: 'quadratic-in-out'}
 								}
 						],
-                label: 'Play',
+                label: 'Play >',
                 method: 'animate'
             },
 			{
@@ -125,7 +127,16 @@ function doPlot() {
 									transition: {duration: 50, easing: 'quadratic-in-out'}
 								}
 						],
-                label: 'Play fast',
+                label: 'Play >>',
+                method: 'animate'
+            },
+			{
+                args: [null, {frame: {duration: 10, redraw: false},
+									fromcurrent: true, 
+									transition: {duration: 5, easing: 'linear'}
+								}
+						],
+                label: 'Play >>>',
                 method: 'animate'
             },
             {
@@ -138,11 +149,11 @@ function doPlot() {
                 method: 'animate'
             }
         ]        
-    }]
-	},
-    {
-	  xaxis: {autorange: true},
+    }],
+    layout: {
+	  xaxis: {range: [0, 250], autorange: false},
 	  yaxis: {autorange: true}
+	}
 	}).then(function () {
 	  Plotly.addFrames('myDiv', frames);
 	})
@@ -186,7 +197,7 @@ function clickNext() {
 		})
 	}
 */
-/* frame_c++
+ frame_c++
   if(frame_c==frames.length)frame_c=0
   k = Object.keys(traces)[frame_c]
   var fr = 'frame' + k.toString()
@@ -202,10 +213,28 @@ function clickNext() {
     ],
     mode: 'afterall'
   })
-*/
+
 }
 
 function clickPrev() {
+
+}
+
+function readNew() {
+
+	readCvs();
+	setTimeout(function(){ 
+
+	console.log(frames)
+	console.log(allSteps.length)
+
+
+	console.log(Object.values(traces)[0])
+
+	doPlot();
+
+		}, 3000);
+
 
 }
 

@@ -330,8 +330,6 @@ int main(int argc, char *argv[]) {
 		auto plan_orp = exOrSolver.CalcTdmAccessPlan();
 		auto plan_srp = srpSolver.CalcTdmAccessPlan();
 
-		std::cout << "I am here" << std::endl;
-
 		//
 		// plot proportion of feedback/network discovery/excessive redundant packets to all sent packets
 		//
@@ -349,12 +347,10 @@ int main(int argc, char *argv[]) {
 		for (auto node : net->GetNodes())
 			d[node->GetId()] = node->GetDatarate();
 		PlotRates(lb, subpath, exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(),
-				srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), d, sim_par.warmup, sim_par.simDuration - sim_par.warmdown, sim_par.simDuration, sim_par.GetInLine());
+				srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), d, sim_par.warmup, sim_par.simDuration - sim_par.warmdown, sim_par.simDuration, sim_par.GetInLine(), sim_par.genSize);
 		PlotRanks(lb, subpath, sim_par.warmup, sim_par.simDuration - sim_par.warmdown);
 
 		PlotRatesPerDst(lb, subpath, net->GetDstIds(), d, sim_par.warmup, sim_par.simDuration - sim_par.warmdown);
-
-		std::cout << "LINK LOSS: " << GetLinkLossValue(lb, subpath, sim_par.warmup, sim_par.simDuration - sim_par.warmdown, sim_par.genSize) << std::endl;
 
 		CreateArqInfoCvs(lb, subpath);
 		//

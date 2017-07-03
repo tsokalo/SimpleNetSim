@@ -215,6 +215,12 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, bool linDep) {
 
 		DoFilter();
 	}
+
+	m_logItem.aw.s_rx = GetRxAckWinStart();
+	m_logItem.aw.s_tx = GetTxAckWinStart();
+	m_logItem.aw.e_tx = GetTxAckWinEnd();
+	m_logItem.aw.e_rx = GetRxAckWinEnd();
+
 }
 void NcRoutingRules::UpdateLoss(GenId genId, UanAddress id) {
 
@@ -668,7 +674,7 @@ double NcRoutingRules::GetInfoOnDsts() {
 	return a;
 }
 GenId NcRoutingRules::GetAckWinSize() {
-	GenId ack_win = (m_nodeType == SOURCE_NODE_TYPE) ? m_sp.numGen >> 2 : m_sp.numGen;
+	GenId ack_win = (m_nodeType == SOURCE_NODE_TYPE) ? m_sp.numGen: m_sp.numGen;
 	assert(ack_win < MAX_GEN_SSN);
 	return ack_win;
 }
@@ -712,7 +718,7 @@ GenId NcRoutingRules::GetTxAckWinEnd() {
 		if (m_lastInTx.find(addr) != m_lastInTx.end()) {
 			auto cg = m_lastInTx.at(addr);
 			assert(cg != MAX_GEN_SSN);
-			if (gen_ssn_t(cg) > gen_ssn_t(e_ack) || e_ack == MAX_GEN_SSN) e_ack = m_lastInTx.at(addr);
+			if (gen_ssn_t(cg) > gen_ssn_t(e_ack) || e_ack == MAX_GEN_SSN) e_ack = cg;
 		}
 	}
 	//
@@ -720,6 +726,9 @@ GenId NcRoutingRules::GetTxAckWinEnd() {
 	//
 	GenId oe_ack = GetRxAckWinEnd();
 	e_ack = (e_ack == MAX_GEN_SSN) ? oe_ack : e_ack;
+
+	GenId s_ack = GetTxAckWinStart();
+	if(gen_ssn_t(e_ack) < gen_ssn_t(s_ack))e_ack = gen_ssn_t::rotate(s_ack,1);
 
 	return e_ack;
 }
@@ -1603,11 +1612,6 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 		Overshoot(oldest_nacked);
 	}
 
-	m_logItem.aw.s_rx = GetRxAckWinStart();
-	m_logItem.aw.s_tx = GetTxAckWinStart();
-	m_logItem.aw.e_tx = GetTxAckWinEnd();
-	m_logItem.aw.e_rx = GetRxAckWinEnd();
-
 	if (m_addLog) m_addLog(m_logItem, m_id);
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Receive ACK " << l.ackInfo);
@@ -1647,7 +1651,10 @@ void NcRoutingRules::SetAcks() {
 
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Set ACKs of rcvd+fwrd+bckl " << m_f.ackInfo);
 	}
-	if (m_nodeType == DESTINATION_NODE_TYPE) DoForgetGeneration();
+	if (m_nodeType == DESTINATION_NODE_TYPE) {
+
+		DoForgetGeneration();
+	}
 	m_f.ackInfo.ackWinEnd = GetRxAckWinEnd();
 }
 

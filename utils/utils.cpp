@@ -716,7 +716,7 @@ void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstId
 }
 
 void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d, uint32_t warmup, uint32_t warmdown,
-		uint64_t simdur, std::string sim_par) {
+		uint64_t simdur, std::string sim_par, uint16_t genSize) {
 
 	gen_ssn_t gsn = 0;
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
@@ -780,9 +780,10 @@ void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std:
 			fd.close();
 		}
 		{
+			auto link_loss = GetLinkLossValue(lb, path, warmup, warmdown, genSize);
 			std::ofstream fd(path + "noc_sim_res.txt", std::ios_base::out | std::ios_base::app);
 			fd << sim_par << "\t" << (double) nru / dur / 1000000 << "\t" << (double) nr / dur / 1000000 << "\t" << opt / 1000000 << "\t"
-					<< single_opt / 1000000 << std::endl;
+					<< single_opt / 1000000 << "\t" << link_loss << std::endl;
 			fd.close();
 
 		}

@@ -147,7 +147,7 @@ struct SimParameters {
 		os << "Give RR priority to SRC\t\t\t" << (uint16_t) giveRrPriorToSrc << std::endl;
 		os << "Who can forward RR\t\t\t" << rrCanSend << std::endl;
 		os << "Warm-up period\t\t\t\t" << warmup << std::endl;
-		os << "Warm-down period\t\t\t" << warmup << std::endl;
+		os << "Warm-down period\t\t\t" << warmdown << std::endl;
 		os << "Simulation duration\t\t\t" << simDuration << std::endl;
 	}
 
