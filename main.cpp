@@ -87,20 +87,19 @@ void CreateAutoSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp, u
 	net->PrintNet();
 }
 
-
 void CreateBetaSquareScenario(std::shared_ptr<CommNet> &net, SimParameters sp, uint16_t dim) {
 	net = std::shared_ptr<CommNet>(new CommNet(dim * dim, sp));
 
 	double e1 = 0.1, e2 = 0.6;
 	for (uint16_t i = 0; i < dim; i++) {
 		for (uint16_t j = 0; j < dim - 1; j++) {
-			net->ConnectNodes(i * dim + j, i * dim + j + 1, e1 + e2 * (1 - (float)std::abs(j - i) / (float)dim));
+			net->ConnectNodes(i * dim + j, i * dim + j + 1, e1 + e2 * (1 - (float) std::abs(j - i) / (float) dim));
 
 		}
 	}
 	for (uint16_t i = 0; i < dim - 1; i++) {
 		for (uint16_t j = 0; j < dim; j++) {
-			net->ConnectNodes(i * dim + j, i * dim + j + dim, e1 + e2 * (1 - (float)std::abs(j - i) / (float)dim));
+			net->ConnectNodes(i * dim + j, i * dim + j + dim, e1 + e2 * (1 - (float) std::abs(j - i) / (float) dim));
 		}
 	}
 	net->SetSource(0);
@@ -250,13 +249,13 @@ int main(int argc, char *argv[]) {
 	//
 	// using default parameters
 	//
-	CreateAutoSquareScenario(net, sim_par, 3);
+//	CreateAutoSquareScenario(net, sim_par, 3);
 //	CreateBetaSquareScenario(net, sim_par, 3);
 
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
 //	CreateStackScenario(net, 8, sim_par);
-//	CreateTriangleScenario(net, sim_par);
+	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
@@ -336,8 +335,8 @@ int main(int argc, char *argv[]) {
 		PlotResourceWaste(lb, subpath, exOrSolver.GetOptChannelUses(), sim_par.warmup, sim_par.simDuration - sim_par.warmdown);
 
 		std::cout << "Optimal plan: " << plan_orp << ", SRP plan" << plan_srp << std::endl;
-		std::cout << "Optimal d: " << exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate()
-				<< ", SRP d: " << srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate() << std::endl;
+		std::cout << "Optimal d: " << exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate() << ", SRP d: "
+				<< srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate() << std::endl;
 		PlotSendingStatistics(lb, subpath, plan_orp, sim_par.warmup, sim_par.simDuration - sim_par.warmdown);
 
 		//
@@ -347,7 +346,8 @@ int main(int argc, char *argv[]) {
 		for (auto node : net->GetNodes())
 			d[node->GetId()] = node->GetDatarate();
 		PlotRates(lb, subpath, exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(),
-				srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), d, sim_par.warmup, sim_par.simDuration - sim_par.warmdown, sim_par.simDuration, sim_par.GetInLine(), sim_par.genSize);
+				srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), d, sim_par.warmup, sim_par.simDuration - sim_par.warmdown,
+				sim_par.simDuration, sim_par.GetInLine(), sim_par.genSize);
 		PlotRanks(lb, subpath, sim_par.warmup, sim_par.simDuration - sim_par.warmdown);
 
 		PlotRatesPerDst(lb, subpath, net->GetDstIds(), d, sim_par.warmup, sim_par.simDuration - sim_par.warmdown);
@@ -363,8 +363,28 @@ int main(int argc, char *argv[]) {
 		PlotOutputStability(lb, subpath, exOrSolver.GetOptChannelUses(), net->GetDst());
 
 	} else if (m == TEST_MODE) {
-//		TestChannelCapacityStack(folder);
-		TestBitSet();
+
+		std::string f = folder + GetLogFileName();
+		std::cout << "Using file " << f << std::endl;
+		LogBank lb = ReadLogBank(f);
+
+		//
+		// setup your filter
+		//
+		UanAddress s = 0;
+
+		if (lb.find(s) == lb.end()) {
+			std::cout << "Found no data for the sender " << s << std::endl;
+		}
+
+		for (auto v : lb[s]) {
+			//
+			// select only those entries that correspond to the sending event
+			//
+			if (v.log.ns == 1) {
+				std::cout << v.t << "\t" << v.m << "\t" << v.log << std::endl;
+			}
+		}
 	}
 
 	std::cout << std::endl << "Finished successfully" << std::endl;
