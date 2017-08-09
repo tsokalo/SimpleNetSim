@@ -38,7 +38,7 @@ void CommNode::SetLogCallback(add_log_func addLog) {
 }
 void CommNode::Configure(NodeType type, std::vector<UanAddress> dst) {
 	m_nodeType = type;
-	m_sp.numGen = (m_nodeType == SOURCE_NODE_TYPE) ? 2 * m_sp.numGen : m_sp.numGen;
+//	m_sp.numGen = (m_nodeType == SOURCE_NODE_TYPE) ? 2 * m_sp.numGen : m_sp.numGen;
 
 	m_brr = routing_rules_ptr(new MulticastBrr(m_id, m_nodeType, dst, m_sp));
 
