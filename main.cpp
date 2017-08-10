@@ -221,7 +221,9 @@ int main(int argc, char *argv[]) {
 
 	std::string path = argv[0];
 	size_t position = path.rfind("/build");
+	std::cout << "see position " << position << std::endl;
 	std::string subpath = path.substr(0, position + 1);
+
 	if (subpath.empty()) {
 		std::cout << "Please, give the full path" << std::endl;
 		exit(1);
@@ -243,6 +245,8 @@ int main(int argc, char *argv[]) {
 	}
 
 	std::shared_ptr<CommNet> net;
+
+	std::cout << "see position " << position << std::endl;
 
 	SimParameters sim_par(subpath + GetSimParamFileName());
 

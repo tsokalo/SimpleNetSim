@@ -11,7 +11,7 @@ def add_current_dir_to_includes(self):
 def build(bld):
     loc = bld.path.relpath()
     def full_name(name):
-        return loc + '/' + name
+        return loc
 
     for name, deps, inc in [
         ('utils', ['OTHER'], ['..'])]:
