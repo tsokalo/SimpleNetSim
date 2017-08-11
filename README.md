@@ -7,7 +7,7 @@
 
 2. KODO: 
 	- clone the repository [kodo-rlnc] from https://github.com/steinwurf/kodo-rlnc. You need to apply for the academic license (http://steinwurf.com/license.html);
-	- inside of the kodo-rlnc folder, run "CXXFLAG="-fPIC" ./waf configure && ./waf build && ./waf install --install_static_libs --install_path="./kodo_build".
+	- inside of the kodo-rlnc folder, run "CXXFLAGS="-fPIC" ./waf configure && ./waf build && ./waf install --install_static_libs --install_path="./kodo_build".
 
 3. SIMPLENETSIM: 
 	- clone this repository; 
