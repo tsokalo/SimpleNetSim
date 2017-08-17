@@ -16,6 +16,12 @@ set grid xtics ytics back lw 1 lc rgb "#AFAFAF"
 set key right bottom
 
 
-set output './Results/priorities_2.svg'
+set output './Results/priorities_8.svg'
 plot "./gnuplot/data.txt" every 10 using ($1):(($2==0) ? $3/1000000 : 1/0) with linespoints ls 1 lw 1 linecolor 1 pt 7 ps 0.3 title "vertex=0",\
 "./gnuplot/data.txt" every 10 using ($1):(($2==1) ? $3/1000000 : 1/0) with linespoints ls 1 lw 1 linecolor 2 pt 7 ps 0.3 title "vertex=1",\
+"./gnuplot/data.txt" every 10 using ($1):(($2==2) ? $3/1000000 : 1/0) with linespoints ls 1 lw 1 linecolor 3 pt 7 ps 0.3 title "vertex=2",\
+"./gnuplot/data.txt" every 10 using ($1):(($2==3) ? $3/1000000 : 1/0) with linespoints ls 1 lw 1 linecolor 4 pt 7 ps 0.3 title "vertex=3",\
+"./gnuplot/data.txt" every 10 using ($1):(($2==4) ? $3/1000000 : 1/0) with linespoints ls 1 lw 1 linecolor 5 pt 7 ps 0.3 title "vertex=4",\
+"./gnuplot/data.txt" every 10 using ($1):(($2==5) ? $3/1000000 : 1/0) with linespoints ls 1 lw 1 linecolor 6 pt 7 ps 0.3 title "vertex=5",\
+"./gnuplot/data.txt" every 10 using ($1):(($2==6) ? $3/1000000 : 1/0) with linespoints ls 1 lw 1 linecolor 7 pt 7 ps 0.3 title "vertex=6",\
+"./gnuplot/data.txt" every 10 using ($1):(($2==7) ? $3/1000000 : 1/0) with linespoints ls 1 lw 1 linecolor 8 pt 7 ps 0.3 title "vertex=7",\
