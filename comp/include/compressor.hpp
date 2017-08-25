@@ -18,10 +18,9 @@ namespace fbcd
     class Compressor
     {
     public:
-        //! \todo threshold
         //! \todo
         //! \todo DELIMITER
-        Compressor(u8_t optimisticCnt = 0U);
+        Compressor(u8_t optimisticCnt = 0U, u16_t sensitivity = 0U);
 
         Compressor(const Compressor&) = delete;
 
@@ -68,6 +67,8 @@ namespace fbcd
         const u8_t  optimisticCnt;
         bool        isOptimistic;
         u8_t        optimisticTo;
+
+        const u16_t sensitivity;
 
         u32_t   sn;
         size_t  ucBytes;

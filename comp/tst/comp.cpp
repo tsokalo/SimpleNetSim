@@ -11,7 +11,7 @@
 extern size_t g_priorituesLen;
 extern unsigned g_priorities[];
 
-TEST(fbComp, PriorityTooLarge)
+TEST(Compressor, PriorityTooLarge)
 {
     fbcd::Compressor c;
 
@@ -25,7 +25,7 @@ TEST(fbComp, PriorityTooLarge)
     }, fbcd::Compressor::CompressionError);
 } /* PriorityTooLarge */
 
-TEST(fbComp, DISABLED_Initialisation)
+TEST(Compressor, Initialisation)
 {
     fbcd::Compressor c;
 
@@ -49,19 +49,25 @@ TEST(fbComp, DISABLED_Initialisation)
             ++bufSz;
         }
         //printf("\n");
-        EXPECT_EQ(sizeof (u32_t), bufSz - 1);
+        EXPECT_EQ(bufSz - 1, sizeof (u32_t) + 2);
 
         u8_t bufTest[500] = { 0x80 };
-        u32_t out = 0xffffffff;
-        std::memcpy(bufTest, &out, sizeof (u32_t));
+        bufTest[1] = 0x0f;
+        bufTest[2] = 0x7f;
+        bufTest[3] = 0xff;
+        bufTest[4] = 0xff;
+        bufTest[5] = 0xff;
         for (size_t i = 0U; i < bufSz - 1; ++i)
         {
-            EXPECT_EQ(bufTest[i], buf[i]);
+            EXPECT_EQ(buf[i], bufTest[i]);
         }
+
+        //writePacketDump(bufTest, bufSz);
+        //writePacketDump(buf, bufSz);
     });
 } /* Initialisation */
 
-TEST(fbComp, Priority)
+TEST(Compressor, Priority)
 {
     fbcd::Compressor c;
 
@@ -79,7 +85,7 @@ TEST(fbComp, Priority)
     printf("Savings: %f\n", c.GetCompressionRate());
 } /* Priority */
 
-TEST(fbComp, Optimistic)
+TEST(Compressor, Optimistic)
 {
     fbcd::Compressor c { 1U };
 
@@ -96,3 +102,21 @@ TEST(fbComp, Optimistic)
 
     printf("Savings: %f\n", c.GetCompressionRate());
 } /* Optimistic */
+
+TEST(Compressor, PrioritySensitivity)
+{
+    fbcd::Compressor c { 1U, 1000U };
+
+    EXPECT_NO_THROW
+    ({
+        for (int i = 0U; i < g_priorituesLen; ++i)
+        {
+            c.Update(g_priorities[i]);
+            std::stringstream ss;
+            ss << c;
+        }
+    });
+
+    printf("Savings: %f\n", c.GetCompressionRate());
+} /* Optimistic */
+

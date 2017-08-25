@@ -4,6 +4,7 @@ extern "C"
 }
 
 #include <cstdio>
+#include <cassert>
 
 
 inline size_t CompVariableLsb(u32_t value, u8_t *pBuf)
@@ -11,7 +12,7 @@ inline size_t CompVariableLsb(u32_t value, u8_t *pBuf)
     size_t length = 0U;
 
     /* lsb_7 */
-    if (value <= 0x7fff)
+    if (value <= 0x7f)
     {
         pBuf[0] = 0x80;
         pBuf[0] |= value & 0x7f;
@@ -49,7 +50,7 @@ inline size_t CompVariableLsb(u32_t value, u8_t *pBuf)
     /* full_offset */
     else
     {
-        pBuf[0] = 0xff;
+        pBuf[0] = 0x0f;
         pBuf[1] = value >> 24 & 0xff;
         pBuf[2] = value >> 16 & 0xff;
         pBuf[3] = value >> 8 & 0xff;
@@ -59,3 +60,46 @@ inline size_t CompVariableLsb(u32_t value, u8_t *pBuf)
 
     return length;
 } /* CompVariableLsb */
+
+inline u32_t DecompVariableLsb(const u8_t *pBuf)
+{
+    u32_t value = 0U;
+
+    /* lsb_7 */
+    if ((pBuf[0] & 0x80) ==  0x80)
+    {
+        value = pBuf[0] & 0x7f;
+    }
+    /* lsb_14 */
+    else if ((pBuf[0] & 0xc0) == 0x40)
+    {
+        value = (pBuf[0] << 8 & 0x3f00)
+            | (pBuf[1] & 0xff);
+    }
+    /* lsb_21 */
+    else if ((pBuf[0] & 0xe0) == 0x20)
+    {
+        value = (pBuf[0] << 16 & 0x1f0000)
+            | (pBuf[1] << 8 & 0xff00)
+            | (pBuf[2] & 0xff);
+    }
+    /* lsb_29 */
+    else if ((pBuf[0] & 0xf0) == 0x10)
+    {
+        value = (pBuf[0] << 24 & 0x0f000000)
+            | (pBuf[1] << 16 & 0xff0000)
+            | (pBuf[2] << 8 & 0xff00)
+            | (pBuf[3] & 0xff);
+    }
+    /* full_offset */
+    else
+    {
+        assert(pBuf[0] == 0x0f);
+        value = (pBuf[1] << 24 & 0xff000000)
+            | (pBuf[2] << 16 & 0xff0000)
+            | (pBuf[3] << 8 & 0xff00)
+            | (pBuf[4] & 0xff);
+    }
+
+    return value;
+} /* DecompVariableLsb */

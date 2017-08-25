@@ -7,9 +7,10 @@
 #include <cassert>
 
 
-fbcd::Compressor::Compressor(u8_t optimisticCnt)
+fbcd::Compressor::Compressor(u8_t optimisticCnt, u16_t sensitivity)
     : optimisticCnt { optimisticCnt }, isOptimistic { true },
-      optimisticTo { optimisticCnt }, sn { 0U }, ucBytes { 0U }, coBytes { 0U },
+      optimisticTo { optimisticCnt }, sensitivity { sensitivity },
+      sn { 0U }, ucBytes { 0U }, coBytes { 0U },
       priorityPrev { 0U }, priorityCurr { 0U }
 {
 
@@ -72,19 +73,39 @@ std::stringstream& fbcd::Compressor::operator >> (std::stringstream &ss)
         size_t len = 0U;
         if (this->priorityCurr > this->priorityPrev)
         {
-            len = CompVariableLsb(this->priorityCurr - this->priorityPrev, &buf[0]);
+            if (this->priorityCurr - this->priorityPrev > this->sensitivity)
+            {
+                len = CompVariableLsb(this->priorityCurr - this->priorityPrev, &buf[0]);
+            }
+            else
+            {
+                flags = 0x00;
+                len = 0U;
+            }
         }
         else
         {
-            flags |= 0x40;
-            len = CompVariableLsb(this->priorityPrev - this->priorityCurr, &buf[0]);
+            if (this->priorityPrev - this->priorityCurr > this->sensitivity)
+            {
+                flags |= 0x40;
+                len = CompVariableLsb(this->priorityPrev - this->priorityCurr, &buf[0]);
+            }
+            else
+            {
+                flags = 0x00;
+                len = 0U;
+            }
         }
 
         /* flags */
         ss << flags;
+        /*if (buf[0] == 0x20)
+        {
+            ss << (u8_t)0x20;
+        }*/
         for (size_t i = 0U; i < len; ++i)
         {
-            ss << buf[i];
+            ss << (u8_t)buf[i];
         }
 #endif
 
@@ -126,5 +147,5 @@ const char* fbcd::Compressor::CompressionError::what() const throw()
 
 std::stringstream& fbcd::operator << (std::stringstream &ss, Compressor &c)
 {
-    c >> ss;
+    return c >> ss;
 } /* operator << */

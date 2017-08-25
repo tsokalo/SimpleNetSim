@@ -2,6 +2,9 @@
 #define __TYPEDEFS_H__
 
 
+#include <stdio.h>
+
+
 typedef unsigned char   u8_t;       ///< Unsigned byte.
 typedef unsigned short  u16_t;      ///< Unsigned word.
 typedef unsigned int    u32_t;      ///< Unsigned dword.
@@ -35,6 +38,26 @@ typedef enum
 #endif
 
 #define PROFILE_CNT 9
+
+inline void writePacketDump(const u8_t *buf, u16_t bufSz)
+{
+    if (buf != 0 && bufSz != 0)
+    {
+        int i = 0;
+
+        for (i = 0; i < bufSz; i += 8)
+        {
+            int j;
+
+            printf("%04x ", i);
+            for (j = 0; j < 8 && (i + j) < bufSz; j++)
+            {
+                printf("%02x ", buf[i + j]);
+            }
+            printf("\n");
+        }
+    }
+}
 
 
 #endif /* __TYPEDEFS_H__ */
