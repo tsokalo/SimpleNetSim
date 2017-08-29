@@ -32,6 +32,7 @@ struct FeedbackInfo {
 		this->netDiscovery = other.netDiscovery;
 		this->ttl = other.ttl;
 		this->ackInfo = other.ackInfo;
+		this->rcvNum = other.rcvNum;
 
 		this->updated = true;
 	}
@@ -46,32 +47,45 @@ struct FeedbackInfo {
 			this->netDiscovery = other.netDiscovery;
 			this->ttl = other.ttl;
 			this->ackInfo = other.ackInfo;
+			this->rcvNum = other.rcvNum;
 
 			this->updated = true;
 		}
 		return *this;
 	}
 
-	void Reset()
-	{
+	void Reset() {
 		this->rcvMap.clear();
 		this->rrInfo.clear();
 		this->netDiscovery = false;
 		this->ackInfo.clear();
 		this->updated = false;
+		this->rcvNum.clear();
 	}
 
 	void Serialize(std::stringstream &ss) {
 
 		ss << addr << DELIMITER;
 		ss << p.val() << DELIMITER;
-		ss << (uint16_t)netDiscovery << DELIMITER;
+		ss << (uint16_t) netDiscovery << DELIMITER;
 		ss << ttl << DELIMITER;
-		ss << (uint16_t)rcvMap.size() << DELIMITER;
+		ss << (uint16_t) rcvMap.size() << DELIMITER;
 		for (auto r : rcvMap)
 			ss << r.first << DELIMITER << r.second.Serialize();
 		rrInfo.Serialize(ss);
 		ackInfo.Serialize(ss);
+		auto serialize_rcv_num = [this](std::stringstream &ss)
+		{
+			ss << (uint16_t) rcvNum.size() << DELIMITER;
+			auto it = rcvNum.begin_orig_order();
+			while (it != rcvNum.last_orig_order()) {
+				ss << it->first << DELIMITER;
+				ss << (uint16_t) it->second.size() << DELIMITER;
+				for(auto i : it->second) ss << i.first << DELIMITER << i.second << DELIMITER;
+				it = rcvNum.next_orig_order(it);
+			}
+		};
+		serialize_rcv_num(ss);
 
 		updated = false;
 	}
@@ -99,6 +113,27 @@ struct FeedbackInfo {
 		rrInfo.clear();
 		rrInfo.Deserialize(ss);
 		ackInfo.Deserialize(ss);
+		auto deserialize_rcv_num = [this](std::stringstream &ss)
+		{
+			uint16_t n = 0, m = 0;
+			ss >> n;
+			for(auto i = 0; i < n; i++)
+			{
+				GenId gid = 0;
+				ss >> gid;
+				ss >> m;
+				for(auto j = 0; j < m; j++)
+				{
+					UanAddress id;
+					uint16_t v;
+					ss >> id;
+					ss >> v;
+					rcvNum[gid][id] = v;
+				}
+			}
+		};
+		rcvNum.clear();
+		deserialize_rcv_num(ss);
 
 		updated = true;
 	}
@@ -128,6 +163,10 @@ struct FeedbackInfo {
 	 * this flag is for local usage only
 	 */
 	bool updated;
+	/*
+	 * how many symbols from whom for each generation I've received
+	 */
+	RcvNum rcvNum;
 };
 
 }

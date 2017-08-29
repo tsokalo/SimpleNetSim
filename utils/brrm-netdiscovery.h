@@ -26,6 +26,7 @@ struct NetDiscoveryMInfo: public FeedbackMInfo {
 		this->netDiscovery = true;
 		this->ttl = ttl;
 		this->ackInfo = other.ackInfo;
+		this->rcvNum = other.rcvNum;
 	}
 
 	NetDiscoveryMInfo(const NetDiscoveryInfo &other) {
@@ -35,6 +36,7 @@ struct NetDiscoveryMInfo: public FeedbackMInfo {
 		this->netDiscovery = other.netDiscovery;
 		this->ttl = other.ttl;
 		this->ackInfo = other.ackInfo;
+		this->rcvNum = other.rcvNum;
 
 		this->updated = true;
 	}

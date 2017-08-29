@@ -30,6 +30,7 @@
 #include "utils/sim-parameters.h"
 #include "utils/brr-header.h"
 #include "utils/ack-backlog.h"
+#include "utils/ack-countdown.h"
 #include "utils/retrans-gen-id.h"
 #include "utils/coding-vector.h"
 #include "utils/retrans-request-counter.h"
@@ -127,6 +128,7 @@ private:
 	void DoUpdateForwardPlan();
 	void DoForgetGeneration();
 	void DoForgetGeneration(GenId id);
+	void PlanForgetGeneration(GenId gid);
 
 	/*
 	 * Retransmission requests
@@ -148,8 +150,9 @@ private:
 	void ProcessAcks(FeedbackInfo l);
 	void SetAcks();
 	void ClearAcks();
-	bool AreNewAcksPresent();
+	bool HaveAcksToSend();
 	void SetFastAck();
+	void ProcessOptimisticAcks();
 
 	void Reset();
 
@@ -159,11 +162,11 @@ private:
 	node_map_it LookUpOutputs(UanAddress id);
 
 	void UpdateLogItem();
-	GenId GetAckWinSize();
-	GenId GetTxAckWinStart();
-	GenId GetRxAckWinStart();
-	GenId GetRxAckWinEnd();
-	GenId GetTxAckWinEnd();
+	GenId GetWinSize();
+	GenId GetTxWinStart();
+	GenId GetRxWinStart();
+	GenId GetRxWinEnd();
+	GenId GetTxWinEnd();
 
 	void Overshoot(GenId gid);
 
@@ -172,9 +175,13 @@ private:
 
 	/********************************************************************************************************
 	 * all received packets from the nodes with lower priority and increasing the coding matrix rank;
-	 * they are the subject to be filtered
+	 * they are the subject to be passed through the filter
 	 */
-	RcvNum m_rcvNum;
+	RcvNum m_inRcvNum;
+	/*
+	 * received packet by my neighbors from me; obtained from the feedback
+	 */
+	RcvNum m_outRcvNum;
 	/*
 	 * forwarding plan specifies the number of degrees of freedom to be forwarded to the sinks of output edges;
 	 * it does not include redundancy; includes both retransmission and filtered symbols
@@ -194,22 +201,22 @@ private:
 	 * it does include redundancy; roughly speaking the transmission plan is the forwarding plan plus redundancy
 	 */
 	TxPlan m_txPlan;
-	/*
+	/*AckCountDown
 	 * number of actually sent recoded packets
 	 */
 	SentNum m_sentNum;
 	/*
-	 * storing actual indeces of the acknowledged generations: either own or received ACKs
+	 * the indeces of the generations that are already removed from the buffer
 	 */
-	AckBacklog m_ackBacklog;
+	AckBacklog m_forgottenGens;
 	/*
-	 * storing indeces of the acknowledged generations that are already sent
+	 * the indeces of the generations that are already removed from the buffer; and still no feedback message was sent with this info
 	 */
-	AckBacklog m_ackBacklogTx;
+	AckCountDown m_forgottenGensInform;
 	/*
-	 * indeces of generations that are last in the Tx buffers of corresponding vertices
+	 * the end of the RX window of the corresponding vertices
 	 */
-	std::map<UanAddress, GenId> m_lastInTx;
+	std::map<UanAddress, GenId> m_remoteRxWinEnd;
 	/********************************************************************************************************/
 
 	/*
@@ -301,7 +308,7 @@ private:
 	 */
 	RetransGenId m_oldestRetransGenId;
 	/*
-	 * send feedback at next possible opportunity; fast feedback is targeted to ACK the generaitions,
+	 * send feedback at next possible opportunity; fast feedback is targeted to ACK the generations,
 	 * for which the vertices with lower priorities replicate RRs
 	 */
 	bool m_fastFeedback;
@@ -313,6 +320,10 @@ private:
 	 * counter of retransmission requests per generation
 	 */
 	rr_counter_ptr m_numRr;
+	/*
+	 * counter of broadcasted packets
+	 */
+	uint32_t m_sent;
 
 	NodeType m_nodeType;
 

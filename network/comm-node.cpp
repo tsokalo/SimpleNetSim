@@ -371,7 +371,8 @@ void CommNode::NotifyLoss(Edge * input, NcPacket pkt) {
 		// special for this simulator
 		//
 		auto txPlan = pkt.GetHeader().txPlan;
-		assert(txPlan.size() == 1);
+//		assert(txPlan.size() == 1);
+		assert(txPlan.size() > 0);
 		auto genId = txPlan.begin()->first;
 
 		m_brr->UpdateLoss(genId, input->v_);

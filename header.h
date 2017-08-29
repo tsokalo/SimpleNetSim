@@ -108,7 +108,7 @@ enum ProgMode {
 	RUN_MODE, EVAL_MODE, TEST_MODE
 };
 enum MessType {
-	DATA_MSG_TYPE, FEEDBACK_MSG_TYPE, NETDISC_MSG_TYPE, RETRANS_REQUEST_MSG_TYPE, ORIG_MSG_TYPE
+	DATA_MSG_TYPE, FEEDBACK_MSG_TYPE, NETDISC_MSG_TYPE, RETRANS_REQUEST_MSG_TYPE, ORIG_MSG_TYPE, FEEDBACK_REQUEST_MSG_TYPE
 };
 
 /*************************************************************************************************/
@@ -300,7 +300,7 @@ struct LogItem {
 	friend std::ostream&
 	operator<<(std::ostream& os, const LogItem& l) {
 		os << l.dst << "\t" << l.d << "\t" << l.p << "\t" << l.cr << "\t" << l.cs << "\t" << l.ns << "\t" << l.nr << "\t" << l.ssn << "\t" << l.gsn << "\t"
-				<< l.rank << "\t" << l.aw.s_tx << "\t" << l.aw.s_rx << "\t" << l.aw.e_tx << "\t" << l.aw.e_rx << "\t" << l.fp.size() << "\t" << l.eps.size();
+				<< l.rank << "\t" << l.aw.s_rx << "\t" << l.aw.s_tx << "\t" << l.aw.e_tx << "\t" << l.aw.e_rx << "\t" << l.fp.size() << "\t" << l.eps.size();
 
 		for (std::map<int16_t, double>::const_iterator it = l.fp.begin(); it != l.fp.end(); it++)
 			os << "\t" << it->first << "\t" << it->second;

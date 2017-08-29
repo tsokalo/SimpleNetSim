@@ -39,6 +39,7 @@ struct FeedbackMInfo {
 			this->netDiscovery = other.netDiscovery;
 			this->ttl = other.ttl;
 			this->ackInfo = other.ackInfo;
+			this->rcvNum = other.rcvNum;
 
 			this->updated = true;
 		}
@@ -51,6 +52,7 @@ struct FeedbackMInfo {
 		this->netDiscovery = false;
 		this->ackInfo.clear();
 		this->updated = false;
+		this->rcvNum.clear();
 		this->p.clear();
 	}
 
@@ -67,6 +69,18 @@ struct FeedbackMInfo {
 			ss << r.first << DELIMITER << r.second.Serialize();
 		rrInfo.Serialize(ss);
 		ackInfo.Serialize(ss);
+		auto serialize_rcv_num = [this](std::stringstream &ss)
+		{
+			ss << (uint16_t) rcvNum.size() << DELIMITER;
+			auto it = rcvNum.begin_orig_order();
+			while (it != rcvNum.last_orig_order()) {
+				ss << it->first << DELIMITER;
+				ss << (uint16_t) it->second.size() << DELIMITER;
+				for(auto i : it->second) ss << i.first << DELIMITER << i.second << DELIMITER;
+				it = rcvNum.next_orig_order(it);
+			}
+		};
+		serialize_rcv_num(ss);
 
 		updated = false;
 	}
@@ -100,6 +114,27 @@ struct FeedbackMInfo {
 		rrInfo.clear();
 		rrInfo.Deserialize(ss);
 		ackInfo.Deserialize(ss);
+		auto deserialize_rcv_num = [this](std::stringstream &ss)
+		{
+			uint16_t n = 0, m = 0;
+			ss >> n;
+			for(auto i = 0; i < n; i++)
+			{
+				GenId gid = 0;
+				ss >> gid;
+				ss >> m;
+				for(auto j = 0; j < m; j++)
+				{
+					UanAddress id;
+					uint16_t v;
+					ss >> id;
+					ss >> v;
+					rcvNum[gid][id] = v;
+				}
+			}
+		};
+		rcvNum.clear();
+		deserialize_rcv_num(ss);
 
 		updated = true;
 	}
@@ -129,6 +164,10 @@ struct FeedbackMInfo {
 	 * this flag is for local usage only
 	 */
 	bool updated;
+	/*
+	 * how many symbols from whom for each generation I've received
+	 */
+	RcvNum rcvNum;
 };
 
 }

@@ -25,6 +25,7 @@ struct NetDiscoveryInfo: public FeedbackInfo {
 		this->netDiscovery = true;
 		this->ttl = ttl;
 		this->ackInfo = other.ackInfo;
+		this->rcvNum = other.rcvNum;
 	}
 
 	/*

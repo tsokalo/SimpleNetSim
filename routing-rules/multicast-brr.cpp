@@ -84,6 +84,7 @@ void MulticastBrr::RcvFeedbackInfo(FeedbackMInfo l) {
 	f.netDiscovery = l.netDiscovery;
 	f.ttl = l.ttl;
 	f.ackInfo = l.ackInfo;
+	f.rcvNum = l.rcvNum;
 	f.updated = l.updated;
 
 	for (auto p : l.p) {
@@ -243,6 +244,7 @@ FeedbackMInfo MulticastBrr::GetFeedbackInfo() {
 	feedback.netDiscovery = f.netDiscovery;
 	feedback.ttl = f.ttl;
 	feedback.ackInfo = f.ackInfo;
+	feedback.rcvNum = f.rcvNum;
 	feedback.updated = true;
 
 	return feedback;
@@ -262,6 +264,7 @@ FeedbackMInfo MulticastBrr::GetRetransRequestInfo(ttl_t ttl) {
 	feedback.netDiscovery = f.netDiscovery;
 	feedback.ttl = f.ttl;
 	feedback.ackInfo = f.ackInfo;
+	feedback.rcvNum = f.rcvNum;
 	feedback.updated = true;
 
 	return feedback;
@@ -419,6 +422,7 @@ NetDiscoveryMInfo MulticastBrr::GetNetDiscoveryInfo(ttl_t ttl) {
 	ndi.netDiscovery = f.netDiscovery;
 	ndi.ttl = f.ttl;
 	ndi.ackInfo = f.ackInfo;
+	ndi.rcvNum = f.rcvNum;
 	ndi.updated = true;
 
 	return ndi;
@@ -494,6 +498,7 @@ bool MulticastBrr::ProcessRetransRequest(FeedbackMInfo l) {
 	f.netDiscovery = l.netDiscovery;
 	f.ttl = l.ttl;
 	f.ackInfo = l.ackInfo;
+	f.rcvNum = l.rcvNum;
 	f.updated = l.updated;
 
 	bool b = false;
@@ -519,6 +524,7 @@ bool MulticastBrr::HasRetransRequest(FeedbackMInfo l) {
 	f.netDiscovery = l.netDiscovery;
 	f.ttl = l.ttl;
 	f.ackInfo = l.ackInfo;
+	f.rcvNum = l.rcvNum;
 	f.updated = l.updated;
 
 	bool b = false;
