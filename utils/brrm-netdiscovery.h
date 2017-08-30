@@ -15,18 +15,17 @@ namespace ncr {
 struct NetDiscoveryMInfo: public FeedbackMInfo {
 	NetDiscoveryMInfo() :
 			FeedbackMInfo() {
-		netDiscovery = true;
+		type = FeedbackInfo::NET_DISC;
 	}
 
 	NetDiscoveryMInfo(FeedbackMInfo& other, ttl_t ttl) {
 		FeedbackMInfo::operator=(other);
-		this->netDiscovery = true;
+		type = FeedbackInfo::NET_DISC;
 		this->ttl = ttl;
 	}
 
 	NetDiscoveryMInfo(const NetDiscoveryInfo &other) {
 		FeedbackMInfo::operator=(*static_cast<const FeedbackInfo*>(&other));
-		this->netDiscovery = other.netDiscovery;
 	}
 
 

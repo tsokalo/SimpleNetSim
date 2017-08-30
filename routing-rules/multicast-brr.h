@@ -79,13 +79,12 @@ public:
 	//
 	bool NeedGen();
 	uint32_t GetNumGreedyGen();
-	bool MaySendData(double dr = 0);
+	bool MaySend(double dr = 0);
 	bool MaySendFeedback();
 	bool MaySendNetDiscovery(ttl_t ttl = -1);
 	// retransmission requests
 	bool MaySendRetransRequest(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
 	bool ProcessRetransRequest(FeedbackMInfo fb);
-	bool HasRetransRequest(FeedbackMInfo fb);
 	void ResetRetransInfo();
 	void UpdateRetransRequest();
 	//

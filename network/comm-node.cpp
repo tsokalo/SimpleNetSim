@@ -192,12 +192,10 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 				auto notify_sending = std::bind(&MulticastBrr::NotifySending, m_brr);
 				for (auto i : m_outs) m_simulator->Schedule(std::bind(&Edge::Transmit, i, std::placeholders::_1), f, (i->v_ == m_outs.at(0)->v_), m, notify_sending);;
 			};
-	;
 
 	SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receives from " << input->v_);
 
-	m_brr->RcvHeaderInfo(pkt.GetHeader());
-
+	m_brr->ProcessHeaderInfo(pkt.GetHeader());
 
 	if (!pkt.IsFeedbackSymbol()) {
 
@@ -209,8 +207,7 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 		GenId genId = txPlan.begin()->first;
 		auto plan_item = txPlan.begin()->second;
 
-		if (m_nodeType == SOURCE_NODE_TYPE)
-			return;
+		if (m_nodeType == SOURCE_NODE_TYPE) return;
 
 		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receives packet from generation " << genId);
 
@@ -226,99 +223,38 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 #ifdef HASH_VECTOR_FEEDBACK_ART
 		m_brr->AddRcvdCcack(genId, ExtractCodingVector(pkt.GetData(), m_sp.genSize));
 #endif
-		NcPacket feedback;
+		NcPacket serviceMsg;
 
 		//
 		// --->
 		//
-		if (m_brr->MaySendNetDiscovery()) {
-			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends the network discovery message with maximum TTL");
-			feedback.SetHeader(m_brr->GetHeaderInfo());
-			feedback.SetFeedback(m_brr->GetNetDiscoveryInfo());
-			plan_broadcast(feedback, NETDISC_MSG_TYPE);
-		} else {
-			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " refuses to send the network discovery message");
 
-			//
-			// --->
-			//
-			if (m_brr->MaySendRetransRequest(m_decQueue->get_ranks(), input->v_, genId, plan_item.all_prev_acked)) {
-				SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends the retransmission request");
-				feedback.SetHeader(m_brr->GetHeaderInfo());
-				feedback.SetFeedback(m_brr->GetRetransRequestInfo());
-				plan_broadcast(feedback, RETRANS_REQUEST_MSG_TYPE);
-			} else {
-				SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " refuses to send the retransmission request");
+		m_brr->UpdateRetransRequestInfo(m_decQueue->get_ranks(), input->v_, genId, plan_item.all_prev_acked);
 
-				//
-				// --->
-				//
-				if (m_brr->MaySendFeedback()) {
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends the feedback");
-					feedback.SetHeader(m_brr->GetHeaderInfo());
-					feedback.SetFeedback(m_brr->GetFeedbackInfo());
-					plan_broadcast(feedback, FEEDBACK_MSG_TYPE);
-				} else {
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " refuses to send the feedback");
-				}
-			}
+		if (m_brr->MaySendServiceMessage()) {
+			serviceMsg.SetFeedback(m_brr->GetServiceMessage());
+			serviceMsg.SetHeader(m_brr->GetHeaderInfo());
+			auto type = serviceMsg.GetFeedback().type;
+
+			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << (uint16_t)type << ", TTL: " << serviceMsg.GetFeedback().ttl);
+			plan_broadcast(serviceMsg, FeedbackInfo::ConvertToMessType(type));
 		}
+
 	} else {
 
 		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receive feedback symbol");
-		m_brr->RcvFeedbackInfo(pkt.GetFeedback());
+		auto f = pkt.GetFeedback();
+		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " TTL has " << (f.ttl != 0 ? "not expired" : "expired"));
 
-		if (pkt.GetFeedback().ttl != 0) {
+		m_brr->ProcessServiceMessage(f);
 
-			//
-			// --->
-			//
-			if (pkt.GetFeedback().netDiscovery) {
+		if (m_brr->MaySendServiceMessage(f.ttl)) {
+			serviceMsg.SetFeedback(m_brr->GetServiceMessage());
+			serviceMsg.SetHeader(m_brr->GetHeaderInfo());
+			auto type = serviceMsg.GetFeedback().type;
 
-				SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receive the network discovery message with TTL " << pkt.GetFeedback().ttl);
-
-				if (m_brr->MaySendNetDiscovery(pkt.GetFeedback().ttl)) {
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends the network discovery message with TTL " << pkt.GetFeedback().ttl - 1);
-					NcPacket feedback;
-					feedback.SetHeader(m_brr->GetHeaderInfo());
-					feedback.SetFeedback(m_brr->GetNetDiscoveryInfo(pkt.GetFeedback().ttl - 1));
-					plan_broadcast(feedback, NETDISC_MSG_TYPE);
-				} else {
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " refuses to send the network discovery message");
-				}
-			} else {
-				SIM_LOG(COMM_NODE_LOG, "Node " << m_id << ". Network discovery flag is not set");
-
-				if (m_brr->HasRetransRequest(pkt.GetFeedback())) {
-
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " processing retransission request");
-
-					//
-					// --->
-					//
-					if (m_brr->ProcessRetransRequest(pkt.GetFeedback())) {
-						if (m_nodeType != SOURCE_NODE_TYPE) {
-
-							SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " forward retransmission request. TTL " << pkt.GetFeedback().ttl);
-
-							NcPacket feedback;
-							feedback.SetHeader(m_brr->GetHeaderInfo());
-							feedback.SetFeedback(m_brr->GetRetransRequestInfo(pkt.GetFeedback().ttl - 1));
-							//							m_brr->ResetRetransInfo();
-							plan_broadcast(feedback, RETRANS_REQUEST_MSG_TYPE);
-						} else {
-							SIM_LOG(COMM_NODE_LOG, "Node " << m_id << ". The source does not forward retransmission requests");
-						}
-					} else {
-						SIM_LOG(COMM_NODE_LOG, "Node " << m_id << ". Retransmission request is either not set or I should not forward it");
-					}
-				} else {
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " there is no retransmission request");
-				}
-			}
-
-		} else {
-			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " TTL has expired");
+			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << (uint16_t)type << ", TTL: " << serviceMsg.GetFeedback().ttl);
+			plan_broadcast(serviceMsg, FeedbackInfo::ConvertToMessType(type));
 		}
 	}
 }
@@ -326,7 +262,7 @@ bool CommNode::DoIwannaSend() {
 
 	SIM_LOG_FUNC(COMM_NODE_LOG);
 
-	return m_brr->MaySendData();
+	return m_brr->MaySend();
 //
 //	if (!m_brr->MaySendData()) return false;
 //
@@ -344,8 +280,7 @@ bool CommNode::DoIwannaSend() {
 //	return (accumulate(txPlan) > 0);
 }
 void CommNode::SetMessTypeCallback(set_msg_type_func f) {
-	if (m_trafSink)
-		m_trafSink->SetMessTypeCallback(f);
+	if (m_trafSink) m_trafSink->SetMessTypeCallback(f);
 }
 
 void CommNode::EnableCcack(hash_matrix_set_ptr hashMatrixSet) {

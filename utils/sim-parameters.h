@@ -23,7 +23,8 @@ struct SimParameters {
 		apiRate = 1000000;
 		sendRate = 1000000;
 		numGenBuffering = 2;
-		numGenRetrans = numGenBuffering + 1;
+		numGenPtpAck = (numGen > numGenBuffering + 2) ? numGenBuffering + 2: numGen;
+		numGenRetrans = (numGen > 2) ? numGen - 2 : 0;
 		numGenSingleTx = 20;
 		fieldSize = 8;
 		ccackLevels = 2;
@@ -60,6 +61,7 @@ struct SimParameters {
 			this->apiRate = other.apiRate;
 			this->sendRate = other.sendRate;
 			this->numGenBuffering = other.numGenBuffering;
+			this->numGenPtpAck = other.numGenPtpAck;
 			this->numGenRetrans = other.numGenRetrans;
 			this->numGenSingleTx = other.numGenSingleTx;
 			this->fieldSize = other.fieldSize;
@@ -97,6 +99,7 @@ struct SimParameters {
 		apiRate = ReadVal<Datarate>(in_f);
 		sendRate = ReadVal<Datarate>(in_f);
 		numGenBuffering = ReadVal<uint16_t>(in_f);
+		numGenPtpAck = ReadVal<uint16_t>(in_f);
 		numGenRetrans = ReadVal<uint16_t>(in_f);
 		numGenSingleTx = ReadVal<uint16_t>(in_f);
 		fieldSize = ReadVal<uint16_t>(in_f);
@@ -131,8 +134,9 @@ struct SimParameters {
 		os << "Application data rate / bps\t\t" << apiRate << std::endl;
 		os << "Sending data rate / bps\t\t\t" << sendRate << std::endl;
 		os << "Number of buffering generations (Tx)\t" << numGenBuffering << std::endl;
-		os << "Number of buffering generations (RR)\t" << numGenRetrans << std::endl;
-		os << "Number of generataions in single MPDU\t" << numGenSingleTx << std::endl;
+		os << "Number of generations before soft ACK\t" << numGenPtpAck << std::endl;
+		os << "Number of generations before RR\t\t\t" << numGenRetrans << std::endl;
+		os << "Number of generations in single MPDU\t" << numGenSingleTx << std::endl;
 		os << "Field size / power of 2\t\t\t" << fieldSize << std::endl;
 		os << "CCACK levels\t\t\t\t" << ccackLevels << std::endl;
 		os << "Maximum coalition size\t\t\t" << maxCoalitionSize << std::endl;
@@ -159,6 +163,7 @@ struct SimParameters {
 		os << apiRate << '\t';
 		os << sendRate << '\t';
 		os << numGenBuffering << '\t';
+		os << numGenPtpAck << '\t';
 		os << numGenRetrans << '\t';
 		os << numGenSingleTx << '\t';
 		os << fieldSize << '\t';
@@ -242,6 +247,10 @@ struct SimParameters {
 	 * number of generations that should be buffered before the retransmissions can be requested
 	 */
 	uint16_t numGenRetrans;
+	/*
+	 * number of generations in the reception buffer over which the Ptp ACKs will be requested
+	 */
+	uint16_t numGenPtpAck;
 	/*
 	 * maximum number of retransmission requests
 	 */

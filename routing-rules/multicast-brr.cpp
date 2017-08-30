@@ -406,12 +406,12 @@ uint32_t MulticastBrr::GetNumGreedyGen() {
 	}
 	return num;
 }
-bool MulticastBrr::MaySendData(double dr) {
+bool MulticastBrr::MaySend(double dr) {
 	//
 	// if at least for all destination we may send data
 	//
 	for (auto brr_it : m_brr)
-		if (brr_it.second->MaySendData(dr)) return true;
+		if (brr_it.second->MaySend(dr)) return true;
 
 	return false;
 }
@@ -455,21 +455,6 @@ bool MulticastBrr::ProcessRetransRequest(FeedbackMInfo l) {
 		assert(m_brr.find(addr) != m_brr.end());
 		l.p = p.second;
 		b = (m_brr.at(addr)->ProcessRetransRequest(l)) ? true : b;
-	}
-
-	return b;
-}
-bool MulticastBrr::HasRetransRequest(FeedbackMInfo l) {
-	//
-	// 1. ask for the retransmission request for each destination
-	// 2. return true if at least by one destination the processing returns true
-	//
-	bool b = false;
-	for (auto p : l.ps) {
-		auto addr = p.first;
-		assert(m_brr.find(addr) != m_brr.end());
-		l.p = p.second;
-		b = (m_brr.at(addr)->HasRetransRequest(l)) ? true : b;
 	}
 
 	return b;

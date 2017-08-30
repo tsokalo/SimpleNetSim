@@ -14,12 +14,12 @@ namespace ncr{
 
 struct NetDiscoveryInfo: public FeedbackInfo {
 	NetDiscoveryInfo() : FeedbackInfo() {
-		netDiscovery = true;
+		type = FeedbackInfo::NET_DISC;
 	}
 
 	NetDiscoveryInfo(FeedbackInfo& other, ttl_t ttl) {
 		FeedbackInfo::operator=(other);
-		this->netDiscovery = true;
+		type = FeedbackInfo::NET_DISC;
 		this->ttl = ttl;
 	}
 

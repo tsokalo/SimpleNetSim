@@ -19,22 +19,50 @@ namespace ncr {
 
 struct FeedbackInfo {
 
+	enum ServiceMessType
+	{
+		REGULAR,
+		/*
+		 * request for the point-to-point ACK; only the neighbors of the sender respond to it; this request is not forwarded
+		 */
+		REQ_PTP_ACK,
+		/*
+		 * request for the end-to-end ACK; the direct neighbors respond to it if they have ACK for the requested generation(s);
+		 * otherwise forward it in direction of the destination
+		 */
+		REQ_ETE_ACK,
+		/*
+		 * response to the point-to-point ACK request; behaves as a regular feedback; this response is not forwarded
+		 */
+		RESP_PTP_ACK,
+		/*
+		 * response to the end-to-end ACK request; will be forwarded in direction to the source
+		 */
+		RESP_ETE_ACK,
+		/*
+		 * network discovery
+		 */
+		NET_DISC,
+		/*
+		 * retransmission request
+		 */
+		REQ_RETRANS
+	};
+
 	FeedbackInfo() {
-		netDiscovery = false;
 		ttl = 0;
 		updated = false;
-		requestAck = false;
+		type = REGULAR;
 	}
 	FeedbackInfo(const FeedbackInfo &other) {
 		this->addr = other.addr;
 		this->p = other.p;
 		this->rcvMap = other.rcvMap;
 		this->rrInfo = other.rrInfo;
-		this->netDiscovery = other.netDiscovery;
 		this->ttl = other.ttl;
 		this->ackInfo = other.ackInfo;
 		this->rcvNum = other.rcvNum;
-		this->requestAck = other.requestAck;
+		this->type = other.type;
 
 		this->updated = true;
 	}
@@ -46,11 +74,10 @@ struct FeedbackInfo {
 			this->p = other.p;
 			this->rcvMap = other.rcvMap;
 			this->rrInfo = other.rrInfo;
-			this->netDiscovery = other.netDiscovery;
 			this->ttl = other.ttl;
 			this->ackInfo = other.ackInfo;
 			this->rcvNum = other.rcvNum;
-			this->requestAck = other.requestAck;
+			this->type = other.type;
 
 			this->updated = true;
 		}
@@ -60,19 +87,17 @@ struct FeedbackInfo {
 	void Reset() {
 		this->rcvMap.clear();
 		this->rrInfo.clear();
-		this->netDiscovery = false;
 		this->ackInfo.clear();
 		this->updated = false;
 		this->rcvNum.clear();
-		this->requestAck = false;
+		this->type = REGULAR;
 	}
 
 	void Serialize(std::stringstream &ss) {
 
 		ss << addr << DELIMITER;
 		ss << p.val() << DELIMITER;
-		ss << (uint16_t) netDiscovery << DELIMITER;
-		ss << (uint16_t) requestAck << DELIMITER;
+		ss << (uint16_t) type << DELIMITER;
 		ss << ttl << DELIMITER;
 		ss << (uint16_t) rcvMap.size() << DELIMITER;
 		for (auto r : rcvMap)
@@ -103,9 +128,7 @@ struct FeedbackInfo {
 		p = v;
 		uint16_t w;
 		ss >> w;
-		netDiscovery = w;
-		ss >> w;
-		requestAck = w;
+		type = ServiceMessType(w);
 		ss >> ttl;
 		uint16_t n;
 		ss >> n;
@@ -145,6 +168,15 @@ struct FeedbackInfo {
 		updated = true;
 	}
 
+	static MessType ConvertToMessType(ServiceMessType type)
+	{
+		if(type == REGULAR || type == REQ_PTP_ACK || type == REQ_ETE_ACK || type == RESP_PTP_ACK || type == RESP_ETE_ACK)return FEEDBACK_MSG_TYPE;
+		if(type == NET_DISC)return NETDISC_MSG_TYPE;
+		if(type == REQ_RETRANS)return RETRANS_REQUEST_MSG_TYPE;
+
+		assert(0);
+	}
+
 	/*
 	 * sender address
 	 */
@@ -159,10 +191,6 @@ struct FeedbackInfo {
 	AckInfo ackInfo;
 
 	/*
-	 * network discovery flag
-	 */
-	bool netDiscovery;
-	/*
 	 * time to live
 	 */
 	ttl_t ttl;
@@ -175,9 +203,10 @@ struct FeedbackInfo {
 	 */
 	RcvNum rcvNum;
 	/*
-	 * force the receivers of this feedback respond with the feedback containing ACKs
+	 * kind of the message
 	 */
-	bool requestAck;
+	ServiceMessType type;
+
 };
 
 }

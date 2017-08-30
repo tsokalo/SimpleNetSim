@@ -66,8 +66,7 @@ public:
 	/*
 	 * INPUTS
 	 */
-	void RcvHeaderInfo(HeaderInfo l);
-	void RcvFeedbackInfo(FeedbackInfo l);
+	void ProcessHeaderInfo(HeaderInfo l);
 	void UpdateSent(GenId genId, uint32_t num, bool notify_sending = false);
 	void UpdateRcvd(GenId genId, UanAddress id, bool linDep = false);
 	void UpdateRcvd(GenId genId, UanAddress id, std::vector<OrigSymbol> v);
@@ -78,31 +77,29 @@ public:
 	//
 	void AddToCoalition(UanAddress addr);
 	void SetSendingRate(Datarate d);
+	//
+	void ProcessServiceMessage();
+	void CreateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
+	//
+	void ResetRetransInfo();
 
 	/*
 	 * OUTPUTS
 	 */
 	TxPlan GetTxPlan();
 	BrrHeader GetHeader(TxPlan txPlan, FeedbackInfo f);
-	FeedbackInfo GetFeedbackInfo();
-	FeedbackInfo GetRetransRequestInfo(ttl_t ttl = -2);
 	HeaderInfo GetHeaderInfo();
 	HeaderInfo GetHeaderInfo(TxPlan txPlan);
-	NetDiscoveryInfo GetNetDiscoveryInfo(ttl_t ttl = -2);
 	UanAddress GetSinkVertex();
+	FeedbackInfo GetServiceMessage();
 	//
 	bool NeedGen();
 	uint32_t GetNumGreedyGen();
+	bool MaySend(double dr = 0);
 	bool MaySendData(double dr = 0);
-	bool MaySendFeedback();
-	bool MaySendNetDiscovery(ttl_t ttl = -1);
-	// retransmission requests
-	bool MaySendRetransRequest(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
-	bool MayRequestAck();
-	bool ProcessRetransRequest(FeedbackInfo fb);
-	bool HasRetransRequest(FeedbackInfo fb);
-	void ResetRetransInfo();
-	void UpdateRetransRequest();
+	bool MaySendServiceMessage(ttl_t ttl = -1);
+	//
+	void CreateRetransRequest();
 	//
 	uint32_t GetGenBufSize(uint32_t maxPkts);
 	uint32_t GetAmountTxData();
@@ -131,6 +128,25 @@ private:
 	void DoForgetGeneration(GenId id);
 	void PlanForgetGeneration(GenId gid);
 
+	bool MaySendReqPtpAck();
+	bool MaySendReqEteAck();
+	bool MaySendRespPtpAck();
+	bool MaySendRespEteAck();
+	bool MaySendNetDisc();
+	bool MaySendReqRetrans();
+	bool MaySendGeneralFeedback(FeedbackInfo f);
+
+	void ProcessRegularFeedback(FeedbackInfo f);
+	void ProcessReqPtpAck(FeedbackInfo f);
+	void ProcessReqEteAck(FeedbackInfo f);
+	void ProcessRespPtpAck(FeedbackInfo f);
+	void ProcessRespEteAck(FeedbackInfo f);
+	void ProcessNetDisc(FeedbackInfo f);
+	void ProcessReqRetrans(FeedbackInfo f);
+
+	void OriginateReqPtpAck();
+	void OriginateReqEteAck();
+
 	/*
 	 * Retransmission requests
 	 */
@@ -143,7 +159,7 @@ private:
 	bool IsRetransRequestOld(FeedbackInfo fb);
 	void FormRrInfo(FeedbackInfo fb, std::map<GenId, CoderHelpInfo> helpInfo);
 	void RefineCoderHelpInfo(std::map<GenId, CoderHelpInfo> &helpInfo);
-	bool CreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId genId);
+	bool DoCreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId genId);
 	/*
 	 * Acknowledgements
 	 */
@@ -153,7 +169,7 @@ private:
 	void ClearAcks();
 	bool HaveAcksToSend();
 	void SetFastAck();
-	void ProcessOptimisticAcks();
+	void EvaluateSoftAck();
 
 	void Reset();
 
@@ -164,7 +180,6 @@ private:
 	 * thus on source the overflow problem is similar to the problem of blocking the protocol layer above
 	 */
 	bool IsOverflowDanger();
-
 
 	node_map_it LookUpInputs(UanAddress id);
 	node_map_it LookUpOutputs(UanAddress id);
@@ -333,6 +348,21 @@ private:
 	 * counter of broadcasted packets
 	 */
 	uint32_t m_sent;
+	/*
+	 * the flag is set to 1 when the request for the PtP ACK is observed; it is set to 0 when the corresponding response
+	 * message is constructed (get)
+	 */
+	bool m_rcvdReqPtpAck;
+	/*
+	 * the flag is set to 1 when the request for the EtE ACK is observed; it is set to 0 when the corresponding response
+	 * message is constructed (get)
+	 */
+	bool m_rcvdReqEteAck;
+	/*
+	 * the flag is set to 1 when it is decided that the retransmission request should be send; it is set to 0 when
+	 * the corresponding message is constructed (get)
+	 */
+	bool m_needSendRr;
 
 	NodeType m_nodeType;
 
@@ -352,5 +382,5 @@ private:
 
 };
 
-}//ncr
+} //ncr
 #endif /* NCROUTINGRULES_H_ */

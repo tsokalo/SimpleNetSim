@@ -4,8 +4,9 @@ Symbol size / bytes						10
 Application data rate / bps				1e+06
 Sending data rate / bps					1e+06
 Number of buffering generations (Tx)	2
-Number of buffering generations (RR)	3
-Number of generataions in single MPDU	20
+Number of generations before soft ACK	4
+Number of generations before RR			7
+Number of generations in a single MPDU	20
 Field size / power of 2					8
 CCACK levels							2
 Maximum coalition size					4
