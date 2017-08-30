@@ -19,26 +19,14 @@ struct NetDiscoveryMInfo: public FeedbackMInfo {
 	}
 
 	NetDiscoveryMInfo(FeedbackMInfo& other, ttl_t ttl) {
-		this->addr = other.addr;
-		this->p = other.p;
-		this->rcvMap = other.rcvMap;
-		this->rrInfo = other.rrInfo;
+		FeedbackMInfo::operator=(other);
 		this->netDiscovery = true;
 		this->ttl = ttl;
-		this->ackInfo = other.ackInfo;
-		this->rcvNum = other.rcvNum;
 	}
 
 	NetDiscoveryMInfo(const NetDiscoveryInfo &other) {
-		this->addr = other.addr;
-		this->rcvMap = other.rcvMap;
-		this->rrInfo = other.rrInfo;
+		FeedbackMInfo::operator=(*static_cast<const FeedbackInfo*>(&other));
 		this->netDiscovery = other.netDiscovery;
-		this->ttl = other.ttl;
-		this->ackInfo = other.ackInfo;
-		this->rcvNum = other.rcvNum;
-
-		this->updated = true;
 	}
 
 

@@ -23,6 +23,7 @@ struct FeedbackInfo {
 		netDiscovery = false;
 		ttl = 0;
 		updated = false;
+		requestAck = false;
 	}
 	FeedbackInfo(const FeedbackInfo &other) {
 		this->addr = other.addr;
@@ -33,6 +34,7 @@ struct FeedbackInfo {
 		this->ttl = other.ttl;
 		this->ackInfo = other.ackInfo;
 		this->rcvNum = other.rcvNum;
+		this->requestAck = other.requestAck;
 
 		this->updated = true;
 	}
@@ -48,6 +50,7 @@ struct FeedbackInfo {
 			this->ttl = other.ttl;
 			this->ackInfo = other.ackInfo;
 			this->rcvNum = other.rcvNum;
+			this->requestAck = other.requestAck;
 
 			this->updated = true;
 		}
@@ -61,6 +64,7 @@ struct FeedbackInfo {
 		this->ackInfo.clear();
 		this->updated = false;
 		this->rcvNum.clear();
+		this->requestAck = false;
 	}
 
 	void Serialize(std::stringstream &ss) {
@@ -68,6 +72,7 @@ struct FeedbackInfo {
 		ss << addr << DELIMITER;
 		ss << p.val() << DELIMITER;
 		ss << (uint16_t) netDiscovery << DELIMITER;
+		ss << (uint16_t) requestAck << DELIMITER;
 		ss << ttl << DELIMITER;
 		ss << (uint16_t) rcvMap.size() << DELIMITER;
 		for (auto r : rcvMap)
@@ -99,6 +104,8 @@ struct FeedbackInfo {
 		uint16_t w;
 		ss >> w;
 		netDiscovery = w;
+		ss >> w;
+		requestAck = w;
 		ss >> ttl;
 		uint16_t n;
 		ss >> n;
@@ -167,6 +174,10 @@ struct FeedbackInfo {
 	 * how many symbols from whom for each generation I've received
 	 */
 	RcvNum rcvNum;
+	/*
+	 * force the receivers of this feedback respond with the feedback containing ACKs
+	 */
+	bool requestAck;
 };
 
 }

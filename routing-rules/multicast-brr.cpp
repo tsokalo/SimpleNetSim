@@ -77,24 +77,13 @@ void MulticastBrr::RcvHeaderInfo(HeaderMInfo l) {
 }
 void MulticastBrr::RcvFeedbackInfo(FeedbackMInfo l) {
 
-	FeedbackInfo f;
-	f.addr = l.addr;
-	f.rcvMap = l.rcvMap;
-	f.rrInfo = l.rrInfo;
-	f.netDiscovery = l.netDiscovery;
-	f.ttl = l.ttl;
-	f.ackInfo = l.ackInfo;
-	f.rcvNum = l.rcvNum;
-	f.updated = l.updated;
-
-	for (auto p : l.p) {
+	for (auto p : l.ps) {
 		auto dst = p.first;
 		assert(m_brr.find(dst) != m_brr.end());
-		f.p = p.second;
-		SIM_LOG_N(BRRM_LOG, m_id, "Feedback source " << f.addr << " with priority " << f.p << " for DST " << dst);
-		m_brr.at(dst)->RcvFeedbackInfo(f);
+		l.p = p.second;
+		SIM_LOG_N(BRRM_LOG, m_id, "Feedback source " << l.addr << " with priority " << l.p << " for DST " << dst);
+		m_brr.at(dst)->RcvFeedbackInfo(l);
 	}
-
 }
 void MulticastBrr::UpdateSent(GenId genId, uint32_t num, bool notify_sending) {
 	for (auto brr : m_brr)
@@ -226,48 +215,28 @@ BrrMHeader MulticastBrr::GetHeader(TxPlan txPlan, FeedbackMInfo f) {
 
 	auto h = GetHeaderInfo(txPlan);
 	f.addr = h.addr;
-	f.p = h.p;
+	f.ps = h.p;
 	return BrrMHeader(h, f);
 }
 FeedbackMInfo MulticastBrr::GetFeedbackInfo() {
-	FeedbackMInfo feedback(m_brr.begin()->second->GetFeedbackInfo());
 
+	FeedbackMInfo f(m_brr.begin()->second->GetFeedbackInfo());
 	for (auto brr_it : m_brr) {
 		auto brr = brr_it.second;
 		auto dst = brr_it.first;
-		feedback.p[dst] = brr->GetFeedbackInfo().p;
+		f.ps[dst] = brr->GetPriority();
 	}
-
-	auto f = m_brr.begin()->second->GetFeedbackInfo();
-	feedback.rcvMap = f.rcvMap;
-	feedback.rrInfo = f.rrInfo;
-	feedback.netDiscovery = f.netDiscovery;
-	feedback.ttl = f.ttl;
-	feedback.ackInfo = f.ackInfo;
-	feedback.rcvNum = f.rcvNum;
-	feedback.updated = true;
-
-	return feedback;
+	return f;
 }
 FeedbackMInfo MulticastBrr::GetRetransRequestInfo(ttl_t ttl) {
-	FeedbackMInfo feedback(m_brr.begin()->second->GetFeedbackInfo());
 
+	FeedbackMInfo f(m_brr.begin()->second->GetRetransRequestInfo(ttl));
 	for (auto brr_it : m_brr) {
 		auto brr = brr_it.second;
 		auto dst = brr_it.first;
-		feedback.p[dst] = brr->GetFeedbackInfo().p;
+		f.ps[dst] = brr->GetPriority();
 	}
-
-	auto f = m_brr.begin()->second->GetRetransRequestInfo(ttl);
-	feedback.rcvMap = f.rcvMap;
-	feedback.rrInfo = f.rrInfo;
-	feedback.netDiscovery = f.netDiscovery;
-	feedback.ttl = f.ttl;
-	feedback.ackInfo = f.ackInfo;
-	feedback.rcvNum = f.rcvNum;
-	feedback.updated = true;
-
-	return feedback;
+	return f;
 }
 
 HeaderMInfo MulticastBrr::GetHeaderInfo() {
@@ -408,24 +377,13 @@ HeaderMInfo MulticastBrr::GetHeaderInfo(TxPlan txPlan) {
 }
 NetDiscoveryMInfo MulticastBrr::GetNetDiscoveryInfo(ttl_t ttl) {
 
-	NetDiscoveryMInfo ndi(m_brr.begin()->second->GetNetDiscoveryInfo(ttl));
-
+	NetDiscoveryMInfo f(m_brr.begin()->second->GetNetDiscoveryInfo(ttl));
 	for (auto brr_it : m_brr) {
 		auto brr = brr_it.second;
 		auto dst = brr_it.first;
-		ndi.p[dst] = brr->GetNetDiscoveryInfo(ttl).p;
+		f.ps[dst] = brr->GetPriority();
 	}
-
-	auto f = m_brr.begin()->second->GetNetDiscoveryInfo(ttl);
-	ndi.rcvMap = f.rcvMap;
-	ndi.rrInfo = f.rrInfo;
-	ndi.netDiscovery = f.netDiscovery;
-	ndi.ttl = f.ttl;
-	ndi.ackInfo = f.ackInfo;
-	ndi.rcvNum = f.rcvNum;
-	ndi.updated = true;
-
-	return ndi;
+	return f;
 }
 bool MulticastBrr::NeedGen() {
 	//
@@ -491,23 +449,12 @@ bool MulticastBrr::ProcessRetransRequest(FeedbackMInfo l) {
 	// 1. process the retransmission request for each destination
 	// 2. return true if at least by one destination the processing returns true
 	//
-	FeedbackInfo f;
-	f.addr = l.addr;
-	f.rcvMap = l.rcvMap;
-	f.rrInfo = l.rrInfo;
-	f.netDiscovery = l.netDiscovery;
-	f.ttl = l.ttl;
-	f.ackInfo = l.ackInfo;
-	f.rcvNum = l.rcvNum;
-	f.updated = l.updated;
-
 	bool b = false;
-	for (auto p : l.p) {
+	for (auto p : l.ps) {
 		auto addr = p.first;
 		assert(m_brr.find(addr) != m_brr.end());
-		f.p = p.second;
-//		m_brr.at(addr)->RcvFeedbackInfo(f);
-		b = (m_brr.at(addr)->ProcessRetransRequest(f)) ? true : b;
+		l.p = p.second;
+		b = (m_brr.at(addr)->ProcessRetransRequest(l)) ? true : b;
 	}
 
 	return b;
@@ -517,23 +464,12 @@ bool MulticastBrr::HasRetransRequest(FeedbackMInfo l) {
 	// 1. ask for the retransmission request for each destination
 	// 2. return true if at least by one destination the processing returns true
 	//
-	FeedbackInfo f;
-	f.addr = l.addr;
-	f.rcvMap = l.rcvMap;
-	f.rrInfo = l.rrInfo;
-	f.netDiscovery = l.netDiscovery;
-	f.ttl = l.ttl;
-	f.ackInfo = l.ackInfo;
-	f.rcvNum = l.rcvNum;
-	f.updated = l.updated;
-
 	bool b = false;
-	for (auto p : l.p) {
+	for (auto p : l.ps) {
 		auto addr = p.first;
 		assert(m_brr.find(addr) != m_brr.end());
-		f.p = p.second;
-//		m_brr.at(addr)->RcvFeedbackInfo(f);
-		b = (m_brr.at(addr)->HasRetransRequest(f)) ? true : b;
+		l.p = p.second;
+		b = (m_brr.at(addr)->HasRetransRequest(l)) ? true : b;
 	}
 
 	return b;

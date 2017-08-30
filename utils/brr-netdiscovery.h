@@ -18,14 +18,9 @@ struct NetDiscoveryInfo: public FeedbackInfo {
 	}
 
 	NetDiscoveryInfo(FeedbackInfo& other, ttl_t ttl) {
-		this->addr = other.addr;
-		this->p = other.p;
-		this->rcvMap = other.rcvMap;
-		this->rrInfo = other.rrInfo;
+		FeedbackInfo::operator=(other);
 		this->netDiscovery = true;
 		this->ttl = ttl;
-		this->ackInfo = other.ackInfo;
-		this->rcvNum = other.rcvNum;
 	}
 
 	/*

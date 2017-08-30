@@ -98,6 +98,7 @@ public:
 	bool MaySendNetDiscovery(ttl_t ttl = -1);
 	// retransmission requests
 	bool MaySendRetransRequest(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
+	bool MayRequestAck();
 	bool ProcessRetransRequest(FeedbackInfo fb);
 	bool HasRetransRequest(FeedbackInfo fb);
 	void ResetRetransInfo();
@@ -157,16 +158,24 @@ private:
 	void Reset();
 
 	void CheckBuffering();
+	/*
+	 * the buffer overflow causes data drops; on relays and destination it happens due to reception of too much data
+	 * without ACKs; on source the overflow does not happen, instead the protocol does not accept any new generated packets,
+	 * thus on source the overflow problem is similar to the problem of blocking the protocol layer above
+	 */
+	bool IsOverflowDanger();
+
 
 	node_map_it LookUpInputs(UanAddress id);
 	node_map_it LookUpOutputs(UanAddress id);
 
 	void UpdateLogItem();
-	GenId GetWinSize();
+	GenId GetMaxRxWinSize();
 	GenId GetTxWinStart();
 	GenId GetRxWinStart();
 	GenId GetRxWinEnd();
 	GenId GetTxWinEnd();
+	uint16_t GetRxWinSize();
 
 	void Overshoot(GenId gid);
 
@@ -208,11 +217,11 @@ private:
 	/*
 	 * the indeces of the generations that are already removed from the buffer
 	 */
-	AckBacklog m_forgottenGens;
+	AckBacklog m_outdatedGens;
 	/*
 	 * the indeces of the generations that are already removed from the buffer; and still no feedback message was sent with this info
 	 */
-	AckCountDown m_forgottenGensInform;
+	AckCountDown m_outdatedGensInform;
 	/*
 	 * the end of the RX window of the corresponding vertices
 	 */
