@@ -1,7 +1,7 @@
-#include "../include/compressor.hpp"    /* Current header */
+#include "compressor.hpp"    /* Current header */
 
 
-#include "../include/lsb.hpp"
+#include "lsb.hpp"
 
 #include <cstring>
 #include <cassert>
@@ -13,7 +13,9 @@ fbcd::Compressor::Compressor(u8_t optimisticCnt, u16_t sensitivity)
       sn { 0U }, ucBytes { 0U }, coBytes { 0U },
       priorityPrev { 0U }, priorityCurr { 0U }
 {
-
+    csrc_table_init(&this->probabilityTable, 0);
+    this->probabilityTable.oaCnt        = this->optimisticCnt;
+    this->probabilityTable.oaCntInit    = this->optimisticCnt;
 } /* Compressor */
 
 fbcd::Compressor::~Compressor()
@@ -21,7 +23,7 @@ fbcd::Compressor::~Compressor()
 
 } /* ~Compressor */
 
-void fbcd::Compressor::Update(u32_t priority)
+void fbcd::Compressor::Update(u32_t priority, pf_t &probabilities)
 {
     isOptimistic   = this->optimisticTo ? true : false;
 
@@ -46,6 +48,24 @@ void fbcd::Compressor::Update(u32_t priority)
         sprintf(msg, "Priority out of bounds with value 0x%0x!", priority);
         throw CompressionError { msg };
     }
+
+    u8_t items[64] = { 0x00 };
+    size_t i = 0U;
+    for (auto p : probabilities)
+    {
+        //printf("%d - %f (%u)\n", p.first, p.second, (u32_t)(0.403 * 10000000) & 0xffffff);
+        u32_t item = (p.first << 24 & 0xff000000)
+            | (static_cast<u32_t>(p.second * 10000000) & 0xffffff);
+        //printf("%d (%0x)\n", item, item);
+        items[i++] = item >> 24 & 0xff;
+        items[i++] = item >> 16 & 0xff;
+        items[i++] = item >> 8 & 0xff;
+        items[i++] = item & 0xff;
+    }
+    //printf("%0x %0x %0x\n", *(u32_t*)(items), *(u32_t*)(items + 4), *(u32_t*)(items + 8));
+    csrc_table_evaluate_field(&this->probabilityTable,
+        reinterpret_cast<u32_t*>(items), probabilities.size());
+    this->ucBytes += probabilities.size() * (sizeof (short) + sizeof (double));
 
     /* stats */
     this->ucBytes += sizeof (u32_t);
@@ -120,6 +140,23 @@ std::stringstream& fbcd::Compressor::operator >> (std::stringstream &ss)
         /* stats */
         this->coBytes += 1U;
     }
+
+    /* probability compression */
+    const size_t BUF_SZ = 64U;
+    u8_t buf[BUF_SZ] = { 0U };
+    u8_t len = 0U;
+    if (list_csrc_compress(&this->probabilityTable, buf, BUF_SZ, &len))
+    {
+        assert(false);
+    }
+
+    for (size_t j = 0U; j < len; ++j)
+    {
+        //printf("%0x ", buf[j]);
+        ss << (u8_t)buf[j];
+    }
+    //printf("\n");
+    this->coBytes += len;
 
     return ss;
 } /* operator << */

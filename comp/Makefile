@@ -30,9 +30,11 @@ OBJS			:= $(subst .cpp,.o,$(SRCS))
 OBJS			:= $(subst .cc,.o,$(OBJS))
 OBJS			:= $(subst .c,.o,$(OBJS))
 
+INC				:= -I$(DIR_INC)
+FLAGS			:= -DLITTLE_ENDIAN_MACHINE
+
 # gTest
 GTEST_DIR		:= $(DIR_DEP)/googletest
-FLAGS			:=
 LIBS			:= $(GTEST_DIR)/build/googlemock/libgmock.a $(GTEST_DIR)/build/googlemock/gtest/libgtest.a
 INCLUDE			:= -I$(GTEST_DIR)/googletest/include/ -I$(GTEST_DIR)/googlemock/include/ -Isrc/ -I$(DIR_INC)/
 TEST_OUT		:= test

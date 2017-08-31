@@ -33,6 +33,8 @@
         "utility": "cpp",
         "fstream": "cpp",
         "functional": "cpp",
-        "memory": "cpp"
+        "memory": "cpp",
+        "stdio.h": "c",
+        "memory.h": "c"
     }
 }

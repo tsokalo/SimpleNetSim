@@ -10,6 +10,7 @@
 
 extern size_t g_priorituesLen;
 extern unsigned g_priorities[];
+extern size_t LoadProbability(pf_t&, size_t);
 
 TEST(Compressor, PriorityTooLarge)
 {
@@ -21,7 +22,8 @@ TEST(Compressor, PriorityTooLarge)
 
     EXPECT_THROW
     ({
-        c.Update(static_cast<u32_t>(-1));
+        pf_t dummy;
+        c.Update(static_cast<u32_t>(-1), dummy);
     }, fbcd::Compressor::CompressionError);
 } /* PriorityTooLarge */
 
@@ -31,7 +33,8 @@ TEST(Compressor, Initialisation)
 
     EXPECT_NO_THROW
     ({
-        c.Update(0x7fffffff);
+        pf_t dummy;
+        c.Update(0x7fffffff, dummy);
 
         std::stringstream ss;
         ss << c;
@@ -49,7 +52,7 @@ TEST(Compressor, Initialisation)
             ++bufSz;
         }
         //printf("\n");
-        EXPECT_EQ(bufSz - 1, sizeof (u32_t) + 2);
+        EXPECT_EQ(bufSz - 1, sizeof (u32_t) + 2 + 1);
 
         u8_t bufTest[500] = { 0x80 };
         bufTest[1] = 0x0f;
@@ -76,7 +79,8 @@ TEST(Compressor, Priority)
         for (int i = 0U; i < g_priorituesLen; ++i)
         {
             //printf("%u - %0x\n", i, g_priorities[i]);
-            c.Update(g_priorities[i]);
+            pf_t dummy;
+            c.Update(g_priorities[i], dummy);
             std::stringstream ss;
             ss << c;
         }
@@ -94,7 +98,8 @@ TEST(Compressor, Optimistic)
         for (int i = 0U; i < g_priorituesLen; ++i)
         {
             //printf("%u - %0x\n", i, g_priorities[i]);
-            c.Update(g_priorities[i]);
+            pf_t dummy;
+            c.Update(g_priorities[i], dummy);
             std::stringstream ss;
             ss << c;
         }
@@ -111,12 +116,33 @@ TEST(Compressor, PrioritySensitivity)
     ({
         for (int i = 0U; i < g_priorituesLen; ++i)
         {
-            c.Update(g_priorities[i]);
+            pf_t dummy;
+            c.Update(g_priorities[i], dummy);
             std::stringstream ss;
             ss << c;
         }
     });
 
     printf("Savings: %f\n", c.GetCompressionRate());
-} /* Optimistic */
+} /* PrioritySensitivity */
 
+TEST(Compressor, Probability)
+{
+    fbcd::Compressor c { 1U, 1000U };
+
+    EXPECT_NO_THROW
+    ({
+        for (int i = 0U; i < g_priorituesLen; ++i)
+        {
+            pf_t probability;
+            size_t offset = 0U;
+            offset = LoadProbability(probability, offset);
+
+            c.Update(g_priorities[i], probability);
+            std::stringstream ss;
+            ss << c;
+        }
+    });
+
+    printf("Savings: %f\n", c.GetCompressionRate());
+} /* Probability */

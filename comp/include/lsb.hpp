@@ -61,7 +61,7 @@ inline size_t CompVariableLsb(u32_t value, u8_t *pBuf)
     return length;
 } /* CompVariableLsb */
 
-inline u32_t DecompVariableLsb(const u8_t *pBuf)
+inline u32_t DecompVariableLsb(const u8_t *pBuf, size_t *pLengthOut)
 {
     u32_t value = 0U;
 
@@ -69,12 +69,14 @@ inline u32_t DecompVariableLsb(const u8_t *pBuf)
     if ((pBuf[0] & 0x80) ==  0x80)
     {
         value = pBuf[0] & 0x7f;
+        *pLengthOut = 1U;
     }
     /* lsb_14 */
     else if ((pBuf[0] & 0xc0) == 0x40)
     {
         value = (pBuf[0] << 8 & 0x3f00)
             | (pBuf[1] & 0xff);
+        *pLengthOut = 2U;
     }
     /* lsb_21 */
     else if ((pBuf[0] & 0xe0) == 0x20)
@@ -82,6 +84,7 @@ inline u32_t DecompVariableLsb(const u8_t *pBuf)
         value = (pBuf[0] << 16 & 0x1f0000)
             | (pBuf[1] << 8 & 0xff00)
             | (pBuf[2] & 0xff);
+        *pLengthOut = 3U;
     }
     /* lsb_29 */
     else if ((pBuf[0] & 0xf0) == 0x10)
@@ -90,6 +93,7 @@ inline u32_t DecompVariableLsb(const u8_t *pBuf)
             | (pBuf[1] << 16 & 0xff0000)
             | (pBuf[2] << 8 & 0xff00)
             | (pBuf[3] & 0xff);
+            *pLengthOut = 4U;
     }
     /* full_offset */
     else
@@ -99,6 +103,7 @@ inline u32_t DecompVariableLsb(const u8_t *pBuf)
             | (pBuf[2] << 16 & 0xff0000)
             | (pBuf[3] << 8 & 0xff00)
             | (pBuf[4] & 0xff);
+        *pLengthOut = 5U;
     }
 
     return value;

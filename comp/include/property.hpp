@@ -10,6 +10,8 @@ namespace diversity
     friend F;
 
     public:
+        Property();
+
         Property(T val);
 
         Property(Property&) = delete;
@@ -30,7 +32,11 @@ namespace diversity
 
         T operator -> () const;
 
+        T const& operator * () const;
+
     protected:
+        T& operator () () const;
+
         void operator () (const T &val) const;
 
     private:
@@ -39,6 +45,12 @@ namespace diversity
 } /* diversity */
 
 /* inline methods ----------------------------------------------------------- */
+
+template <typename T, typename F>
+inline diversity::Property<T, F>::Property()
+{
+
+} /* Property */
 
 template <typename T, typename F>
 inline diversity::Property<T, F>::Property(T val)
@@ -74,10 +86,22 @@ inline T diversity::Property<T, F>::operator -> () const
 } /* operator T& */
 
 template <typename T, typename F>
+inline T const& diversity::Property<T, F>::operator * () const
+{
+    return this->val;
+} /* operator * */
+
+template <typename T, typename F>
+inline T& diversity::Property<T, F>::operator () () const
+{
+    return this->val;
+} /* operator () */
+
+template <typename T, typename F>
 inline void diversity::Property<T, F>::operator () (const T &val) const
 {
     this->val = val;
-} /* Set */
+} /* operator () */
 
 
 #endif /* __PROPERTY_HPP__ */

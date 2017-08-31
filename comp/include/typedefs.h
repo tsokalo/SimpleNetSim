@@ -59,5 +59,25 @@ inline void writePacketDump(const u8_t *buf, u16_t bufSz)
     }
 }
 
+#define SWAP16(x) ((u16_t)(((((u16_t)(x)) >> 8) & 0xffU)    \
+                   | ((((u16_t)(x)) & 0xffU) << 8)))
+
+#define SWAP32(x) (((((u32_t)(x)) >> 24) & 0xffU)           \
+                   | ((((u32_t)(x)) >>  8) & 0xff00U)       \
+                   | ((((u32_t)(x)) <<  8) & 0xff0000U)     \
+                   | ((((u32_t)(x)) << 24) & 0xff000000U))
+
+#if defined(BIG_ENDIAN_MACHINE)
+#    define HTONS(x) (x)
+#    define NTOHS(x) (x)
+#    define HTONL(x) (x)
+#    define NTOHL(x) (x)
+#elif defined(LITTLE_ENDIAN_MACHINE)
+#    define HTONS(x) (SWAP16(x))
+#    define NTOHS(x) (SWAP16(x))
+#    define HTONL(x) (SWAP32(x))
+#    define NTOHL(x) (SWAP32(x))
+#endif
+
 
 #endif /* __TYPEDEFS_H__ */

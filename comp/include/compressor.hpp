@@ -5,7 +5,9 @@
 extern "C"
 {
 #include "typedefs.h"
+#include "list_csrc.h"
 }
+#include "typedefs.hpp"
 
 #include <cstdio>
 #include <exception>
@@ -15,17 +17,29 @@ extern "C"
 
 namespace fbcd
 {
+    /*!
+     * \brief Compression context for brr-pkt-header.
+     */
     class Compressor
     {
     public:
-        //! \todo
-        //! \todo DELIMITER
+        /*!
+         * \brief ctor.
+         *
+         * Set configuration here.
+         *
+         * \param optimisticCnt Number of times to repeat an update.
+         * \param sensitivity   Threshhold for priority update.
+         */
         Compressor(u8_t optimisticCnt = 0U, u16_t sensitivity = 0U);
 
         Compressor(const Compressor&) = delete;
 
         Compressor& operator = (const Compressor&) = delete;
 
+        /*!
+         * \brief dtor.
+         */
         virtual ~Compressor();
 
         /*!
@@ -38,18 +52,37 @@ namespace fbcd
          * \return Length of the compressed fields in bits.
          */
 
-#if 0
-    ss << addr << DELIMITER;
-		ss << p.val() << DELIMITER;
-		ss << (uint16_t)pf.size() << DELIMITER;
-		for(auto p : pf)ss << p.first << DELIMITER << p.second << DELIMITER;
-#endif
-        virtual void Update(u32_t priority);
+        /*!
+         * \brief Updates compressor context with new values.
+         *
+         * Call before operator << or >>.
+         *
+         * \param priority      Next priority value.
+         * \param probabilities Next probability set.
+         */
+        virtual void Update(u32_t priority, pf_t &probabilities);
 
+         /*!
+         * \brief Writes compressed header to stream.
+         *
+         * Call after Update.
+         *
+         * \param ss    String stream entity to write to.
+         *
+         * \return  Same as param.
+         */
         virtual std::stringstream& operator >> (std::stringstream &ss);
 
+        /*!
+         * \brief Returns current metric.
+         *
+         * \return  Compression ratio.
+         */
         virtual float GetCompressionRate() const;
 
+        /*!
+         * \brief Compression errors are signalled via this.
+         */
         class CompressionError : public std::exception
         {
         public:
@@ -76,8 +109,20 @@ namespace fbcd
 
         u32_t   priorityPrev;
         u32_t   priorityCurr;
+
+        CSRCCompressionTable_t probabilityTable;
     }; /* Compressor */
 
+    /*!
+     * \brief Writes compressed header to stream.
+     *
+     * Call after Update.
+     *
+     * \param ss    String stream entity to write to.
+     * \param c     Compressor instance..
+     *
+     * \return  Same as ss.
+     */
     std::stringstream& operator << (std::stringstream &ss, Compressor &c);
 }; /* fbcd */
 
