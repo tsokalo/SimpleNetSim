@@ -66,7 +66,7 @@ public:
 	void SetSendingRate(Datarate d);
 	//
 	void ProcessServiceMessage(FeedbackMInfo f);
-	void CreateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
+	void UpdateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
 	//
 	void ResetRetransInfo();
 
@@ -83,12 +83,11 @@ public:
 	uint32_t GetNumGreedyGen();
 	bool MaySend(double dr = 0);
 	bool MaySendData(double dr = 0);
-	bool MaySendServiceMessage(ttl_t ttl = -1);
+	bool MaySendServiceMessage();
 	//
 	void CreateRetransRequest();
 	//
 	uint32_t GetGenBufSize(uint32_t maxPkts);
-	uint32_t GetAmountTxData();
 	uint16_t GetAckBacklogSize();
 	std::map<UanAddress, uint16_t> GetCoalitionSize();
 

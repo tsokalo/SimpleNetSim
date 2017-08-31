@@ -120,13 +120,13 @@ void MulticastBrr::ProcessServiceMessage(FeedbackMInfo f) {
 		m_brr.at(dst)->ProcessServiceMessage(f);
 	}
 }
-void MulticastBrr::CreateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked)
+void MulticastBrr::UpdateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked)
 {
 	//
 	// if at least for all destination we may send the retransmission request
 	//
 	for (auto brr_it : m_brr)
-		brr_it.second->CreateRetransRequestInfo(ranks, id, genId, all_prev_acked);
+		brr_it.second->UpdateRetransRequestInfo(ranks, id, genId, all_prev_acked);
 }
 /*
  * OUTPUTS
@@ -410,12 +410,12 @@ bool MulticastBrr::MaySendData(double dr){
 
 	return false;
 }
-bool MulticastBrr::MaySendServiceMessage(ttl_t ttl){
+bool MulticastBrr::MaySendServiceMessage(){
 	//
 	// if at least for all destination we may send data
 	//
 	for (auto brr_it : m_brr)
-		if (brr_it.second->MaySendServiceMessage(ttl)) return true;
+		if (brr_it.second->MaySendServiceMessage()) return true;
 
 	return false;
 }
@@ -439,30 +439,6 @@ uint32_t MulticastBrr::GetGenBufSize(uint32_t maxPkts) {
 		num = (num > v) ? v : num;
 	}
 	return num;
-}
-uint32_t MulticastBrr::GetAmountTxData() {
-	//
-	// get the number of symbols that are already present in TX plan
-	//
-	auto txPlan = GetTxPlan();
-	uint32_t sum_tx = 0;
-	for (auto item : txPlan) {
-		sum_tx += item.second.num_all;
-	}
-	//
-	// get minimum of {maximum eligible to be sent from the view of BRR} for each generation
-	//
-	uint32_t max_el_brr = std::numeric_limits < uint32_t > ::max();
-	for (auto brr_it : m_brr) {
-		auto v = floor(brr_it.second->GetMaxAmountTxData() * brr_it.second->GetCodingRate());
-	}
-
-	uint32_t act_tx = sum_tx;
-
-	SIM_LOG_N(BRRM_LOG, m_id,
-			"[sum_tx " << sum_tx << "],[max_el_brr " << max_el_brr << "],[act_tx " << act_tx << "],[res " << ((act_tx > max_el_brr) ? max_el_brr : act_tx) << "]");
-
-	return (act_tx > max_el_brr) ? max_el_brr : act_tx;
 }
 uint16_t MulticastBrr::GetAckBacklogSize() {
 	//

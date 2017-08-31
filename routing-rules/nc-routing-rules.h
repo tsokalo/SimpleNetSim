@@ -79,7 +79,7 @@ public:
 	void SetSendingRate(Datarate d);
 	//
 	void ProcessServiceMessage(FeedbackInfo f);
-	void CreateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
+	void UpdateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
 	//
 	void ResetRetransInfo();
 
@@ -97,7 +97,7 @@ public:
 	uint32_t GetNumGreedyGen();
 	bool MaySend(double dr = 0);
 	bool MaySendData(double dr = 0);
-	bool MaySendServiceMessage(ttl_t ttl = -1);
+	bool MaySendServiceMessage();
 	//
 	void CreateRetransRequest();
 	//
@@ -127,15 +127,14 @@ private:
 	void DoForgetGeneration();
 	void DoForgetGeneration(GenId id);
 	void PlanForgetGeneration(GenId gid);
-
-	bool MaySendReqPtpAck();
-	bool MaySendReqEteAck();
-	bool MaySendRespPtpAck();
-	bool MaySendRespEteAck();
-	bool MaySendNetDisc(ttl_t ttl);
-	bool MaySendReqRetrans();
-	bool MaySendGeneralFeedback();
-
+	/*
+	 * ARQ and congestion control
+	 */
+	void CheckGeneralFeedback();
+	void CheckReqPtpAck();
+	void CheckReqEteAck();
+	void CheckNetDisc();
+	//
 	void ProcessRegularFeedback(FeedbackInfo f);
 	void ProcessReqPtpAck(FeedbackInfo f);
 	void ProcessReqEteAck(FeedbackInfo f);
@@ -143,7 +142,7 @@ private:
 	void ProcessRespEteAck(FeedbackInfo f);
 	void ProcessNetDisc(FeedbackInfo f);
 	void ProcessReqRetrans(FeedbackInfo f);
-
+	//
 	void OriginateReqPtpAck();
 	void OriginateReqEteAck();
 
@@ -323,11 +322,6 @@ private:
 	 */
 	ttl_t m_ttl;
 	/*
-	 * number of generations to be buffered before the transmission
-	 * can start
-	 */
-	uint16_t m_numGenBuffering;
-	/*
 	 * oldest generation ID to retransmit
 	 */
 	RetransGenId m_oldestRetransGenId;
@@ -336,10 +330,6 @@ private:
 	 * for which the vertices with lower priorities replicate RRs
 	 */
 	bool m_fastFeedback;
-	/*
-	 * the newest generation ID
-	 */
-	GenId m_newestRcvGenId;
 	/*
 	 * counter of retransmission requests per generation
 	 */

@@ -274,6 +274,8 @@ FeedbackInfo NcRoutingRules::GetServiceMessage() {
 	m_f.rcvMap = m_inRcvMap;
 	m_f.rcvNum.clear();
 	m_f.rcvNum = m_inRcvNum;
+	m_fastFeedback = false;
+	m_sent = 0;
 
 	for (std::map<UanAddress, RcvMap>::iterator it = m_f.rcvMap.begin(); it != m_f.rcvMap.end(); it++) {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Prepare feedback with receive map for " << it->first);
@@ -283,7 +285,7 @@ FeedbackInfo NcRoutingRules::GetServiceMessage() {
 
 	auto f = m_f;
 
-	m_f.type = ServiceMessType::REGULAR;
+	if (m_f.type.assign(ServiceMessType::NONE)) m_f.ttl = -1;
 
 	return f;
 }
@@ -298,15 +300,19 @@ uint32_t NcRoutingRules::GetNumGreedyGen() {
 	return (m_txPlan.size() >= m_sp.numGenBuffering) ? 0 : (m_sp.numGenBuffering - m_txPlan.size() + 1);
 }
 bool NcRoutingRules::MaySend(double dr) {
-	if (MaySendData(dr)) return true;
-	if (MaySendServiceMessage()) return true;
 
-	return false;
+	CheckGeneralFeedback();
+	CheckReqPtpAck();
+	CheckReqEteAck();
+	CheckNetDisc();
+
+	return (MaySendData(dr) || MaySendServiceMessage());
 }
 bool NcRoutingRules::MaySendData(double dr) {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
+#ifdef SECONDRY_CODE
 	//
 	// if retransmission was requested
 	//
@@ -316,116 +322,88 @@ bool NcRoutingRules::MaySendData(double dr) {
 		//
 		if (!HaveDataForRetransmissions()) return false;
 	}
+#endif
 
-	if (m_inRcvNum.empty()) return false;
+	return (GetAmountTxData() != 0);
+}
+bool NcRoutingRules::MaySendServiceMessage() {
 
-	if (GetMaxAmountTxData() == 0) Overshoot(m_inRcvNum.begin_orig_order()->first);
+	return (m_f.type != ServiceMessType::NONE);
+}
 
-	auto txData = GetAmountTxData();
-	if (txData == 0) {
-		if (m_nodeType == SOURCE_NODE_TYPE) {
-			Overshoot(m_inRcvNum.begin_orig_order()->first);
-		} else {
-			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "I am not the source. I will not overshoot");
-		}
-		return (m_nodeType == SOURCE_NODE_TYPE);
+void NcRoutingRules::CheckGeneralFeedback() {
+	auto check = [this]()->bool
+	{
+		SIM_LOG_FUNC(BRR_LOG);
+
+		//
+		// source never sends the feedback
+		//
+			if (m_nodeType == SOURCE_NODE_TYPE) return false;
+
+			if (m_fastFeedback) {
+				return true;
+			}
+			//
+			// the coalition of the destination is always empty; the nodes without coalition cannot help the sender
+			// So, they do not have to inform the sender about their presence sending the feedback
+			//
+			if (m_coalition.empty() && m_id != m_dst) return false;
+
+			if (HaveAcksToSend()) return true;
+
+			if (m_sent >= 200) {
+				return true;
+			}
+
+			return (m_dis(m_gen) < m_feedbackP);
+		};
+	if (check()) {
+		if (m_f.type.assign(ServiceMessType::REGULAR)) m_f.ttl = -1;
 	}
-
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Function end");
-	return true;
 }
-bool NcRoutingRules::MaySendServiceMessage(ttl_t ttl) {
-	//
-	// the sequence is important
-	//
-	if (MaySendNetDisc(ttl)) return true;
-	if (MaySendRespEteAck()) return true;
-	if (MaySendReqEteAck()) return true;
-	if (MaySendReqRetrans()) return true;
-	if (MaySendRespPtpAck()) return true;
-	if (MaySendReqPtpAck()) return true;
-	if (MaySendGeneralFeedback()) return true;
-
-	return false;
+void NcRoutingRules::CheckReqPtpAck() {
+	if (GetRxWinSize() > m_sp.numGenPtpAck) {
+		if (m_f.type.assign(ServiceMessType::REQ_PTP_ACK)) m_f.ttl = -1;
+	}
 }
-
-bool NcRoutingRules::MaySendGeneralFeedback() {
+void NcRoutingRules::CheckReqEteAck() {
+	if (GetRxWinSize() > m_sp.numGenRetrans) {
+		if (m_f.type.assign(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = m_ttl;
+	}
+}
+void NcRoutingRules::CheckNetDisc() {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	//
-	// source never sends the feedback
-	//
-	if (m_nodeType == SOURCE_NODE_TYPE) return false;
+	auto check = [this]()->bool
+	{
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Node type: " << m_nodeType << ", coalition size: " << m_coalition.size());
 
-	if (m_fastFeedback) {
-		m_fastFeedback = false;
-		return true;
+		//
+		// source never sends the network discovery messages
+		//
+			if (m_nodeType == SOURCE_NODE_TYPE) return false;
+
+		//
+		// if the current node has at least anybody in its coalition, it does not need explore the network
+		// by sending the network discovery message; instead it has an opportunity to send the data packets
+		// and can receive the feedback for them, which gives to the current node the same information as the
+		// response on the network discovery message
+		//
+			if (!m_coalition.empty()) return false;
+		//
+		// the destination does not need to explore the network itself; it should only respond on the
+		// network discovery messages
+		//
+			if (m_id == m_dst) return false;
+
+			return (m_dis(m_gen) < m_netDiscP);
+		};
+
+	if (check()) {
+		if (m_f.type.assign(ServiceMessType::NET_DISC)) m_f.ttl = m_ttl;
 	}
-	//
-	// the coalition of the destination is always empty; the nodes without coalition cannot help the sender
-	// So, they do not have to inform the sender about their presence sending the feedback
-	//
-	if (m_coalition.empty() && m_id != m_dst) return false;
-
-	if (HaveAcksToSend()) return true;
-
-	if (m_sent >= 200) {
-		m_sent = 0;
-		return true;
-	}
-
-	return false;
-//	return (m_dis(m_gen) < m_feedbackP);
 }
-bool NcRoutingRules::MaySendReqPtpAck() {
-	// ReqPtpAck cannot be forwarded, only initiated by the vertex
-	return (GetRxWinSize() > m_sp.numGenPtpAck);
-}
-bool NcRoutingRules::MaySendReqEteAck() {
-	// ReqEteAck can be either initiated or forwarded by the vertex
-	return (GetRxWinSize() > m_sp.numGenRetrans || m_f.type == ServiceMessType::REQ_PTP_ACK);
-}
-bool NcRoutingRules::MaySendRespPtpAck() {
-	return (m_f.type == ServiceMessType::RESP_PTP_ACK);
-}
-bool NcRoutingRules::MaySendRespEteAck() {
-	return (m_f.type == ServiceMessType::RESP_ETE_ACK);
-}
-bool NcRoutingRules::MaySendNetDisc(ttl_t ttl) {
-	SIM_LOG_FUNC(BRR_LOG);
-
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Node type: " << m_nodeType << ", TTL: " << ttl << ", coalition size: " << m_coalition.size());
-
-	//
-	// source never sends the network discovery messages
-	//
-	if (m_nodeType == SOURCE_NODE_TYPE) return false;
-	//
-	// if TTL is equal or above zero then the current node retransmits the network discovery message
-	// upon the reception of the network discovery message
-	//
-	if (ttl >= 0) return true;
-	//
-	// if the current node has at least anybody in its coalition, it does not need explore the network
-	// by sending the network discovery message; instead it has an opportunity to send the data packets
-	// and can receive the feedback for them, which gives to the current node the same information as the
-	// response on the network discovery message
-	//
-	if (!m_coalition.empty()) return false;
-	//
-	// the destination does not need to explore the network itself; it should only respond on the
-	// network discovery messages; "ttl < 0" means that the current function is called when
-	// not a network discovery message was received
-	//
-	if (m_id == m_dst && ttl < 0) return false;
-
-	return (m_dis(m_gen) < m_netDiscP);
-}
-bool NcRoutingRules::MaySendReqRetrans() {
-	if (m_nodeType == SOURCE_NODE_TYPE) return false;
-	return m_needSendRr;
-}
-
 void NcRoutingRules::ProcessServiceMessage(FeedbackInfo f) {
 
 	ProcessRegularFeedback(f);
@@ -474,7 +452,7 @@ void NcRoutingRules::ProcessRegularFeedback(FeedbackInfo l) {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "feedback has no receive map for me");
 	}
 
-	if (m_p < l.p) ProcessAcks (l);
+	if (m_p < l.p) ProcessAcks(l);
 
 	for (auto r : l.rcvNum) {
 		auto gid = r.first;
@@ -490,7 +468,7 @@ void NcRoutingRules::ProcessReqPtpAck(FeedbackInfo f) {
 
 	if (m_p <= m_outputs.at(f.addr)) return;
 
-	m_f.type = ServiceMessType::RESP_PTP_ACK;
+	if (m_f.type.assign(ServiceMessType::RESP_PTP_ACK)) m_f.ttl = -1;
 }
 void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 
@@ -503,8 +481,7 @@ void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 
 	if (m_nodeType == DESTINATION_NODE_TYPE) {
 
-		m_f.type = ServiceMessType::RESP_ETE_ACK;
-		m_f.ttl = m_ttl;
+		if (m_f.type.assign(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = m_ttl;
 
 	} else {
 
@@ -516,19 +493,16 @@ void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 			auto gid = r.first;
 			if (!m_f.ackInfo[gid]) {
 				if (f.ttl > 0) {
-					m_f.type = ServiceMessType::REQ_ETE_ACK;
-					m_f.ttl = f.ttl - 1;
+					if (m_f.type.assign(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = f.ttl - 1;
 					return;
 				} else {
-					m_f.type = ServiceMessType::NONE;
-					m_f.ttl = -1;
+					if (m_f.type.assign_if(ServiceMessType::REQ_ETE_ACK, ServiceMessType::NONE)) m_f.ttl = -1;
 					return;
 				}
 			}
 		}
 
-		m_f.type = ServiceMessType::RESP_ETE_ACK;
-		m_f.ttl = m_ttl;
+		if (m_f.type.assign(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = m_ttl;
 	}
 }
 void NcRoutingRules::ProcessRespPtpAck(FeedbackInfo f) {
@@ -547,149 +521,138 @@ void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
 	// forward the response
 	//
 	if (f.ttl > 0) {
-		m_f.type = ServiceMessType::RESP_ETE_ACK;
-		m_f.ttl = f.ttl - 1;
+		if (m_f.type.assign(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = f.ttl - 1;
 	} else {
-		m_f.type = ServiceMessType::NONE;
-		m_f.ttl = -1;
+		if (m_f.type.assign_if(ServiceMessType::RESP_ETE_ACK, ServiceMessType::NONE)) m_f.ttl = -1;
 	}
 }
 void NcRoutingRules::ProcessNetDisc(FeedbackInfo f) {
-	if (f.ttl == 0) {
-		m_f.type = ServiceMessType::REGULAR;
-		m_f.ttl = -1;
+	if (f.ttl > 0) {
+		if (m_f.type.assign(ServiceMessType::NET_DISC)) m_f.ttl = f.ttl - 1;
 	} else {
-		m_f.type = ServiceMessType::NET_DISC;
-		m_f.ttl = (f.ttl < 0) ? m_ttl : f.ttl - 1;
+		if (m_f.type.assign_if(ServiceMessType::RESP_ETE_ACK, ServiceMessType::NONE)) m_f.ttl = -1;
 	}
 }
 void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	if (f.ttl == 0) {
-		m_f.type = ServiceMessType::REGULAR;
-		m_f.ttl = -1;
-		m_needSendRr = false;
-	}
+	auto check = [this](FeedbackInfo f)->bool {
 
-	m_f.type = ServiceMessType::REQ_RETRANS;
-	m_f.ttl = f.ttl - 1;
+		if (f.ttl == 0)return false;
 
-	if (m_id == m_dst) {
+		if (m_id == m_dst) {
+			//
+			// check if the request is old
+			//
+			if (IsRetransRequestOld(f)) SetFastAck();
+			return false;
+		}
+
+		if (f.p < m_p) {
+			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Ignore RR from the node with priority " << f.p);
+			//
+			// check if the request is old
+			//
+			if (IsRetransRequestOld(f)) SetFastAck();
+			return false;
+		}
+
+		assert(!f.rrInfo.empty());
+		assert(f.ttl > 0);
+
 		//
-		// check if the request is old
+		// remove information already not present at this node
 		//
-		if (IsRetransRequestOld (f)) SetFastAck();
-		m_needSendRr = false;
-		return;
-	}
+		RefineFeedback(f);
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Remaining feedback is" << (f.rrInfo.empty() ? "" : " NOT") << " empty");
+		if (f.rrInfo.empty()) {
+			return false;
+		}
 
-	if (f.p < m_p) {
-		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Ignore RR from the node with priority " << f.p);
 		//
-		// check if the request is old
+		// calculate the difference between the achievable rank
+		// at the node requesting the retransmission if the current node retransmits available information
+		// which is not present on the sender of the feedback yet
 		//
-		if (IsRetransRequestOld (f)) SetFastAck();
-		m_needSendRr = false;
-		return;
+		std::map<GenId, CoderHelpInfo> helpInfo;
+		GetAchievableRank(f, helpInfo);
+
+		//
+		// remove already done RR
+		//
+		RefineCoderHelpInfo(helpInfo);
+		//
+		// update retransmission plan
+		//
+		DoUpdateRetransPlan(helpInfo);
+		//
+		// decide on RR replication
+		//
+		if (f.rrInfo.forwarder == m_id) {
+
+			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "I am the specified forwarder");
+
+			FormRrInfo(f, helpInfo);
+			return (!m_f.rrInfo.empty());
+		} else {
+
+			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "I am not the specified forwarder " << m_f.rrInfo.forwarder);
+			return false;
+		}
+
+		return false;
+	};
+
+	if (check(f) && m_nodeType != SOURCE_NODE_TYPE) {
+		if (m_f.type.assign(ServiceMessType::REQ_RETRANS)) m_f.ttl = f.ttl - 1;
 	}
-
-	assert(!f.rrInfo.empty());
-	assert(f.ttl > 0);
-
-	//
-	// remove information already not present at this node
-	//
-	RefineFeedback (f);
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Remaining feedback is" << (f.rrInfo.empty() ? "" : " NOT") << " empty");
-	if (f.rrInfo.empty()) {
-		m_needSendRr = false;
-		return;
-	}
-
-	//
-	// calculate the difference between the achievable rank
-	// at the node requesting the retransmission if the current node retransmits available information
-	// which is not present on the sender of the feedback yet
-	//
-	std::map<GenId, CoderHelpInfo> helpInfo;
-	GetAchievableRank(f, helpInfo);
-
-	//
-	// remove already done RR
-	//
-	RefineCoderHelpInfo(helpInfo);
-	//
-	// update retransmission plan
-	//
-	DoUpdateRetransPlan(helpInfo);
-	//
-	// decide on RR replication
-	//
-	if (f.rrInfo.forwarder == m_id) {
-
-		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "I am the specified forwarder");
-
-		FormRrInfo(f, helpInfo);
-		m_needSendRr = (!m_f.rrInfo.empty());
-		return;
-	} else {
-
-		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "I am not the specified forwarder " << m_f.rrInfo.forwarder);
-		m_needSendRr = false;
-		return;
-	}
-
-	m_needSendRr = false;
-	return;
 }
 
-void NcRoutingRules::CreateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked) {
+void NcRoutingRules::UpdateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked) {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	m_f.type = ServiceMessType::REQ_RETRANS;
-	m_f.ttl = m_ttl;
+	auto check = [this](std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked)->bool {
+		//
+		// do not send RR if
+		// the sending vertex have all previous generations acked
+		//
+			if (all_prev_acked) {
+				if (m_inRcvNum.size() + m_sp.numGenRetrans >= m_sp.numGen) {
+					//
+					// send some data from the oldest generations
+					//
+					assert(!m_inRcvNum.empty());
+					auto gid = m_inRcvNum.begin_orig_order()->first;
+					SIM_LOG_NPG(1, m_id, m_p, genId, "Relay overshoots GID: " << gid);
+					Overshoot(gid);
+				}
+				SIM_LOG_NPD(1, m_id, m_p, m_dst, "Say NO to sending of RR. Previous are ACKed");
+				return false;
+			}
 
-	//
-	// do not send RR if
-	// the sending vertex have all previous generations acked
-	//
-	if (all_prev_acked) {
-		if (m_inRcvNum.size() + m_sp.numGenRetrans >= m_sp.numGen) {
 			//
-			// send some data from the oldest generations
+			// check necessity in retransmission request; only the destination can originate RR;
+			// other nodes can just forward or replicate it (see ProcessRetransRequest())
 			//
-			assert(!m_inRcvNum.empty());
-			auto gid = m_inRcvNum.begin_orig_order()->first;
-			SIM_LOG_NPG(1, m_id, m_p, genId, "Relay overshoots GID: " << gid);
-			Overshoot(gid);
-		}
-		SIM_LOG_NPD(1, m_id, m_p, m_dst, "Say NO to sending of RR. Previous are ACKed");
-		m_needSendRr = false;
-		return;
-	}
+			if (m_nodeType == DESTINATION_NODE_TYPE) {
+				return MayOriginateRetransRequest(ranks, genId);
+			}
+			if (m_nodeType == RELAY_NODE_TYPE) {
+				if (MayReplicateRetransRequest(id, genId)) {
+					return true;
+				} else {
+					return MayOriginateRetransRequest(ranks, genId);
+				}
+			}
 
-	//
-	// check necessity in retransmission request; only the destination can originate RR;
-	// other nodes can just forward or replicate it (see ProcessRetransRequest())
-	//
-	if (m_nodeType == DESTINATION_NODE_TYPE) {
-		m_needSendRr = MayOriginateRetransRequest(ranks, genId);
-		return;
-	}
-	if (m_nodeType == RELAY_NODE_TYPE) {
-		if (MayReplicateRetransRequest(id, genId)) {
-			m_needSendRr = true;
-			return;
-		} else {
-			m_needSendRr = MayOriginateRetransRequest(ranks, genId);
-			return;
-		}
-	}
+			assert(0);
+			return false;
+		};
 
-	assert(0);
-	m_needSendRr = false;
+	if (check(ranks, id, genId, all_prev_acked) && m_nodeType != SOURCE_NODE_TYPE) {
+		if (m_f.type.assign(ServiceMessType::REQ_RETRANS)) m_f.ttl = m_ttl;
+	}
 }
 bool NcRoutingRules::MayOriginateRetransRequest(std::map<GenId, uint32_t> ranks, GenId genId) {
 

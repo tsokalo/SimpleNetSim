@@ -120,57 +120,59 @@ UanAddress CommNode::GetId() {
 NcPacket CommNode::DoBroadcast() {
 
 	SIM_LOG_FUNC_N(COMM_NODE_LOG, m_id);
-
-	assert(m_nodeType != DESTINATION_NODE_TYPE);
-
-	TxPlan plan = m_brr->GetTxPlan();
-	assert(!plan.empty());
-
-//	auto it = plan.begin();
-//	std::cout << "Node " << m_id << ": Tx plan: ";
-//	for (; it != plan.end(); it++) {
-//		std::cout << "<" << it->first << " - " << it->second.num_all << " - " << m_getRank(it->first) << "> ";
-//	}
-//	std::cout << std::endl;
-
-	auto item_it = plan.begin_orig_order();
-
-	assert(item_it != plan.end());
-
-	GenId genId = item_it->first;
-	TxPlanItem planItem = item_it->second;
-
-	assert(planItem.num_all != 0);
-
-	SIM_LOG(COMM_NODE_LOG, "Node " << m_id << ": for generation " << genId << " number of packets in plan: " << planItem.num_all);
-
-	m_brr->UpdateSent(genId, 1);
-
-	planItem.num_all = 1;
-	TxPlan planI;
-	planI[genId] = planItem;
-
-	auto header = m_brr->GetHeaderInfo(planI);
+	auto plan_broadcast =
+			[this](NcPacket f, MessType m)
+			{
+				auto notify_sending = std::bind(&MulticastBrr::NotifySending, m_brr);
+				for (auto i : m_outs) m_simulator->Schedule(std::bind(&Edge::Transmit, i, std::placeholders::_1), f, (i->v_ == m_outs.at(0)->v_), m, notify_sending);;
+			};
 
 	NcPacket pkt;
-	if (m_nodeType == SOURCE_NODE_TYPE) {
-		pkt.SetData(m_encQueue->get_coded(genId));
-	} else {
-		pkt.SetData(m_decQueue->get_coded(genId));
-	}
-#ifdef HASH_VECTOR_FEEDBACK_ART
-	m_brr->AddSentCcack(genId, ExtractCodingVector(pkt.GetData(), m_sp.genSize));
-#endif
-	pkt.SetHeader(header);
-	auto notify_sending = std::bind(&MulticastBrr::NotifySending, m_brr);
-	for (auto &i : m_outs)
-		m_simulator->Schedule(std::bind(&Edge::Transmit, i, std::placeholders::_1), pkt, (i->v_ == m_outs.at(0)->v_), DATA_MSG_TYPE, notify_sending);
-	;
 
-	if (m_nodeType == SOURCE_NODE_TYPE) {
-		if (m_brr->NeedGen()) {
-			m_trafGen->Start(m_sp.genSize);
+	if (m_brr->MaySendServiceMessage()) {
+		//
+		// Sending the packet with the service message
+		//
+		pkt.SetFeedback(m_brr->GetServiceMessage());
+		pkt.SetHeader(m_brr->GetHeaderInfo());
+		auto type = pkt.GetFeedback().type;
+
+		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << type.GetAsInt() << ", TTL: " << pkt.GetFeedback().ttl);
+		plan_broadcast(pkt, ServiceMessType::ConvertToMessType(type));
+
+	} else {
+		//
+		// Sending the packet with data
+		//
+		TxPlan plan = m_brr->GetTxPlan();
+		assert(!plan.empty());
+		//
+		// in this implementation we send one data symbol per the broadcast event; so we take only one
+		//
+		auto item_it = plan.begin_orig_order();
+		GenId genId = item_it->first;
+		TxPlanItem planItem = item_it->second;
+		assert(planItem.num_all != 0);
+		planItem.num_all = 1;
+		TxPlan planI;
+		planI[genId] = planItem;
+
+		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << ": for generation " << genId << " number of packets in plan: " << planItem.num_all);
+
+		m_brr->UpdateSent(genId, 1);
+		auto header = m_brr->GetHeaderInfo(planI);
+		pkt.SetHeader(header);
+
+		if (m_nodeType == SOURCE_NODE_TYPE) {
+			pkt.SetData(m_encQueue->get_coded(genId));
+		} else {
+			pkt.SetData(m_decQueue->get_coded(genId));
 		}
+#ifdef HASH_VECTOR_FEEDBACK_ART
+		m_brr->AddSentCcack(genId, ExtractCodingVector(pkt.GetData(), m_sp.genSize));
+#endif
+
+		plan_broadcast(pkt, DATA_MSG_TYPE);
 	}
 
 	return pkt;
@@ -185,13 +187,6 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 	SIM_LOG_FUNC(COMM_NODE_LOG);
 
 	assert(!m_outs.empty());
-
-	auto plan_broadcast =
-			[this](NcPacket f, MessType m)
-			{
-				auto notify_sending = std::bind(&MulticastBrr::NotifySending, m_brr);
-				for (auto i : m_outs) m_simulator->Schedule(std::bind(&Edge::Transmit, i, std::placeholders::_1), f, (i->v_ == m_outs.at(0)->v_), m, notify_sending);;
-			};
 
 	SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receives from " << input->v_);
 
@@ -223,22 +218,7 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 #ifdef HASH_VECTOR_FEEDBACK_ART
 		m_brr->AddRcvdCcack(genId, ExtractCodingVector(pkt.GetData(), m_sp.genSize));
 #endif
-		NcPacket pkt;
-
-		//
-		// --->
-		//
-
-		m_brr->CreateRetransRequestInfo(m_decQueue->get_ranks(), input->v_, genId, plan_item.all_prev_acked);
-
-		if (m_brr->MaySendServiceMessage()) {
-			pkt.SetFeedback(m_brr->GetServiceMessage());
-			pkt.SetHeader(m_brr->GetHeaderInfo());
-			auto type = pkt.GetFeedback().type;
-
-			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << type.GetAsInt() << ", TTL: " << pkt.GetFeedback().ttl);
-			plan_broadcast(pkt, FeedbackInfo::ConvertToMessType(type));
-		}
+		m_brr->UpdateRetransRequestInfo(m_decQueue->get_ranks(), input->v_, genId, plan_item.all_prev_acked);
 
 	} else {
 
@@ -250,36 +230,19 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 
 		m_brr->ProcessServiceMessage(f);
 
-		if (m_brr->MaySendServiceMessage(f.ttl)) {
-			pkt.SetFeedback(m_brr->GetServiceMessage());
-			pkt.SetHeader(m_brr->GetHeaderInfo());
-			auto type = pkt.GetFeedback().type;
-
-			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << type.GetAsInt() << ", TTL: " << pkt.GetFeedback().ttl);
-			plan_broadcast(pkt, FeedbackInfo::ConvertToMessType(type));
+		if (m_nodeType == SOURCE_NODE_TYPE) {
+			if (m_brr->NeedGen()) {
+				m_trafGen->Start(m_sp.genSize);
+			}
 		}
 	}
+
 }
 bool CommNode::DoIwannaSend() {
 
 	SIM_LOG_FUNC(COMM_NODE_LOG);
 
 	return m_brr->MaySend();
-//
-//	if (!m_brr->MaySendData()) return false;
-//
-//	TxPlan txPlan = m_brr->GetTxPlan();
-//	auto accumulate = [](TxPlan plan)->uint32_t
-//	{
-//		uint32_t sum = 0;
-//		for(auto item : plan)
-//		{
-//			sum += item.second.num_all;
-//		}
-//		return sum;
-//	};
-//
-//	return (accumulate(txPlan) > 0);
 }
 void CommNode::SetMessTypeCallback(set_msg_type_func f) {
 	if (m_trafSink) m_trafSink->SetMessTypeCallback(f);
