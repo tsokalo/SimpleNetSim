@@ -24,6 +24,8 @@ struct SimParameters {
 		sendRate = 1000000;
 		numGenBuffering = 2;
 		numGenPtpAck = (numGen > numGenBuffering + 2) ? numGenBuffering + 2: numGen;
+		numPtpAckBeforeEteAck = 2;
+		ackMaxRetransNum = 3;
 		numGenRetrans = (numGen > 2) ? numGen - 2 : 0;
 		numGenSingleTx = 20;
 		fieldSize = 8;
@@ -42,6 +44,7 @@ struct SimParameters {
 		warmup = 1000;
 		warmdown= 1000;
 		simDuration = 10000;
+		softAckDecision = 1.1;
 	}
 
 	SimParameters(std::string path) {
@@ -62,6 +65,8 @@ struct SimParameters {
 			this->sendRate = other.sendRate;
 			this->numGenBuffering = other.numGenBuffering;
 			this->numGenPtpAck = other.numGenPtpAck;
+			this->numPtpAckBeforeEteAck = other.numPtpAckBeforeEteAck;
+			this->ackMaxRetransNum = other.ackMaxRetransNum;
 			this->numGenRetrans = other.numGenRetrans;
 			this->numGenSingleTx = other.numGenSingleTx;
 			this->fieldSize = other.fieldSize;
@@ -80,6 +85,7 @@ struct SimParameters {
 			this->warmup = other.warmup;
 			this->warmdown = other.warmdown;
 			this->simDuration = other.simDuration;
+			this->softAckDecision = other.softAckDecision;
 		}
 		return *this;
 	}
@@ -100,6 +106,8 @@ struct SimParameters {
 		sendRate = ReadVal<Datarate>(in_f);
 		numGenBuffering = ReadVal<uint16_t>(in_f);
 		numGenPtpAck = ReadVal<uint16_t>(in_f);
+		numPtpAckBeforeEteAck =  ReadVal<uint16_t>(in_f);
+		ackMaxRetransNum =  ReadVal<uint16_t>(in_f);
 		numGenRetrans = ReadVal<uint16_t>(in_f);
 		numGenSingleTx = ReadVal<uint16_t>(in_f);
 		fieldSize = ReadVal<uint16_t>(in_f);
@@ -118,7 +126,10 @@ struct SimParameters {
 		warmup = ReadVal<uint32_t>(in_f);
 		warmdown = ReadVal<uint32_t>(in_f);
 		simDuration = ReadVal<uint64_t>(in_f);
+		softAckDecision = ReadVal<double>(in_f);
 		in_f.close();
+
+		assert(numGenPtpAck > 0);
 	}
 
 	void Print() {
@@ -135,6 +146,8 @@ struct SimParameters {
 		os << "Sending data rate / bps\t\t\t" << sendRate << std::endl;
 		os << "Number of buffering generations (Tx)\t" << numGenBuffering << std::endl;
 		os << "Number of generations before soft ACK\t" << numGenPtpAck << std::endl;
+		os << "Number of ReqPtpAck before ReqEteAck\t" << numPtpAckBeforeEteAck << std::endl;
+		os << "Number of ACK retransmission (+1)\t" << ackMaxRetransNum << std::endl;
 		os << "Number of generations before RR\t\t\t" << numGenRetrans << std::endl;
 		os << "Number of generations in single MPDU\t" << numGenSingleTx << std::endl;
 		os << "Field size / power of 2\t\t\t" << fieldSize << std::endl;
@@ -153,6 +166,7 @@ struct SimParameters {
 		os << "Warm-up period\t\t\t\t" << warmup << std::endl;
 		os << "Warm-down period\t\t\t" << warmdown << std::endl;
 		os << "Simulation duration\t\t\t" << simDuration << std::endl;
+		os << "Soft ACK decision coefficient\t\t\t" << softAckDecision << std::endl;
 	}
 
 	std::string GetInLine() {
@@ -164,6 +178,8 @@ struct SimParameters {
 		os << sendRate << '\t';
 		os << numGenBuffering << '\t';
 		os << numGenPtpAck << '\t';
+		os << numPtpAckBeforeEteAck << '\t';
+		os << ackMaxRetransNum << '\t';
 		os << numGenRetrans << '\t';
 		os << numGenSingleTx << '\t';
 		os << fieldSize << '\t';
@@ -181,7 +197,8 @@ struct SimParameters {
 		os << rrCanSend << '\t';
 		os << warmup << '\t';
 		os << warmdown << '\t';
-		os << simDuration;
+		os << simDuration << '\t';
+		os << softAckDecision;
 		return os.str();
 	}
 	template<typename T>
@@ -252,6 +269,14 @@ struct SimParameters {
 	 */
 	uint16_t numGenPtpAck;
 	/*
+	 * number of ReqPtpAck messages sent for a particular generation before sending a ReqEteAck
+	 */
+	uint16_t numPtpAckBeforeEteAck;
+	/*
+	 * number of ACK retransmission plus the first transmission
+	 */
+	uint16_t ackMaxRetransNum;
+	/*
 	 * maximum number of retransmission requests
 	 */
 	uint16_t numRr;
@@ -295,6 +320,10 @@ struct SimParameters {
 	 * simulation duration
 	 */
 	uint64_t simDuration;
+	/*
+	 * coefficient used in the soft ACK decision
+	 */
+	double softAckDecision;
 };
 }
 

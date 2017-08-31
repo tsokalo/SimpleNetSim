@@ -132,7 +132,8 @@ private:
 	 */
 	void CheckGeneralFeedback();
 	void CheckReqPtpAck();
-	void CheckReqEteAck();
+	void CheckReqEteAckI();
+	void CheckReqEteAckII();
 	void CheckNetDisc();
 	//
 	void ProcessRegularFeedback(FeedbackInfo f);
@@ -224,7 +225,7 @@ private:
 	 * it does include redundancy; roughly speaking the transmission plan is the forwarding plan plus redundancy
 	 */
 	TxPlan m_txPlan;
-	/*AckCountDown
+	/*
 	 * number of actually sent recoded packets
 	 */
 	SentNum m_sentNum;
@@ -236,6 +237,10 @@ private:
 	 * the indeces of the generations that are already removed from the buffer; and still no feedback message was sent with this info
 	 */
 	AckCountDown m_outdatedGensInform;
+	/*
+	 * counter of PtpAck
+	 */
+	std::map<GenId, uint16_t> m_ptpAckCount;
 	/*
 	 * the end of the RX window of the corresponding vertices
 	 */
@@ -339,10 +344,9 @@ private:
 	 */
 	uint32_t m_sent;
 	/*
-	 * the flag is set to 1 when it is decided that the retransmission request should be send; it is set to 0 when
-	 * the corresponding message is constructed (get)
+	 * soft ACK information
 	 */
-	bool m_needSendRr;
+	AckInfo softAckInfo;
 
 	NodeType m_nodeType;
 

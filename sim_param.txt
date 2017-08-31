@@ -26,3 +26,4 @@ Simulation duration						60000
 Warm-up period							5000
 Warm-down period						5000
 Simulation duration						120000
+Soft ACK decision coefficient			1.1
