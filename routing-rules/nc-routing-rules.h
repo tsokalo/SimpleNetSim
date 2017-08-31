@@ -78,7 +78,7 @@ public:
 	void AddToCoalition(UanAddress addr);
 	void SetSendingRate(Datarate d);
 	//
-	void ProcessServiceMessage();
+	void ProcessServiceMessage(FeedbackInfo f);
 	void CreateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
 	//
 	void ResetRetransInfo();
@@ -132,9 +132,9 @@ private:
 	bool MaySendReqEteAck();
 	bool MaySendRespPtpAck();
 	bool MaySendRespEteAck();
-	bool MaySendNetDisc();
+	bool MaySendNetDisc(ttl_t ttl);
 	bool MaySendReqRetrans();
-	bool MaySendGeneralFeedback(FeedbackInfo f);
+	bool MaySendGeneralFeedback();
 
 	void ProcessRegularFeedback(FeedbackInfo f);
 	void ProcessReqPtpAck(FeedbackInfo f);
@@ -348,16 +348,6 @@ private:
 	 * counter of broadcasted packets
 	 */
 	uint32_t m_sent;
-	/*
-	 * the flag is set to 1 when the request for the PtP ACK is observed; it is set to 0 when the corresponding response
-	 * message is constructed (get)
-	 */
-	bool m_rcvdReqPtpAck;
-	/*
-	 * the flag is set to 1 when the request for the EtE ACK is observed; it is set to 0 when the corresponding response
-	 * message is constructed (get)
-	 */
-	bool m_rcvdReqEteAck;
 	/*
 	 * the flag is set to 1 when it is decided that the retransmission request should be send; it is set to 0 when
 	 * the corresponding message is constructed (get)

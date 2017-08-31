@@ -61,7 +61,7 @@ void MulticastBrr::EnableCcack(hash_matrix_set_ptr hashMatrixSet) {
 /*
  * INPUTS
  */
-void MulticastBrr::RcvHeaderInfo(HeaderMInfo l) {
+void MulticastBrr::ProcessHeaderInfo(HeaderMInfo l) {
 
 	HeaderInfo h;
 	h.addr = l.addr;
@@ -72,17 +72,7 @@ void MulticastBrr::RcvHeaderInfo(HeaderMInfo l) {
 		auto addr = p.first;
 		assert(m_brr.find(addr) != m_brr.end());
 		h.p = p.second;
-		m_brr.at(addr)->RcvHeaderInfo(h);
-	}
-}
-void MulticastBrr::RcvFeedbackInfo(FeedbackMInfo l) {
-
-	for (auto p : l.ps) {
-		auto dst = p.first;
-		assert(m_brr.find(dst) != m_brr.end());
-		l.p = p.second;
-		SIM_LOG_N(BRRM_LOG, m_id, "Feedback source " << l.addr << " with priority " << l.p << " for DST " << dst);
-		m_brr.at(dst)->RcvFeedbackInfo(l);
+		m_brr.at(addr)->ProcessHeaderInfo(h);
 	}
 }
 void MulticastBrr::UpdateSent(GenId genId, uint32_t num, bool notify_sending) {
@@ -121,7 +111,23 @@ void MulticastBrr::SetSendingRate(Datarate d) {
 	for (auto brr : m_brr)
 		brr.second->SetSendingRate(d);
 }
-
+void MulticastBrr::ProcessServiceMessage(FeedbackMInfo f) {
+	for (auto p : f.ps) {
+		auto dst = p.first;
+		assert(m_brr.find(dst) != m_brr.end());
+		f.p = p.second;
+		SIM_LOG_N(BRRM_LOG, m_id, "Feedback source " << f.addr << " with priority " << f.p << " for DST " << dst);
+		m_brr.at(dst)->ProcessServiceMessage(f);
+	}
+}
+void MulticastBrr::CreateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked)
+{
+	//
+	// if at least for all destination we may send the retransmission request
+	//
+	for (auto brr_it : m_brr)
+		brr_it.second->CreateRetransRequestInfo(ranks, id, genId, all_prev_acked);
+}
 /*
  * OUTPUTS
  */
@@ -217,26 +223,6 @@ BrrMHeader MulticastBrr::GetHeader(TxPlan txPlan, FeedbackMInfo f) {
 	f.addr = h.addr;
 	f.ps = h.p;
 	return BrrMHeader(h, f);
-}
-FeedbackMInfo MulticastBrr::GetFeedbackInfo() {
-
-	FeedbackMInfo f(m_brr.begin()->second->GetFeedbackInfo());
-	for (auto brr_it : m_brr) {
-		auto brr = brr_it.second;
-		auto dst = brr_it.first;
-		f.ps[dst] = brr->GetPriority();
-	}
-	return f;
-}
-FeedbackMInfo MulticastBrr::GetRetransRequestInfo(ttl_t ttl) {
-
-	FeedbackMInfo f(m_brr.begin()->second->GetRetransRequestInfo(ttl));
-	for (auto brr_it : m_brr) {
-		auto brr = brr_it.second;
-		auto dst = brr_it.first;
-		f.ps[dst] = brr->GetPriority();
-	}
-	return f;
 }
 
 HeaderMInfo MulticastBrr::GetHeaderInfo() {
@@ -375,9 +361,9 @@ HeaderMInfo MulticastBrr::GetHeaderInfo(TxPlan txPlan) {
 	header.txPlan = txPlan;
 	return header;
 }
-NetDiscoveryMInfo MulticastBrr::GetNetDiscoveryInfo(ttl_t ttl) {
+FeedbackMInfo MulticastBrr::GetServiceMessage() {
 
-	NetDiscoveryMInfo f(m_brr.begin()->second->GetNetDiscoveryInfo(ttl));
+	FeedbackMInfo f(m_brr.begin()->second->GetServiceMessage());
 	for (auto brr_it : m_brr) {
 		auto brr = brr_it.second;
 		auto dst = brr_it.first;
@@ -399,7 +385,7 @@ uint32_t MulticastBrr::GetNumGreedyGen() {
 	//
 	// select the minimum of that is required for each destination
 	//
-	uint32_t num = std::numeric_limits<uint32_t>::max();
+	uint32_t num = std::numeric_limits < uint32_t > ::max();
 	for (auto brr_it : m_brr) {
 		auto v = brr_it.second->GetNumGreedyGen();
 		num = (num > v) ? v : num;
@@ -415,63 +401,39 @@ bool MulticastBrr::MaySend(double dr) {
 
 	return false;
 }
-bool MulticastBrr::MaySendFeedback() {
+bool MulticastBrr::MaySendData(double dr){
 	//
-	// only if for all destination we may send the feedback
-	//
-	for (auto brr_it : m_brr)
-		if (!brr_it.second->MaySendFeedback()) return false;
-
-	return true;
-}
-bool MulticastBrr::MaySendNetDiscovery(ttl_t ttl) {
-	//
-	// only if for all destination we may send the network discovery
+	// if at least for all destination we may send data
 	//
 	for (auto brr_it : m_brr)
-		if (!brr_it.second->MaySendNetDiscovery(ttl)) return false;
-
-	return true;
-}
-// retransmission requests
-bool MulticastBrr::MaySendRetransRequest(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked) {
-	//
-	// if at least for all destination we may send the retransmission request
-	//
-	for (auto brr_it : m_brr)
-		if (brr_it.second->MaySendRetransRequest(ranks, id, genId, all_prev_acked)) return true;
+		if (brr_it.second->MaySendData(dr)) return true;
 
 	return false;
 }
-bool MulticastBrr::ProcessRetransRequest(FeedbackMInfo l) {
-
+bool MulticastBrr::MaySendServiceMessage(ttl_t ttl){
 	//
-	// 1. process the retransmission request for each destination
-	// 2. return true if at least by one destination the processing returns true
+	// if at least for all destination we may send data
 	//
-	bool b = false;
-	for (auto p : l.ps) {
-		auto addr = p.first;
-		assert(m_brr.find(addr) != m_brr.end());
-		l.p = p.second;
-		b = (m_brr.at(addr)->ProcessRetransRequest(l)) ? true : b;
-	}
+	for (auto brr_it : m_brr)
+		if (brr_it.second->MaySendServiceMessage(ttl)) return true;
 
-	return b;
+	return false;
 }
+void MulticastBrr::CreateRetransRequest() {
+	for (auto brr_it : m_brr)
+		brr_it.second->CreateRetransRequest();
+}
+
 void MulticastBrr::ResetRetransInfo() {
 	for (auto brr_it : m_brr)
 		brr_it.second->ResetRetransInfo();
 }
-void MulticastBrr::UpdateRetransRequest() {
-	for (auto brr_it : m_brr)
-		brr_it.second->UpdateRetransRequest();
-}
+
 uint32_t MulticastBrr::GetGenBufSize(uint32_t maxPkts) {
 	//
 	// select the minimum of that is required for each destination
 	//
-	uint32_t num = std::numeric_limits<uint32_t>::max();
+	uint32_t num = std::numeric_limits < uint32_t > ::max();
 	for (auto brr_it : m_brr) {
 		auto v = brr_it.second->GetGenBufSize(maxPkts);
 		num = (num > v) ? v : num;
@@ -490,7 +452,7 @@ uint32_t MulticastBrr::GetAmountTxData() {
 	//
 	// get minimum of {maximum eligible to be sent from the view of BRR} for each generation
 	//
-	uint32_t max_el_brr = std::numeric_limits<uint32_t>::max();
+	uint32_t max_el_brr = std::numeric_limits < uint32_t > ::max();
 	for (auto brr_it : m_brr) {
 		auto v = floor(brr_it.second->GetMaxAmountTxData() * brr_it.second->GetCodingRate());
 	}
@@ -506,7 +468,7 @@ uint16_t MulticastBrr::GetAckBacklogSize() {
 	//
 	// select the minimum ACK backlog size
 	//
-	uint32_t num = std::numeric_limits<uint32_t>::max();
+	uint32_t num = std::numeric_limits < uint32_t > ::max();
 	for (auto brr_it : m_brr) {
 		auto v = brr_it.second->GetAckBacklogSize();
 		num = (num > v) ? v : num;
@@ -514,7 +476,7 @@ uint16_t MulticastBrr::GetAckBacklogSize() {
 	return num;
 }
 std::map<UanAddress, uint16_t> MulticastBrr::GetCoalitionSize() {
-	std::map<UanAddress, uint16_t> cs;
+	std::map < UanAddress, uint16_t > cs;
 	for (auto brr_it : m_brr) {
 		cs[brr_it.first] = brr_it.second->GetCoalitionSize();
 	}

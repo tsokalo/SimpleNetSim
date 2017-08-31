@@ -108,7 +108,7 @@ enum ProgMode {
 	RUN_MODE, EVAL_MODE, TEST_MODE
 };
 enum MessType {
-	DATA_MSG_TYPE, FEEDBACK_MSG_TYPE, NETDISC_MSG_TYPE, RETRANS_REQUEST_MSG_TYPE, ORIG_MSG_TYPE
+	DATA_MSG_TYPE, FEEDBACK_MSG_TYPE, NETDISC_MSG_TYPE, RETRANS_REQUEST_MSG_TYPE, ORIG_MSG_TYPE, NONE_MSG_TYPE
 };
 
 /*************************************************************************************************/

@@ -38,8 +38,6 @@ NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress 
 	m_congControl = congestion_control_ptr(new CongestionControl(m_nodeType));
 	m_fastFeedback = false;
 	m_sent = 0;
-	m_rcvdReqPtpAck = false;
-	m_rcvdReqEteAck = false;
 	m_needSendRr = false;
 
 	m_feedbackP = 0.0;
@@ -217,14 +215,14 @@ TxPlan NcRoutingRules::GetTxPlan() {
 
 #ifdef HALVE_TX_PLAN
 
-	if (m_nodeType != SOURCE_NODE_TYPE) {
-		for (auto &item : txPlan) {
+//	if (m_nodeType != SOURCE_NODE_TYPE) {
+//		for (auto &item : txPlan) {
 //			auto coef = eq(m_cr,0) ? 1 : 1-1/m_cr;
 //			coef = coef < 0.5 ? 1 : coef;
 //			if(item.second.num_all > (m_sp.genSize* 0.75))
 //			item.second.num_all = ceil((double)item.second.num_all * 0.6);
-		}
-	}
+//		}
+//	}
 
 #else
 
@@ -285,7 +283,7 @@ FeedbackInfo NcRoutingRules::GetServiceMessage() {
 
 	auto f = m_f;
 
-	m_f.type = FeedbackInfo::REGULAR;
+	m_f.type = ServiceMessType::REGULAR;
 
 	return f;
 }
@@ -376,21 +374,24 @@ bool NcRoutingRules::MaySendGeneralFeedback() {
 		return true;
 	}
 
-	return (m_dis(m_gen) < m_feedbackP);
+	return false;
+//	return (m_dis(m_gen) < m_feedbackP);
 }
 bool NcRoutingRules::MaySendReqPtpAck() {
+	// ReqPtpAck cannot be forwarded, only initiated by the vertex
 	return (GetRxWinSize() > m_sp.numGenPtpAck);
 }
 bool NcRoutingRules::MaySendReqEteAck() {
-	return (GetRxWinSize() > m_sp.numGenRetrans);
+	// ReqEteAck can be either initiated or forwarded by the vertex
+	return (GetRxWinSize() > m_sp.numGenRetrans || m_f.type == ServiceMessType::REQ_PTP_ACK);
 }
 bool NcRoutingRules::MaySendRespPtpAck() {
-	return m_rcvdReqPtpAck;
+	return (m_f.type == ServiceMessType::RESP_PTP_ACK);
 }
 bool NcRoutingRules::MaySendRespEteAck() {
-	return m_rcvdReqEteAck;
+	return (m_f.type == ServiceMessType::RESP_ETE_ACK);
 }
-bool NcRoutingRules::MaySendNetDisc() {
+bool NcRoutingRules::MaySendNetDisc(ttl_t ttl) {
 	SIM_LOG_FUNC(BRR_LOG);
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Node type: " << m_nodeType << ", TTL: " << ttl << ", coalition size: " << m_coalition.size());
@@ -428,42 +429,39 @@ bool NcRoutingRules::MaySendReqRetrans() {
 void NcRoutingRules::ProcessServiceMessage(FeedbackInfo f) {
 
 	ProcessRegularFeedback(f);
-	switch (f.type) {
-	case FeedbackInfo::REGULAR: {
-		// do nothing
-		break;
+
+	if (f.type == ServiceMessType::REGULAR) {
+		return;
 	}
-	case FeedbackInfo::REQ_PTP_ACK: {
+	if (ServiceMessType::REQ_PTP_ACK) {
 		ProcessReqPtpAck(f);
-		break;
+		return;
 	}
-	case FeedbackInfo::REQ_ETE_ACK: {
+	if (ServiceMessType::REQ_ETE_ACK) {
 		ProcessReqEteAck(f);
-		break;
+		return;
 	}
-	case FeedbackInfo::RESP_PTP_ACK: {
+	if (ServiceMessType::RESP_PTP_ACK) {
 		ProcessRespPtpAck(f);
-		break;
+		return;
 	}
-	case FeedbackInfo::RESP_ETE_ACK: {
+	if (ServiceMessType::RESP_ETE_ACK) {
 		ProcessRespEteAck(f);
-		break;
+		return;
 	}
-	case FeedbackInfo::NET_DISC: {
+	if (ServiceMessType::NET_DISC) {
 		ProcessNetDisc(f);
-		break;
+		return;
 	}
-	case FeedbackInfo::REQ_RETRANS: {
+	if (ServiceMessType::REQ_RETRANS) {
 		ProcessReqRetrans(f);
-		break;
+		return;
 	}
-	default: {
-		assert(0);
-	}
-	}
+
+	assert(0);
 }
 
-void NcRoutingRules::ProcessRegularFeedback(FeedbackInfo f) {
+void NcRoutingRules::ProcessRegularFeedback(FeedbackInfo l) {
 	SIM_LOG_FUNC(BRR_LOG);
 
 	m_outputs.add(l.addr, l.p);
@@ -489,39 +487,79 @@ void NcRoutingRules::ProcessRegularFeedback(FeedbackInfo f) {
 	DoCalcRedundancy();
 }
 void NcRoutingRules::ProcessReqPtpAck(FeedbackInfo f) {
-	m_rcvdReqPtpAck = true;
-	m_f.type = FeedbackInfo::RESP_PTP_ACK;
+
+	if (m_p <= m_outputs.at(f.addr)) return;
+
+	m_f.type = ServiceMessType::RESP_PTP_ACK;
 }
 void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 
-	m_rcvdReqEteAck = true;
+	if (m_p <= m_outputs.at(f.addr)) return;
 
 	for (auto r : f.rcvNum) {
 		auto gid = r.first;
 		m_f.ackInfo[gid] = f.ackInfo[gid] ? f.ackInfo[gid] : m_f.ackInfo[gid];
 	}
 
-	for (auto r : f.rcvNum) {
-		auto gid = r.first;
-		if (!m_f.ackInfo[gid]) {
-			m_f.type = FeedbackInfo::REQ_PTP_ACK;
-			return;
+	if (m_nodeType == DESTINATION_NODE_TYPE) {
+
+		m_f.type = ServiceMessType::RESP_ETE_ACK;
+		m_f.ttl = m_ttl;
+
+	} else {
+
+		//
+		// we send the response only if all generations are positively ACKed;
+		// until TTL expires we forward the request
+		//
+		for (auto r : f.rcvNum) {
+			auto gid = r.first;
+			if (!m_f.ackInfo[gid]) {
+				if (f.ttl > 0) {
+					m_f.type = ServiceMessType::REQ_ETE_ACK;
+					m_f.ttl = f.ttl - 1;
+					return;
+				} else {
+					m_f.type = ServiceMessType::NONE;
+					m_f.ttl = -1;
+					return;
+				}
+			}
 		}
+
+		m_f.type = ServiceMessType::RESP_ETE_ACK;
+		m_f.ttl = m_ttl;
 	}
-
-	m_f.type = FeedbackInfo::RESP_PTP_ACK;
-
 }
 void NcRoutingRules::ProcessRespPtpAck(FeedbackInfo f) {
+
+	if (m_p > m_outputs.at(f.addr)) return;
 }
 void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
+
+	if (m_p > m_outputs.at(f.addr)) return;
+
+	for (auto r : f.rcvNum) {
+		auto gid = r.first;
+		m_f.ackInfo[gid] = f.ackInfo[gid] ? f.ackInfo[gid] : m_f.ackInfo[gid];
+	}
+	//
+	// forward the response
+	//
+	if (f.ttl > 0) {
+		m_f.type = ServiceMessType::RESP_ETE_ACK;
+		m_f.ttl = f.ttl - 1;
+	} else {
+		m_f.type = ServiceMessType::NONE;
+		m_f.ttl = -1;
+	}
 }
 void NcRoutingRules::ProcessNetDisc(FeedbackInfo f) {
 	if (f.ttl == 0) {
-		m_f.type = FeedbackInfo::REGULAR;
+		m_f.type = ServiceMessType::REGULAR;
 		m_f.ttl = -1;
 	} else {
-		m_f.type = FeedbackInfo::NET_DISC;
+		m_f.type = ServiceMessType::NET_DISC;
 		m_f.ttl = (f.ttl < 0) ? m_ttl : f.ttl - 1;
 	}
 }
@@ -529,42 +567,42 @@ void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
 	if (f.ttl == 0) {
-		m_f.type = FeedbackInfo::REGULAR;
+		m_f.type = ServiceMessType::REGULAR;
 		m_f.ttl = -1;
 		m_needSendRr = false;
 	}
 
-	m_f.type = FeedbackInfo::REQ_RETRANS;
+	m_f.type = ServiceMessType::REQ_RETRANS;
 	m_f.ttl = f.ttl - 1;
 
 	if (m_id == m_dst) {
 		//
 		// check if the request is old
 		//
-		if (IsRetransRequestOld (fb)) SetFastAck();
+		if (IsRetransRequestOld (f)) SetFastAck();
 		m_needSendRr = false;
 		return;
 	}
 
-	if (fb.p < m_p) {
-		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Ignore RR from the node with priority " << fb.p);
+	if (f.p < m_p) {
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Ignore RR from the node with priority " << f.p);
 		//
 		// check if the request is old
 		//
-		if (IsRetransRequestOld (fb)) SetFastAck();
+		if (IsRetransRequestOld (f)) SetFastAck();
 		m_needSendRr = false;
 		return;
 	}
 
-	assert(!fb.rrInfo.empty());
-	assert(fb.ttl > 0);
+	assert(!f.rrInfo.empty());
+	assert(f.ttl > 0);
 
 	//
 	// remove information already not present at this node
 	//
-	RefineFeedback (fb);
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Remaining feedback is" << (fb.rrInfo.empty() ? "" : " NOT") << " empty");
-	if (fb.rrInfo.empty()) {
+	RefineFeedback (f);
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Remaining feedback is" << (f.rrInfo.empty() ? "" : " NOT") << " empty");
+	if (f.rrInfo.empty()) {
 		m_needSendRr = false;
 		return;
 	}
@@ -575,7 +613,7 @@ void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
 	// which is not present on the sender of the feedback yet
 	//
 	std::map<GenId, CoderHelpInfo> helpInfo;
-	GetAchievableRank(fb, helpInfo);
+	GetAchievableRank(f, helpInfo);
 
 	//
 	// remove already done RR
@@ -588,12 +626,12 @@ void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
 	//
 	// decide on RR replication
 	//
-	if (fb.rrInfo.forwarder == m_id) {
+	if (f.rrInfo.forwarder == m_id) {
 
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "I am the specified forwarder");
 
-		FormRrInfo(fb, helpInfo);
-		m_needSendRr = (!m_f.rrInfo.empty())
+		FormRrInfo(f, helpInfo);
+		m_needSendRr = (!m_f.rrInfo.empty());
 		return;
 	} else {
 
@@ -610,7 +648,7 @@ void NcRoutingRules::CreateRetransRequestInfo(std::map<GenId, uint32_t> ranks, U
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	m_f.type = FeedbackInfo::REQ_RETRANS;
+	m_f.type = ServiceMessType::REQ_RETRANS;
 	m_f.ttl = m_ttl;
 
 	//

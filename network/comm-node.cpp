@@ -223,24 +223,26 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 #ifdef HASH_VECTOR_FEEDBACK_ART
 		m_brr->AddRcvdCcack(genId, ExtractCodingVector(pkt.GetData(), m_sp.genSize));
 #endif
-		NcPacket serviceMsg;
+		NcPacket pkt;
 
 		//
 		// --->
 		//
 
-		m_brr->UpdateRetransRequestInfo(m_decQueue->get_ranks(), input->v_, genId, plan_item.all_prev_acked);
+		m_brr->CreateRetransRequestInfo(m_decQueue->get_ranks(), input->v_, genId, plan_item.all_prev_acked);
 
 		if (m_brr->MaySendServiceMessage()) {
-			serviceMsg.SetFeedback(m_brr->GetServiceMessage());
-			serviceMsg.SetHeader(m_brr->GetHeaderInfo());
-			auto type = serviceMsg.GetFeedback().type;
+			pkt.SetFeedback(m_brr->GetServiceMessage());
+			pkt.SetHeader(m_brr->GetHeaderInfo());
+			auto type = pkt.GetFeedback().type;
 
-			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << (uint16_t)type << ", TTL: " << serviceMsg.GetFeedback().ttl);
-			plan_broadcast(serviceMsg, FeedbackInfo::ConvertToMessType(type));
+			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << type.GetAsInt() << ", TTL: " << pkt.GetFeedback().ttl);
+			plan_broadcast(pkt, FeedbackInfo::ConvertToMessType(type));
 		}
 
 	} else {
+
+		NcPacket pkt;
 
 		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receive feedback symbol");
 		auto f = pkt.GetFeedback();
@@ -249,12 +251,12 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 		m_brr->ProcessServiceMessage(f);
 
 		if (m_brr->MaySendServiceMessage(f.ttl)) {
-			serviceMsg.SetFeedback(m_brr->GetServiceMessage());
-			serviceMsg.SetHeader(m_brr->GetHeaderInfo());
-			auto type = serviceMsg.GetFeedback().type;
+			pkt.SetFeedback(m_brr->GetServiceMessage());
+			pkt.SetHeader(m_brr->GetHeaderInfo());
+			auto type = pkt.GetFeedback().type;
 
-			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << (uint16_t)type << ", TTL: " << serviceMsg.GetFeedback().ttl);
-			plan_broadcast(serviceMsg, FeedbackInfo::ConvertToMessType(type));
+			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << type.GetAsInt() << ", TTL: " << pkt.GetFeedback().ttl);
+			plan_broadcast(pkt, FeedbackInfo::ConvertToMessType(type));
 		}
 	}
 }

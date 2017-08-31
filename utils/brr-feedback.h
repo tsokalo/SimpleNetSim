@@ -17,10 +17,15 @@
 
 namespace ncr {
 
-struct FeedbackInfo {
+struct ServiceMessType {
 
-	enum ServiceMessType
-	{
+public:
+
+	ServiceMessType() {
+		t = NONE;
+	}
+
+	enum ServiceMessType_ {
 		REGULAR,
 		/*
 		 * request for the point-to-point ACK; only the neighbors of the sender respond to it; this request is not forwarded
@@ -46,13 +51,55 @@ struct FeedbackInfo {
 		/*
 		 * retransmission request
 		 */
-		REQ_RETRANS
+		REQ_RETRANS,
+		/*
+		 * non-initialized
+		 */
+		NONE
 	};
 
+	ServiceMessType& operator=(const ServiceMessType& other) // copy assignment
+			{
+		if (this != &other) { // self-assignment check expected
+
+			if (this->t != NONE && other.t != NONE) {
+				assert(0);
+			}
+
+			this->t = other.t;
+		}
+		return *this;
+	}
+
+	ServiceMessType& operator=(const uint16_t& other) // copy assignment
+			{
+		this->t = ServiceMessType_(other);
+		return *this;
+	}
+
+	inline friend bool operator==(const ServiceMessType &a, const ServiceMessType &b) {
+		return a.t == b.t;
+	}
+
+	inline friend bool operator==(const ServiceMessType &a, const ServiceMessType_ &b) {
+		return a.t == b;
+	}
+
+	uint16_t GetAsInt() {
+		return (uint16_t) t;
+	}
+
+private:
+
+	ServiceMessType_ t;
+};
+
+struct FeedbackInfo {
+
 	FeedbackInfo() {
+		addr = 0;
 		ttl = 0;
 		updated = false;
-		type = REGULAR;
 	}
 	FeedbackInfo(const FeedbackInfo &other) {
 		this->addr = other.addr;
@@ -90,14 +137,14 @@ struct FeedbackInfo {
 		this->ackInfo.clear();
 		this->updated = false;
 		this->rcvNum.clear();
-		this->type = REGULAR;
+		this->type = ServiceMessType::NONE;
 	}
 
 	void Serialize(std::stringstream &ss) {
 
 		ss << addr << DELIMITER;
 		ss << p.val() << DELIMITER;
-		ss << (uint16_t) type << DELIMITER;
+		ss << type.GetAsInt() << DELIMITER;
 		ss << ttl << DELIMITER;
 		ss << (uint16_t) rcvMap.size() << DELIMITER;
 		for (auto r : rcvMap)
@@ -128,7 +175,7 @@ struct FeedbackInfo {
 		p = v;
 		uint16_t w;
 		ss >> w;
-		type = ServiceMessType(w);
+		type = w;
 		ss >> ttl;
 		uint16_t n;
 		ss >> n;
@@ -168,13 +215,15 @@ struct FeedbackInfo {
 		updated = true;
 	}
 
-	static MessType ConvertToMessType(ServiceMessType type)
-	{
-		if(type == REGULAR || type == REQ_PTP_ACK || type == REQ_ETE_ACK || type == RESP_PTP_ACK || type == RESP_ETE_ACK)return FEEDBACK_MSG_TYPE;
-		if(type == NET_DISC)return NETDISC_MSG_TYPE;
-		if(type == REQ_RETRANS)return RETRANS_REQUEST_MSG_TYPE;
+	static MessType ConvertToMessType(ServiceMessType type) {
+		if (type == ServiceMessType::REGULAR || type == ServiceMessType::REQ_PTP_ACK || type == ServiceMessType::REQ_ETE_ACK
+				|| type == ServiceMessType::RESP_PTP_ACK || type == ServiceMessType::RESP_ETE_ACK) return FEEDBACK_MSG_TYPE;
+		if (type == ServiceMessType::NET_DISC) return NETDISC_MSG_TYPE;
+		if (type == ServiceMessType::REQ_RETRANS) return RETRANS_REQUEST_MSG_TYPE;
 
 		assert(0);
+
+		return NONE_MSG_TYPE;
 	}
 
 	/*
@@ -210,4 +259,5 @@ struct FeedbackInfo {
 };
 
 }
+
 #endif /* BRRFEEDBACK_H_ */
