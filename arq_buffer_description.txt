@@ -1,0 +1,14 @@
+
+		// RECEPTION BUFFER AND ITS WINDOWS
+		//
+		// 	NAME											WINDOWS											//
+		//																									//
+		// 	W_{rmax}:			|--------------------------------numGen---------------------------------|	//
+		// 	W_r:				|---------------------------------------------------------------|			//
+		// 	W_{buf}:			|--numGenBuffering--|														//
+		// 	W_{rr}:																	|---numGenRetrans---|	//
+		// 	W_{softAck}:									 		 |-numGenPtpAck-|						//
+		// 	W_{hardAck} (SRC):										 |~~~~~~~~~~~~~~--------------------|	//
+		// 	W_{hardAck} (REL):										 |~~~~~~~~~~~~~~|						//
+		//
+		// W_r is the actual reception buffer length

@@ -24,7 +24,7 @@ struct AckInfo: public std::map<GenId, bool> {
 
 		ss << (uint16_t) this->size() << DELIMITER;
 		for (auto a : *this)
-		ss << a.first << DELIMITER << (uint8_t) a.second << DELIMITER;
+			ss << a.first << DELIMITER << (uint8_t) a.second << DELIMITER;
 
 		ss << rxWinEnd << DELIMITER;
 	}
@@ -46,8 +46,8 @@ struct AckInfo: public std::map<GenId, bool> {
 
 	friend std::ostream& operator<<(std::ostream& o, AckInfo& m) {
 		o << "Size: " << m.size() << ", last GID " << m.rxWinEnd << " [";
-		for(auto v : m)
-		o << v.first << ":" << (uint16_t)v.second << " ";
+		for (auto v : m)
+			o << v.first << ":" << (uint16_t) v.second << " ";
 		o << "]";
 		return o;
 	}

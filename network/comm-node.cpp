@@ -222,11 +222,9 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 
 	} else {
 
-		NcPacket pkt;
-
-		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receive feedback symbol");
 		auto f = pkt.GetFeedback();
-		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " TTL has " << (f.ttl != 0 ? "not expired" : "expired"));
+		SIM_LOG(COMM_NODE_LOG,
+				"Node " << m_id << " receive service message " << f.type.GetAsInt() << ", TTL " << f.ttl);
 
 		m_brr->ProcessServiceMessage(f);
 

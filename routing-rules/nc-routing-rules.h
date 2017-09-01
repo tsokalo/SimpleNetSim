@@ -185,12 +185,11 @@ private:
 	node_map_it LookUpOutputs(UanAddress id);
 
 	void UpdateLogItem();
-	GenId GetMaxRxWinSize();
 	GenId GetTxWinStart();
 	GenId GetRxWinStart();
 	GenId GetRxWinEnd();
 	GenId GetTxWinEnd();
-	uint16_t GetRxWinSize();
+	GenId GetActualRxWinSize();
 
 	void Overshoot(GenId gid);
 
@@ -325,7 +324,7 @@ private:
 	/*
 	 * time to live for network discovery messages
 	 */
-	ttl_t m_ttl;
+	ttl_t m_maxTtl;
 	/*
 	 * oldest generation ID to retransmit
 	 */
@@ -347,6 +346,10 @@ private:
 	 * soft ACK information
 	 */
 	AckInfo softAckInfo;
+	/*
+	 * counter of Transmission opportunities (TXOPs) for NetDisc
+	 */
+	uint16_t countTxopNetDisc;
 
 	NodeType m_nodeType;
 

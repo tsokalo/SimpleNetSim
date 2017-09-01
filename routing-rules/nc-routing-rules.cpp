@@ -13,7 +13,7 @@
 namespace ncr {
 
 NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress destAddress, SimParameters sp) :
-		m_outdatedGens(2 * sp.numGen), m_outdatedGensInform(2 * sp.numGen, m_sp.ackMaxRetransNum), m_thresholdP(sp.sendRate / 10), m_gen(m_rd()), m_dis(0, 1) {
+		m_outdatedGens(2 * sp.numGen), m_outdatedGensInform(2 * sp.numGen, sp.ackMaxRetransNum), m_thresholdP(sp.sendRate / 10), m_gen(m_rd()), m_dis(0, 1) {
 
 	m_sp = sp;
 	//	assert((sp.sendRate / 5) >= SMALLEST_SENDER_PHY_DATA_RATE && (sp.sendRate / 50) <= SMALLEST_SENDER_PHY_DATA_RATE);
@@ -25,6 +25,7 @@ NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress 
 
 	m_h.addr = m_id;
 	m_f.addr = m_id;
+	m_f.type.assign(ServiceMessType::NONE);
 	m_inF[m_id] = 0;
 	m_cr = 1;
 	m_p = m_thresholdP;
@@ -38,16 +39,15 @@ NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress 
 	m_congControl = congestion_control_ptr(new CongestionControl(m_nodeType));
 	m_fastFeedback = false;
 	m_sent = 0;
+	countTxopNetDisc = m_sp.numTxopNetDisc;
 
 	m_feedbackP = 0.0;
 	m_netDiscP = 1.0;
-	m_ttl = 10;
-	SIM_LOG_NP(BRR_LOG || TEMP_LOG, m_id, m_p, "Using TTL " << m_ttl);
-	SIM_ASSERT_MSG(m_ttl >= m_id, "TTL and addressing problem. TTL " << m_ttl << ", own ID " << m_id);
+	m_maxTtl = m_sp.maxTtl;
+	SIM_LOG_NP(BRR_LOG || TEMP_LOG, m_id, m_p, "Using TTL " << m_maxTtl);
+	SIM_ASSERT_MSG(m_maxTtl >= m_id, "TTL and addressing problem. TTL " << m_maxTtl << ", own ID " << m_id);
 	m_b = 0.1;
 	m_numRr = rr_counter_ptr(new RetransRequestCounter(sp.numRr));
-
-	assert(m_sp.numGenRetrans > m_sp.numGenBuffering);
 }
 NcRoutingRules::~NcRoutingRules() {
 
@@ -287,30 +287,38 @@ FeedbackInfo NcRoutingRules::GetServiceMessage() {
 	//
 	auto f = m_f;
 	if (m_f.type.assign(ServiceMessType::NONE)) m_f.ttl = -1;
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Service message type: " << m_f.type.GetAsInt());
 	return f;
 }
 bool NcRoutingRules::NeedGen() {
-	assert(m_sp.numGenBuffering > 1);
+	SIM_LOG_FUNC(BRR_LOG);
 
-	if (GetRxWinSize() >= GetMaxRxWinSize()) return false;
+	assert(GetActualRxWinSize() <= m_sp.numGen);
 
-	return (!m_congControl->BlockGen(m_txPlan.size(), m_sp.numGenBuffering));
+	return (GetActualRxWinSize() <= m_sp.numGenBuffering);
+//	return (!m_congControl->BlockGen(m_txPlan.size(), m_sp.numGenBuffering));
 }
 uint32_t NcRoutingRules::GetNumGreedyGen() {
+	SIM_LOG_FUNC(BRR_LOG);
+
 	return (m_txPlan.size() >= m_sp.numGenBuffering) ? 0 : (m_sp.numGenBuffering - m_txPlan.size() + 1);
 }
 bool NcRoutingRules::MaySend(double dr) {
+	SIM_LOG_FUNC(BRR_LOG);
 
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "(1) Service message type: " << m_f.type.GetAsInt());
 	CheckGeneralFeedback();
 	CheckReqPtpAck();
 	CheckReqEteAckI();
 	CheckNetDisc();
-
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "(2) Service message type: " << m_f.type.GetAsInt());
 	return (MaySendData(dr) || MaySendServiceMessage());
 }
 bool NcRoutingRules::MaySendData(double dr) {
 
 	SIM_LOG_FUNC(BRR_LOG);
+
+	if (m_coalition.empty()) return false;
 
 #ifdef SECONDRY_CODE
 	//
@@ -327,15 +335,16 @@ bool NcRoutingRules::MaySendData(double dr) {
 	return (GetAmountTxData() != 0);
 }
 bool NcRoutingRules::MaySendServiceMessage() {
+	SIM_LOG_FUNC(BRR_LOG);
 
 	return (m_f.type != ServiceMessType::NONE);
 }
 
 void NcRoutingRules::CheckGeneralFeedback() {
+	SIM_LOG_FUNC(BRR_LOG);
+
 	auto check = [this]()->bool
 	{
-		SIM_LOG_FUNC(BRR_LOG);
-
 		//
 		// source never sends the feedback
 		//
@@ -363,40 +372,66 @@ void NcRoutingRules::CheckGeneralFeedback() {
 	}
 }
 void NcRoutingRules::CheckReqPtpAck() {
-	if (GetRxWinSize() > m_sp.numGenPtpAck) {
+	SIM_LOG_FUNC(BRR_LOG);
+	//
+	// refer to arq_buffer_description.txt: find start of W_{hardAck} (REL)
+	//
+	auto arxWinS = GetActualRxWinSize();
+	auto ws = m_sp.numGen - m_sp.numGenPtpAck - m_sp.numGenRetrans;
+	if (arxWinS > ws) {
 		if (m_f.type.assign(ServiceMessType::REQ_PTP_ACK)) m_f.ttl = -1;
 	}
 }
 void NcRoutingRules::CheckReqEteAckI() {
-	if (GetRxWinSize() > m_sp.numGenRetrans) {
-		if (m_f.type.assign(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = m_ttl;
+	SIM_LOG_FUNC(BRR_LOG);
+	//
+	// source does EteAck request instead of sending the Retransmission Requests
+	// other nodes do send these Requests
+	//
+	if (m_nodeType != SOURCE_NODE_TYPE) return;
+
+	if (IsOverflowDanger()) {
+		if (m_f.type.assign(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = m_maxTtl;
 	}
 }
 
 void NcRoutingRules::CheckReqEteAckII() {
+	SIM_LOG_FUNC(BRR_LOG);
 
 	if (m_f.type == ServiceMessType::REQ_PTP_ACK) {
-		assert(m_inRcvNum.size() > m_sp.numGenPtpAck);
-		int16_t n = m_inRcvNum.size() - m_sp.numGenPtpAck;
-
+		//
+		// refer to arq_buffer_description.txt: find end and start of W_{hardAck} (REL)
+		//
+		auto arxWinS = GetActualRxWinSize();
+		auto ws = m_sp.numGen - m_sp.numGenPtpAck - m_sp.numGenRetrans;
+		auto we = m_sp.numGen - m_sp.numGenRetrans;
+		assert(arxWinS > ws);
+		we = (we > arxWinS) ? arxWinS : we;
+		//
+		// invert ws and we since m_inRcvNum.begin_orig_order() gives the oldest buffer element
+		//
+		ws = arxWinS - we;
+		we = arxWinS - ws;
 		//
 		// use the order of generations in the receiver buffer
 		//
+		uint16_t c = 0;
 		auto it = m_inRcvNum.begin_orig_order();
 		while (it != m_inRcvNum.end()) {
 			//
 			// omit the new generations, for which no explicit PtpAck request was sent
 			//
-			if (n-- <= 0) continue;
+			if (c < ws || c >= we) continue;
+			c++;
 			auto gid = it->first;
-			assert(m_f.ackInfo.find(gid) != m_f.ackInfo.end());
+			assert(m_f.ackInfo.find(gid) != m_f.ackInfo.end());			//because of called after SetAcks
 			if (!m_f.ackInfo[gid]) {
 				if (m_ptpAckCount.find(gid) == m_ptpAckCount.end()) {
 					m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
 				} else {
 					if (m_ptpAckCount[gid]-- == 0) {
 						m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
-						if (m_f.type.assign(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = m_ttl;
+						if (m_f.type.assign(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = m_maxTtl;
 					}
 				}
 			}
@@ -412,59 +447,67 @@ void NcRoutingRules::CheckNetDisc() {
 	{
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Node type: " << m_nodeType << ", coalition size: " << m_coalition.size());
 
-		//
-		// source never sends the network discovery messages
-		//
-			if (m_nodeType == SOURCE_NODE_TYPE) return false;
+//		//
+//		// source never sends the network discovery messages
+//		//
+//			if (m_nodeType == SOURCE_NODE_TYPE) return false;
 
-		//
-		// if the current node has at least anybody in its coalition, it does not need explore the network
-		// by sending the network discovery message; instead it has an opportunity to send the data packets
-		// and can receive the feedback for them, which gives to the current node the same information as the
-		// response on the network discovery message
-		//
+			//
+			// if the current node has at least anybody in its coalition, it does not need explore the network
+			// by sending the network discovery message; instead it has an opportunity to send the data packets
+			// and can receive the feedback for them, which gives to the current node the same information as the
+			// response on the network discovery message
+			//
 			if (!m_coalition.empty()) return false;
-		//
-		// the destination does not need to explore the network itself; it should only respond on the
-		// network discovery messages
-		//
+			//
+			// the destination does not need to explore the network itself; it should only respond on the
+			// network discovery messages
+			//
 			if (m_id == m_dst) return false;
 
-			return (m_dis(m_gen) < m_netDiscP);
+			if(countTxopNetDisc++ == m_sp.numTxopNetDisc)
+			{
+				countTxopNetDisc = 0;
+				return true;
+			}
+			return false;
+//			return (m_dis(m_gen) < m_netDiscP);
 		};
 
 	if (check()) {
-		if (m_f.type.assign(ServiceMessType::NET_DISC)) m_f.ttl = m_ttl;
+		if (m_f.type.assign(ServiceMessType::NET_DISC)) m_f.ttl = m_maxTtl;
 	}
 }
 void NcRoutingRules::ProcessServiceMessage(FeedbackInfo f) {
+
+	SIM_LOG_FUNC(BRR_LOG);
 
 	ProcessRegularFeedback(f);
 
 	if (f.type == ServiceMessType::REGULAR) {
 		return;
 	}
-	if (ServiceMessType::REQ_PTP_ACK) {
+	if (f.type == ServiceMessType::REQ_PTP_ACK) {
 		ProcessReqPtpAck(f);
 		return;
 	}
-	if (ServiceMessType::REQ_ETE_ACK) {
+	if (f.type == ServiceMessType::REQ_ETE_ACK) {
 		ProcessReqEteAck(f);
 		return;
 	}
-	if (ServiceMessType::RESP_PTP_ACK) {
+	if (f.type == ServiceMessType::RESP_PTP_ACK) {
 		ProcessRespPtpAck(f);
 		return;
 	}
-	if (ServiceMessType::RESP_ETE_ACK) {
+	if (f.type == ServiceMessType::RESP_ETE_ACK) {
 		ProcessRespEteAck(f);
 		return;
 	}
-	if (ServiceMessType::NET_DISC) {
+	if (f.type == ServiceMessType::NET_DISC) {
 		ProcessNetDisc(f);
 		return;
 	}
-	if (ServiceMessType::REQ_RETRANS) {
+	if (f.type == ServiceMessType::REQ_RETRANS) {
 		ProcessReqRetrans(f);
 		return;
 	}
@@ -498,23 +541,26 @@ void NcRoutingRules::ProcessRegularFeedback(FeedbackInfo l) {
 	DoCalcRedundancy();
 }
 void NcRoutingRules::ProcessReqPtpAck(FeedbackInfo f) {
+	SIM_LOG_FUNC(BRR_LOG);
 
 	if (m_p <= m_outputs.at(f.addr)) return;
 
 	if (m_f.type.assign(ServiceMessType::RESP_PTP_ACK)) m_f.ttl = -1;
 }
 void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
+	SIM_LOG_FUNC(BRR_LOG);
 
 	if (m_p <= m_outputs.at(f.addr)) return;
 
 	for (auto r : f.rcvNum) {
 		auto gid = r.first;
+		assert(f.ackInfo.find(gid) != f.ackInfo.end());
 		m_f.ackInfo[gid] = f.ackInfo[gid] ? f.ackInfo[gid] : m_f.ackInfo[gid];
 	}
 
 	if (m_nodeType == DESTINATION_NODE_TYPE) {
 
-		if (m_f.type.assign(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = m_ttl;
+		if (m_f.type.assign(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = m_maxTtl;
 
 	} else {
 
@@ -535,14 +581,16 @@ void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 			}
 		}
 
-		if (m_f.type.assign(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = m_ttl;
+		if (m_f.type.assign(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = m_maxTtl;
 	}
 }
 void NcRoutingRules::ProcessRespPtpAck(FeedbackInfo f) {
+	SIM_LOG_FUNC(BRR_LOG);
 
 	// do nothing; it is sufficient to process the regular feedback containing in this service message
 }
 void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
+	SIM_LOG_FUNC(BRR_LOG);
 
 	if (m_p > m_outputs.at(f.addr)) return;
 
@@ -560,10 +608,17 @@ void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
 	}
 }
 void NcRoutingRules::ProcessNetDisc(FeedbackInfo f) {
+	SIM_LOG_FUNC(BRR_LOG);
+
+	if (!m_coalition.empty()) {
+		if (m_f.type.assign_if(ServiceMessType::NET_DISC, ServiceMessType::NONE)) m_f.ttl = -1;
+		return;
+	}
+
 	if (f.ttl > 0) {
 		if (m_f.type.assign(ServiceMessType::NET_DISC)) m_f.ttl = f.ttl - 1;
 	} else {
-		if (m_f.type.assign_if(ServiceMessType::RESP_ETE_ACK, ServiceMessType::NONE)) m_f.ttl = -1;
+		if (m_f.type.assign_if(ServiceMessType::NET_DISC, ServiceMessType::NONE)) m_f.ttl = -1;
 	}
 }
 void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
@@ -646,23 +701,23 @@ void NcRoutingRules::UpdateRetransRequestInfo(std::map<GenId, uint32_t> ranks, U
 	SIM_LOG_FUNC(BRR_LOG);
 
 	auto check = [this](std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked)->bool {
-		//
-		// do not send RR if
-		// the sending vertex have all previous generations acked
-		//
-			if (all_prev_acked) {
-				if (m_inRcvNum.size() + m_sp.numGenRetrans >= m_sp.numGen) {
-					//
-					// send some data from the oldest generations
-					//
-					assert(!m_inRcvNum.empty());
-					auto gid = m_inRcvNum.begin_orig_order()->first;
-					SIM_LOG_NPG(1, m_id, m_p, genId, "Relay overshoots GID: " << gid);
-					Overshoot(gid);
-				}
-				SIM_LOG_NPD(1, m_id, m_p, m_dst, "Say NO to sending of RR. Previous are ACKed");
-				return false;
-			}
+//		//
+//		// do not send RR if
+//		// the sending vertex have all previous generations acked
+//		//
+//			if (all_prev_acked) {
+//				if (GetActualRxWinSize() + m_sp.numGenRetrans >= m_sp.numGen) {
+//					//
+//					// send some data from the oldest generations
+//					//
+//					assert(!m_inRcvNum.empty());
+//					auto gid = m_inRcvNum.begin_orig_order()->first;
+//					SIM_LOG_NPG(1, m_id, m_p, genId, "Relay overshoots GID: " << gid);
+//					Overshoot(gid);
+//				}
+//				SIM_LOG_NPD(1, m_id, m_p, m_dst, "Say NO to sending of RR. Previous are ACKed");
+//				return false;
+//			}
 
 			//
 			// check necessity in retransmission request; only the destination can originate RR;
@@ -684,7 +739,7 @@ void NcRoutingRules::UpdateRetransRequestInfo(std::map<GenId, uint32_t> ranks, U
 		};
 
 	if (check(ranks, id, genId, all_prev_acked) && m_nodeType != SOURCE_NODE_TYPE) {
-		if (m_f.type.assign(ServiceMessType::REQ_RETRANS)) m_f.ttl = m_ttl;
+		if (m_f.type.assign(ServiceMessType::REQ_RETRANS)) m_f.ttl = m_maxTtl;
 	}
 }
 bool NcRoutingRules::MayOriginateRetransRequest(std::map<GenId, uint32_t> ranks, GenId genId) {
@@ -697,20 +752,18 @@ bool NcRoutingRules::MayOriginateRetransRequest(std::map<GenId, uint32_t> ranks,
 		//
 		// if the RX buffer reaches the dangerous limit (possible data drops)
 		//
-		if (m_inRcvNum.size() + m_sp.numGenRetrans >= m_sp.numGen) {
+		if (GetActualRxWinSize() + m_sp.numGenRetrans >= m_sp.numGen) {
 			if (DoCreateRetransRequest(ranks, genId)) {
-
-//				SIM_LOG_NPG(1, m_id, m_p, genId, "Relay creates RR");
 				return true;
-			} else {
-				//
-				// send some data from the oldest generations
-				//
-				assert(!m_inRcvNum.empty());
-				auto gid = m_inRcvNum.begin_orig_order()->first;
-//				SIM_LOG_NPG(1, m_id, m_p, genId, "Relay overshoots GID: " << gid);
-				Overshoot(gid);
 			}
+//			else {
+//				//
+//				// send some data from the oldest generations
+//				//
+//				assert(!m_inRcvNum.empty());
+//				auto gid = m_inRcvNum.begin_orig_order()->first;
+//				Overshoot(gid);
+//			}
 		}
 	}
 
@@ -817,7 +870,7 @@ uint32_t NcRoutingRules::GetGenBufSize(uint32_t maxPkts) {
 	//
 	GenId max_el_brr = 0;
 	if (s_r == MAX_GEN_SSN || e_ack == MAX_GEN_SSN) {
-		max_el_brr = GetMaxRxWinSize();
+		max_el_brr = m_sp.numGen;
 	} else {
 		max_el_brr = (gen_ssn_t(s_r) < gen_ssn_t(e_ack)) ? gen_ssn_t::get_distance(s_r, e_ack) - 1 : 0;
 	}
@@ -885,12 +938,6 @@ double NcRoutingRules::GetInfoOnDsts() {
 
 	return a;
 }
-GenId NcRoutingRules::GetMaxRxWinSize() {
-//	GenId ack_win = (m_nodeType == SOURCE_NODE_TYPE) ? m_sp.numGen << 1 : m_sp.numGen;
-	GenId ack_win = m_sp.numGen;
-	assert(ack_win < MAX_GEN_SSN);
-	return ack_win;
-}
 GenId NcRoutingRules::GetTxWinStart() {
 	GenId s_f = (m_forwardPlan.empty()) ? MAX_GEN_SSN : m_forwardPlan.begin_orig_order()->first;
 	if (s_f == MAX_GEN_SSN) s_f = m_forwardPlan.last_key_in_mem();
@@ -912,7 +959,7 @@ GenId NcRoutingRules::GetRxWinStart() {
 GenId NcRoutingRules::GetRxWinEnd() {
 
 	GenId s_r = GetRxWinStart();
-	GenId ack_win = GetMaxRxWinSize();
+	GenId ack_win = m_sp.numGen;
 	GenId oe_ack = (s_r == MAX_GEN_SSN) ? MAX_GEN_SSN : gen_ssn_t::rotate(s_r, ack_win);
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "[s_r " << s_r << "],[ack_win " << ack_win << "],[oe_ack " << oe_ack << "]");
@@ -943,17 +990,16 @@ GenId NcRoutingRules::GetTxWinEnd() {
 
 	GenId s_ack = GetTxWinStart();
 	if (gen_ssn_t(e_ack) < gen_ssn_t(s_ack)) e_ack = gen_ssn_t::rotate(s_ack, 1);
-	if (m_nodeType == SOURCE_NODE_TYPE) {
-		auto v = gen_ssn_t::rotate(s_ack, m_sp.numGen >> 2);
-		if (gen_ssn_t(e_ack) > gen_ssn_t(v)) e_ack = v;
-	}
+//	if (m_nodeType == SOURCE_NODE_TYPE) {
+//		auto v = gen_ssn_t::rotate(s_ack, m_sp.numGen >> 2);
+//		if (gen_ssn_t(e_ack) > gen_ssn_t(v)) e_ack = v;
+//	}
 
 	return e_ack;
 }
-uint16_t NcRoutingRules::GetRxWinSize() {
-	auto s = GetRxWinStart();
-	auto e = GetRxWinEnd();
-	return gen_ssn_t::get_distance(s, e);
+GenId NcRoutingRules::GetActualRxWinSize() {
+
+	return GetActualRxWinSize();
 }
 void NcRoutingRules::SetSendingRate(Datarate d) {
 
@@ -1012,7 +1058,7 @@ void NcRoutingRules::DoFilter() {
 	//
 	// for all generations
 	//
-	//	std::cout << "Generations in receiver buffer " << m_inRcvNum.size() << std::endl;
+	//	std::cout << "Generations in receiver buffer " << GetActualRxWinSize() << std::endl;
 	for (RcvNum::iterator it = m_inRcvNum.begin(); it != m_inRcvNum.end(); it++) {
 
 		auto genId = it->first;
@@ -1224,7 +1270,7 @@ void NcRoutingRules::DoUpdateTxPlan() {
 	if (v) {
 		for (auto &t : m_txPlan)
 			t.second.all_prev_acked = true;
-		;
+
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "All previous generations are acked");
 	}
 }
@@ -1465,9 +1511,6 @@ void NcRoutingRules::DoUpdateForwardPlan() {
 void NcRoutingRules::DoForgetGeneration() {
 
 	SIM_LOG_FUNC(BRR_LOG);
-
-	assert((uint16_t )m_inRcvNum.size() <= (uint16_t )(m_sp.numGen + 1));
-
 	//
 	// remove the ACKed generations in the front
 	//
@@ -1489,7 +1532,7 @@ void NcRoutingRules::DoForgetGeneration() {
 	// remove the oldest generations if the number of generations in the receive buffer
 	// exceeds the ACK window size
 	//
-	while ((uint16_t) m_inRcvNum.size() > (uint16_t) m_sp.numGen) {
+	while (GetActualRxWinSize() > m_sp.numGen) {
 		auto it = m_inRcvNum.begin_orig_order();
 		assert(it != m_inRcvNum.end());
 
@@ -1821,35 +1864,35 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 		}
 	}
 
-	//
-	// 3. OVERSHOOT
-	//
-
-	//
-	// get the oldest NACKed generation (not counting the last m_sp.numGenBuffering)
-	//
-	uint16_t s = (l.ackInfo.size() > m_sp.numGenRetrans) ? l.ackInfo.size() - m_sp.numGenRetrans : 0;
-	GenId oldest_nacked = MAX_GEN_SSN;
-	for (auto a : l.ackInfo) {
-		if (!a.second) {
-			oldest_nacked = a.first;
-			break;
-		}
-		if (--s == 0) break;
-	}
-
-	//
-	// check if it is on the begin of the ACK window of the ACK sender
-	//
-	auto ack_win_b = gen_ssn_t::rotate_back(l.ackInfo.rxWinEnd, m_sp.numGen >> 1);
-	bool in_rr_win = (gen_ssn_t(oldest_nacked) <= gen_ssn_t(ack_win_b));
-
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst,
-			"[oldest_nacked " << oldest_nacked << "],[m_getRank(oldest_nacked) " << m_getRank(oldest_nacked) << "]" ",[ack_win_b " << ack_win_b << "]");
-	if (m_getRank(oldest_nacked) == m_sp.genSize && in_rr_win && m_inRcvNum.find(oldest_nacked) != m_inRcvNum.end()) {
-
-		Overshoot(oldest_nacked);
-	}
+//	//
+//	// 3. OVERSHOOT
+//	//
+//
+//	//
+//	// get the oldest NACKed generation (not counting the last m_sp.numGenBuffering)
+//	//
+//	uint16_t s = (l.ackInfo.size() > m_sp.numGenRetrans) ? l.ackInfo.size() - m_sp.numGenRetrans : 0;
+//	GenId oldest_nacked = MAX_GEN_SSN;
+//	for (auto a : l.ackInfo) {
+//		if (!a.second) {
+//			oldest_nacked = a.first;
+//			break;
+//		}
+//		if (--s == 0) break;
+//	}
+//
+//	//
+//	// check if it is on the begin of the ACK window of the ACK sender
+//	//
+//	auto ack_win_b = gen_ssn_t::rotate_back(l.ackInfo.rxWinEnd, m_sp.numGen >> 1);
+//	bool in_rr_win = (gen_ssn_t(oldest_nacked) <= gen_ssn_t(ack_win_b));
+//
+//	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst,
+//			"[oldest_nacked " << oldest_nacked << "],[m_getRank(oldest_nacked) " << m_getRank(oldest_nacked) << "]" ",[ack_win_b " << ack_win_b << "]");
+//	if (m_getRank(oldest_nacked) == m_sp.genSize && in_rr_win && m_inRcvNum.find(oldest_nacked) != m_inRcvNum.end()) {
+//
+//		Overshoot(oldest_nacked);
+//	}
 
 	if (m_addLog) m_addLog(m_logItem, m_id);
 
@@ -2331,7 +2374,7 @@ void NcRoutingRules::CheckBuffering() {
 }
 
 bool NcRoutingRules::IsOverflowDanger() {
-	return (GetRxWinSize() > GetMaxRxWinSize() - m_sp.numGenRetrans);
+	return (GetActualRxWinSize() + m_sp.numGenRetrans > m_sp.numGen);
 }
 
 void NcRoutingRules::Overshoot(GenId gid) {

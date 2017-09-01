@@ -253,13 +253,13 @@ int main(int argc, char *argv[]) {
 	//
 	// using default parameters
 	//
-	CreateAutoSquareScenario(net, sim_par, 3);
+//	CreateAutoSquareScenario(net, sim_par, 3);
 //	CreateBetaSquareScenario(net, sim_par, 3);
 
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
 //	CreateStackScenario(net, 8, sim_par);
-//	CreateTriangleScenario(net, sim_par);
+	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);

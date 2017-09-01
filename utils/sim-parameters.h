@@ -26,6 +26,7 @@ struct SimParameters {
 		numGenPtpAck = (numGen > numGenBuffering + 2) ? numGenBuffering + 2: numGen;
 		numPtpAckBeforeEteAck = 2;
 		ackMaxRetransNum = 3;
+		numTxopNetDisc = 5;
 		numGenRetrans = (numGen > 2) ? numGen - 2 : 0;
 		numGenSingleTx = 20;
 		fieldSize = 8;
@@ -34,6 +35,7 @@ struct SimParameters {
 		mutualPhyLlcCoding = false;
 		per = 0.2;
 		numRr = 3;
+		maxTtl = 1;
 		crCalcWay = MINUS_DELTA_REDUNDANCY;
 		crNumSigma = 3;
 		crReducFactor = 0.0;
@@ -67,6 +69,7 @@ struct SimParameters {
 			this->numGenPtpAck = other.numGenPtpAck;
 			this->numPtpAckBeforeEteAck = other.numPtpAckBeforeEteAck;
 			this->ackMaxRetransNum = other.ackMaxRetransNum;
+			this->numTxopNetDisc = other.numTxopNetDisc;
 			this->numGenRetrans = other.numGenRetrans;
 			this->numGenSingleTx = other.numGenSingleTx;
 			this->fieldSize = other.fieldSize;
@@ -75,6 +78,7 @@ struct SimParameters {
 			this->mutualPhyLlcCoding = other.mutualPhyLlcCoding;
 			this->per = other.per;
 			this->numRr = other.numRr;
+			this->maxTtl = other.maxTtl;
 			this->crCalcWay = other.crCalcWay;
 			this->crNumSigma = other.crNumSigma;
 			this->crReducFactor = other.crReducFactor;
@@ -108,6 +112,7 @@ struct SimParameters {
 		numGenPtpAck = ReadVal<uint16_t>(in_f);
 		numPtpAckBeforeEteAck =  ReadVal<uint16_t>(in_f);
 		ackMaxRetransNum =  ReadVal<uint16_t>(in_f);
+		numTxopNetDisc =  ReadVal<uint16_t>(in_f);
 		numGenRetrans = ReadVal<uint16_t>(in_f);
 		numGenSingleTx = ReadVal<uint16_t>(in_f);
 		fieldSize = ReadVal<uint16_t>(in_f);
@@ -116,6 +121,7 @@ struct SimParameters {
 		mutualPhyLlcCoding = ReadVal<bool>(in_f);
 		per = ReadVal<double>(in_f);
 		numRr = ReadVal<uint16_t>(in_f);
+		maxTtl = ReadVal<uint16_t>(in_f);
 		crCalcWay = CodeRedundancyCalcWay(ReadVal<uint16_t>(in_f));
 		crNumSigma = ReadVal<uint16_t>(in_f);
 		crReducFactor = ReadVal<double>(in_f);
@@ -148,7 +154,8 @@ struct SimParameters {
 		os << "Number of generations before soft ACK\t" << numGenPtpAck << std::endl;
 		os << "Number of ReqPtpAck before ReqEteAck\t" << numPtpAckBeforeEteAck << std::endl;
 		os << "Number of ACK retransmission (+1)\t" << ackMaxRetransNum << std::endl;
-		os << "Number of generations before RR\t\t\t" << numGenRetrans << std::endl;
+		os << "Number of TXOP before NetDisc\t\t" << numTxopNetDisc << std::endl;
+		os << "Number of generations before RR\t\t" << numGenRetrans << std::endl;
 		os << "Number of generations in single MPDU\t" << numGenSingleTx << std::endl;
 		os << "Field size / power of 2\t\t\t" << fieldSize << std::endl;
 		os << "CCACK levels\t\t\t\t" << ccackLevels << std::endl;
@@ -156,6 +163,7 @@ struct SimParameters {
 		os << "Mutual PHY and LLC coding / flag\t" << mutualPhyLlcCoding << std::endl;
 		os << "Target packet loss ratio\t\t" << per << std::endl;
 		os << "Maximum number of RRs\t\t\t" << numRr << std::endl;
+		os << "Maximum TTL\t\t\t\t" << maxTtl << std::endl;
 		os << "CR calculation way\t\t\t" << (uint16_t) crCalcWay << std::endl;
 		os << "Number of sigmas\t\t\t" << crNumSigma << std::endl;
 		os << "CR reduction factor\t\t\t" << crReducFactor << std::endl;
@@ -166,7 +174,7 @@ struct SimParameters {
 		os << "Warm-up period\t\t\t\t" << warmup << std::endl;
 		os << "Warm-down period\t\t\t" << warmdown << std::endl;
 		os << "Simulation duration\t\t\t" << simDuration << std::endl;
-		os << "Soft ACK decision coefficient\t\t\t" << softAckDecision << std::endl;
+		os << "Soft ACK decision coefficient\t\t" << softAckDecision << std::endl;
 	}
 
 	std::string GetInLine() {
@@ -180,6 +188,7 @@ struct SimParameters {
 		os << numGenPtpAck << '\t';
 		os << numPtpAckBeforeEteAck << '\t';
 		os << ackMaxRetransNum << '\t';
+		os << numTxopNetDisc << '\t';
 		os << numGenRetrans << '\t';
 		os << numGenSingleTx << '\t';
 		os << fieldSize << '\t';
@@ -188,6 +197,7 @@ struct SimParameters {
 		os << mutualPhyLlcCoding << '\t';
 		os << per << '\t';
 		os << numRr << '\t';
+		os << maxTtl << '\t';
 		os << (uint16_t) crCalcWay << '\t';
 		os << crNumSigma << '\t';
 		os << crReducFactor << '\t';
@@ -210,6 +220,38 @@ struct SimParameters {
 		T v;
 		ss >> v;
 		return v;
+	}
+
+	void Validate()
+	{
+		assert(numGen > 1);
+		assert(genSize > 1);
+		assert(symbolSize > 0);
+		assert(numGenBuffering > 0);
+		assert(numGenSingleTx > 0);
+		assert(fieldSize == 2 || fieldSize == 4 || fieldSize == 8);
+		assert(ccackLevels > 0 && ccackLevels < 4);
+		assert(maxCoalitionSize > 0);
+		assert(numGenRetrans > 0);
+		assert(numGenPtpAck > 0);
+		assert(numPtpAckBeforeEteAck >= 0);
+		assert(ackMaxRetransNum > 0);
+		assert(numTxopNetDisc > 0);
+		assert(numRr > 0);
+		assert(maxTtl > 0);
+		assert(crNumSigma >= 0 && crNumSigma <= 3);
+		assert(crReducFactor >= 0 && crReducFactor <=1);
+		assert(warmup > 0);
+		assert(warmdown > 0);
+		assert(simDuration > 0);
+		assert(softAckDecision >= 1);
+
+		// refer to arq_buffer_description.txt
+
+		assert(numGenPtpAck > numGenBuffering);
+		assert(numGen >= numGenBuffering + numGenRetrans + numGenPtpAck);
+		assert(simDuration > warmup + warmdown);
+
 	}
 
 	/*
@@ -277,9 +319,17 @@ struct SimParameters {
 	 */
 	uint16_t ackMaxRetransNum;
 	/*
+	 * number of transmission opportunities before sending NetDisc
+	 */
+	uint16_t numTxopNetDisc;
+	/*
 	 * maximum number of retransmission requests
 	 */
 	uint16_t numRr;
+	/*
+	 * maximum TTL
+	 */
+	uint16_t maxTtl;
 	/*
 	 * selecting the way of coding redundancy calculation
 	 */

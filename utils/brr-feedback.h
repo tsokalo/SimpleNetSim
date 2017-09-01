@@ -10,6 +10,7 @@
 
 #include <sstream>
 #include <string.h>
+#include <iostream>
 
 #include "header.h"
 #include "utils/brr-retrans-request.h"
@@ -17,7 +18,11 @@
 
 namespace ncr {
 
+struct FeedbackInfo;
+
 struct ServiceMessType {
+
+	friend FeedbackInfo;
 
 public:
 
@@ -64,21 +69,13 @@ public:
 		NONE
 	};
 
-	ServiceMessType& operator=(const ServiceMessType& other) // copy assignment
-			{
-		if (this != &other) { // self-assignment check expected
-			assert(0);
-		}
-		return *this;
-	}
-
 	bool assign(const ServiceMessType_& other) {
 		//
 		// the higher priority corresponds to the smaller ServiceMessType_ value
 		// rewrite the message type only if it is of higher priority or NONE
 		//
-		if (this->t > t || t == NONE) {
-			this->t = t;
+		if (this->t >= other || other == NONE) {
+			this->t = other;
 			return true;
 		}
 		return false;
@@ -86,7 +83,7 @@ public:
 
 	bool assign_if(const ServiceMessType_& c, const ServiceMessType_& other) {
 
-		if(this->t != c)return false;
+		if (this->t != NONE) if (this->t != c) return false;
 		return this->assign(other);
 	}
 
@@ -122,6 +119,18 @@ public:
 		assert(0);
 
 		return NONE_MSG_TYPE;
+	}
+
+protected:
+	/*
+	 * to be used only by friend classes/structures
+	 */
+	ServiceMessType& operator=(const ServiceMessType& other) // copy assignment
+			{
+		if (this != &other) { // self-assignment check expected
+			this->t = other.t;
+		}
+		return *this;
 	}
 
 private:
