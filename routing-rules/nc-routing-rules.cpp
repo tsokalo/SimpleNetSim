@@ -39,7 +39,7 @@ NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress 
 	m_congControl = congestion_control_ptr(new CongestionControl(m_nodeType));
 	m_fastFeedback = false;
 	m_sent = 0;
-	countTxopNetDisc = m_sp.numTxopNetDisc;
+	SetConnected(false);
 
 	m_feedbackP = 0.0;
 	m_netDiscP = 1.0;
@@ -158,6 +158,8 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, bool linDep) {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
+	SetConnected(true);
+
 	uint32_t num = 1;
 
 	m_inRcvMap[id].add(num, 0);
@@ -266,6 +268,8 @@ UanAddress NcRoutingRules::GetSinkVertex() {
 FeedbackInfo NcRoutingRules::GetServiceMessage() {
 	SIM_LOG_FUNC(BRR_LOG);
 
+	assert(m_f.type != ServiceMessType::NONE);
+
 	//
 	// the most part of the feedback message is already prepared
 	//
@@ -287,7 +291,7 @@ FeedbackInfo NcRoutingRules::GetServiceMessage() {
 	//
 	auto f = m_f;
 	if (m_f.type.assign(ServiceMessType::NONE)) m_f.ttl = -1;
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Service message type: " << m_f.type.GetAsInt());
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Service message type: " << f.type.GetAsInt());
 	return f;
 }
 bool NcRoutingRules::NeedGen() {
@@ -295,7 +299,7 @@ bool NcRoutingRules::NeedGen() {
 
 	assert(GetActualRxWinSize() <= m_sp.numGen);
 
-	return (GetActualRxWinSize() <= m_sp.numGenBuffering);
+	return (GetActualRxWinSize() <= m_sp.numGenBuffering || (GetActualTxWinSize() == 0 && !IsOverflowDanger()));
 //	return (!m_congControl->BlockGen(m_txPlan.size(), m_sp.numGenBuffering));
 }
 uint32_t NcRoutingRules::GetNumGreedyGen() {
@@ -312,6 +316,7 @@ bool NcRoutingRules::MaySend(double dr) {
 	CheckReqEteAckI();
 	CheckNetDisc();
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "(2) Service message type: " << m_f.type.GetAsInt());
+
 	return (MaySendData(dr) || MaySendServiceMessage());
 }
 bool NcRoutingRules::MaySendData(double dr) {
@@ -459,15 +464,15 @@ void NcRoutingRules::CheckNetDisc() {
 			// response on the network discovery message
 			//
 			if (!m_coalition.empty()) return false;
-			//
-			// the destination does not need to explore the network itself; it should only respond on the
-			// network discovery messages
-			//
-			if (m_id == m_dst) return false;
+//			//
+//			// the destination does not need to explore the network itself; it should only respond on the
+//			// network discovery messages
+//			//
+//			if (m_id == m_dst) return false;
 
-			if(countTxopNetDisc++ == m_sp.numTxopNetDisc)
+			if(!IsConnected())
 			{
-				countTxopNetDisc = 0;
+				SetConnected(true);// assume to be connected after sending the network discovery message
 				return true;
 			}
 			return false;
@@ -481,6 +486,8 @@ void NcRoutingRules::CheckNetDisc() {
 void NcRoutingRules::ProcessServiceMessage(FeedbackInfo f) {
 
 	SIM_LOG_FUNC(BRR_LOG);
+
+	SetConnected(true);
 
 	ProcessRegularFeedback(f);
 
@@ -610,10 +617,19 @@ void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
 void NcRoutingRules::ProcessNetDisc(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	if (!m_coalition.empty()) {
+	//
+	// source and destination does not forward the network discovery message
+	//
+	if(m_nodeType == SOURCE_NODE_TYPE || m_nodeType == DESTINATION_NODE_TYPE)
+	{
 		if (m_f.type.assign_if(ServiceMessType::NET_DISC, ServiceMessType::NONE)) m_f.ttl = -1;
 		return;
 	}
+
+//	if (!m_coalition.empty()) {
+//		if (m_f.type.assign_if(ServiceMessType::NET_DISC, ServiceMessType::NONE)) m_f.ttl = -1;
+//		return;
+//	}
 
 	if (f.ttl > 0) {
 		if (m_f.type.assign(ServiceMessType::NET_DISC)) m_f.ttl = f.ttl - 1;
@@ -696,6 +712,14 @@ void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
 	}
 }
 
+bool NcRoutingRules::IsConnected()
+{
+	return !(countTxopNetDisc++ >= m_sp.numTxopNetDisc);
+}
+void NcRoutingRules::SetConnected(bool v)
+{
+	countTxopNetDisc = v ? 0 : m_sp.numTxopNetDisc;
+}
 void NcRoutingRules::UpdateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked) {
 
 	SIM_LOG_FUNC(BRR_LOG);
@@ -999,7 +1023,11 @@ GenId NcRoutingRules::GetTxWinEnd() {
 }
 GenId NcRoutingRules::GetActualRxWinSize() {
 
-	return GetActualRxWinSize();
+	return m_inRcvNum.size();
+}
+GenId NcRoutingRules::GetActualTxWinSize()
+{
+	return m_txPlan.size();
 }
 void NcRoutingRules::SetSendingRate(Datarate d) {
 
@@ -1537,14 +1565,14 @@ void NcRoutingRules::DoForgetGeneration() {
 		assert(it != m_inRcvNum.end());
 
 		DoForgetGeneration(it->first);
-		SIM_LOG_NPD(1, m_id, m_p, m_dst, "Erasing generation " << it->first << " due to overflow");
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Erasing generation " << it->first << " due to overflow");
 	}
 }
 void NcRoutingRules::DoForgetGeneration(GenId genId) {
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Erasing generation " << genId << (m_outdatedGens.is_in(genId) ? " acked" : " not acked"));
 	if (!m_outdatedGens.is_in(genId)) {
-		SIM_LOG_NPD(1, m_id, m_p, m_dst, "Erasing generation " << genId << " not acked");
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Erasing generation " << genId << " not acked");
 	}
 
 //	if (m_id == 0) std::cout << "Node " << m_id << ". Forgetting generation " << genId << " after ACK " << std::endl;
@@ -1905,7 +1933,7 @@ void NcRoutingRules::SetAcks() {
 
 	ClearAcks();
 
-	if (m_nodeType != SOURCE_NODE_TYPE) {
+//	if (m_nodeType != SOURCE_NODE_TYPE) {
 
 		auto ack = [this](GenId genId)
 		{
@@ -1931,7 +1959,7 @@ void NcRoutingRules::SetAcks() {
 		}
 
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Set ACKs of rcvd+fwrd+bckl " << m_f.ackInfo);
-	}
+//	}
 	if (m_nodeType == DESTINATION_NODE_TYPE) {
 
 		DoForgetGeneration();
@@ -1964,7 +1992,7 @@ void NcRoutingRules::EvaluateSoftAck() {
 
 		auto gid = rcv_buffer.first;
 		//
-		// find cooperating nodes that send the coder matrix rank
+		// find cooperating nodes that sent the feedback
 		//
 		std::vector<UanAddress> neighbors;
 		for (auto i : m_coalition) {
@@ -2010,7 +2038,7 @@ bool NcRoutingRules::HaveAcksToSend() {
 
 	SetAcks();
 
-	return m_outdatedGensInform.empty();
+	return !m_outdatedGensInform.empty();
 }
 
 bool NcRoutingRules::HaveDataForRetransmissions() {

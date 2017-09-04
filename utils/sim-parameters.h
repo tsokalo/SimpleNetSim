@@ -249,7 +249,7 @@ struct SimParameters {
 		// refer to arq_buffer_description.txt
 
 		assert(numGenPtpAck > numGenBuffering);
-		assert(numGen >= numGenBuffering + numGenRetrans + numGenPtpAck);
+		assert(numGen > numGenBuffering + numGenRetrans + numGenPtpAck);
 		assert(simDuration > warmup + warmdown);
 
 	}

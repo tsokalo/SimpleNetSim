@@ -146,6 +146,9 @@ private:
 	//
 	void OriginateReqPtpAck();
 	void OriginateReqEteAck();
+	//
+	bool IsConnected();
+	void SetConnected(bool v);
 
 	/*
 	 * Retransmission requests
@@ -190,6 +193,7 @@ private:
 	GenId GetRxWinEnd();
 	GenId GetTxWinEnd();
 	GenId GetActualRxWinSize();
+	GenId GetActualTxWinSize();
 
 	void Overshoot(GenId gid);
 

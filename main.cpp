@@ -132,8 +132,9 @@ void CreateDiamondScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net->ConnectNodes(1, 2, 0.2, 0.3);
 	net->ConnectNodes(1, 3, 0.5);
 	net->ConnectNodes(2, 3, 0.1);
-	net->SetDestination(1);
-	net->SetDestination(2);
+	net->SetSource(0);
+//	net->SetDestination(1);
+//	net->SetDestination(2);
 	net->SetDestination(3);
 	net->Configure();
 	net->PrintNet();
@@ -259,9 +260,9 @@ int main(int argc, char *argv[]) {
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
 //	CreateStackScenario(net, 8, sim_par);
-	CreateTriangleScenario(net, sim_par);
+//	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
-//	CreateDiamondScenario(net, sim_par);
+	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);
 

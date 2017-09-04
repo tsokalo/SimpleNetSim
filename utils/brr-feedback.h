@@ -37,36 +37,36 @@ public:
 		/*
 		 * network discovery
 		 */
-		NET_DISC,
+		NET_DISC = 0,
 		/*
 		 * response to the end-to-end ACK request; will be forwarded in direction to the source
 		 */
-		RESP_ETE_ACK,
+		RESP_ETE_ACK = 1,
 		/*
 		 * request for the end-to-end ACK; the direct neighbors respond to it if they have ACK for the requested generation(s);
 		 * otherwise forward it in direction of the destination
 		 */
-		REQ_ETE_ACK,
+		REQ_ETE_ACK = 2,
 		/*
 		 * response to the point-to-point ACK request; behaves as a regular feedback; this response is not forwarded
 		 */
-		RESP_PTP_ACK,
+		RESP_PTP_ACK = 3,
 		/*
 		 * request for the point-to-point ACK; only the neighbors of the sender respond to it; this request is not forwarded
 		 */
-		REQ_PTP_ACK,
+		REQ_PTP_ACK = 4,
 		/*
 		 * retransmission request
 		 */
-		REQ_RETRANS,
+		REQ_RETRANS = 5,
 		/*
 		 * general feedback information
 		 */
-		REGULAR,
+		REGULAR = 6,
 		/*
 		 * non-initialized
 		 */
-		NONE
+		NONE = 7
 	};
 
 	bool assign(const ServiceMessType_& other) {

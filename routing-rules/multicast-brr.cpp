@@ -16,6 +16,8 @@ MulticastBrr::MulticastBrr(UanAddress ownAddress, NodeType type, std::vector<Uan
 
 	for (auto dst : destAddresses) {
 
+		SIM_LOG(BRR_LOG, "Create BRR instance for DST " << dst << ", I am " << m_id);
+
 		NodeType t = (ownAddress == dst) ? DESTINATION_NODE_TYPE : type;
 		assert(!(t == DESTINATION_NODE_TYPE && type == SOURCE_NODE_TYPE));
 
@@ -397,8 +399,9 @@ bool MulticastBrr::MaySend(double dr) {
 	// if at least for all destination we may send data
 	//
 	for (auto brr_it : m_brr)
+	{
 		if (brr_it.second->MaySend(dr)) return true;
-
+	}
 	return false;
 }
 bool MulticastBrr::MaySendData(double dr){
