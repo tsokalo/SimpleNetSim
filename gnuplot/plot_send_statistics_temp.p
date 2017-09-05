@@ -24,5 +24,5 @@ set style histogram cluster gap 1
 set style fill solid border -1
 set boxwidth 0.9
 set style fill pattern border
-set output '/home/tsokalo/workspace/SnsMulticast/Results/send_statistics.svg'
-plot "/home/tsokalo/workspace/SnsMulticast/gnuplot/data.txt" using 2 ti col, '' using 3 ti col, '' using 4:xticlabels(1) ti col
+set output './Results/send_statistics.svg'
+plot "./gnuplot/data.txt" using 2 ti col, '' using 3 ti col, '' using 4:xticlabels(1) ti col

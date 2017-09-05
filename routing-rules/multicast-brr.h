@@ -66,7 +66,7 @@ public:
 	void SetSendingRate(Datarate d);
 	//
 	void ProcessServiceMessage(FeedbackMInfo f);
-	void UpdateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
+	void CheckReqRetrans(UanAddress id, GenId genId, bool all_prev_acked);
 	//
 	void ResetRetransInfo();
 
@@ -80,7 +80,7 @@ public:
 	FeedbackMInfo GetServiceMessage();
 	//
 	bool NeedGen();
-	uint32_t GetNumGreedyGen();
+	uint32_t GetFreeBufferSize();
 	bool MaySend(double dr = 0);
 	bool MaySendData(double dr = 0);
 	bool MaySendServiceMessage();

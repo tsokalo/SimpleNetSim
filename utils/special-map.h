@@ -132,6 +132,27 @@ struct special_map: public std::unordered_map<Key, T> {
 		ss << "]";
 		return ss.str();
 	}
+	/*
+	 * return the range of generation IDs starting from the 's'th oldest till the 'e'th oldest
+	 */
+	std::vector<GenId> get_key_range(uint16_t s, uint16_t e) {
+		std::vector<GenId> gids;
+		auto it = this->begin_orig_order();
+		uint16_t c = 0;
+		while (it != this->end()) {
+			c++;
+			if (c < s + 1) {
+				it = this->next_orig_order(it);
+				continue;
+			}
+			if (c >= e + 1) {
+				break;
+			}
+			gids.push_back(it->first);
+			it = this->next_orig_order(it);
+		}
+		return gids;
+	}
 
 protected:
 
@@ -139,11 +160,11 @@ protected:
 	Key m_lastKeyInMem;
 };
 
-struct NodeVarList : public std::unordered_map<UanAddress, uint16_t>
-{
-	friend std::ostream& operator<<(std::ostream& o,NodeVarList & m) {
+struct NodeVarList: public std::unordered_map<UanAddress, uint16_t> {
+	friend std::ostream& operator<<(std::ostream& o, NodeVarList & m) {
 
-		for(auto v : m) o << "(" << v.first << "," << v.second << ")";
+		for (auto v : m)
+			o << "(" << v.first << "," << v.second << ")";
 		return o;
 	}
 };

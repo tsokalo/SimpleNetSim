@@ -79,7 +79,7 @@ public:
 	void SetSendingRate(Datarate d);
 	//
 	void ProcessServiceMessage(FeedbackInfo f);
-	void UpdateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
+	void CheckReqRetrans(UanAddress id, GenId genId, bool all_prev_acked);
 	//
 	void ResetRetransInfo();
 
@@ -94,7 +94,7 @@ public:
 	FeedbackInfo GetServiceMessage();
 	//
 	bool NeedGen();
-	uint32_t GetNumGreedyGen();
+	uint32_t GetFreeBufferSize();
 	bool MaySend(double dr = 0);
 	bool MaySendData(double dr = 0);
 	bool MaySendServiceMessage();
@@ -144,6 +144,10 @@ private:
 	void ProcessNetDisc(FeedbackInfo f);
 	void ProcessReqRetrans(FeedbackInfo f);
 	//
+	void WorkInPtpAckRange(std::function<bool(GenId)> func);
+	void WorkInEteAckRange(std::function<bool(GenId)> func);
+	void WorkInRetransRange(std::function<bool(GenId)> func);
+	//
 	void OriginateReqPtpAck();
 	void OriginateReqEteAck();
 	//
@@ -154,15 +158,15 @@ private:
 	 * Retransmission requests
 	 */
 	UanAddress SelectRetransRequestForwarder();
-	bool MayOriginateRetransRequest(std::map<GenId, uint32_t> ranks, GenId genId);
-	bool MayReplicateRetransRequest(UanAddress id, GenId genId);
+	bool MayOrigReqRetrans(GenId genId);
+//	bool MayRepeatReqRetrans(UanAddress id, GenId genId);
 	void GetAchievableRank(FeedbackInfo fb, std::map<GenId, CoderHelpInfo> &helpInfo);
 	void DoUpdateRetransPlan(std::map<GenId, CoderHelpInfo> helpInfo);
 	bool HaveDataForRetransmissions();
 	bool IsRetransRequestOld(FeedbackInfo fb);
 	void FormRrInfo(FeedbackInfo fb, std::map<GenId, CoderHelpInfo> helpInfo);
 	void RefineCoderHelpInfo(std::map<GenId, CoderHelpInfo> &helpInfo);
-	bool DoCreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId genId);
+	bool DoCreateRetransRequest(GenId genId);
 	/*
 	 * Acknowledgements
 	 */
@@ -173,6 +177,9 @@ private:
 	bool HaveAcksToSend();
 	void SetFastAck();
 	void EvaluateSoftAck();
+	uint32_t GetRegularFeedbackFreq();
+	bool IsSoftAck(GenId gid);
+	bool IsHardAck(GenId gid);
 
 	void Reset();
 
@@ -194,6 +201,9 @@ private:
 	GenId GetTxWinEnd();
 	GenId GetActualRxWinSize();
 	GenId GetActualTxWinSize();
+
+	bool DoesItCooperate(UanAddress addr);
+	bool DoICooperate(UanAddress addr);
 
 	void Overshoot(GenId gid);
 

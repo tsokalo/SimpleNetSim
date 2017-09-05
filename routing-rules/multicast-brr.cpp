@@ -122,13 +122,13 @@ void MulticastBrr::ProcessServiceMessage(FeedbackMInfo f) {
 		m_brr.at(dst)->ProcessServiceMessage(f);
 	}
 }
-void MulticastBrr::UpdateRetransRequestInfo(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked)
+void MulticastBrr::CheckReqRetrans(UanAddress id, GenId genId, bool all_prev_acked)
 {
 	//
 	// if at least for all destination we may send the retransmission request
 	//
 	for (auto brr_it : m_brr)
-		brr_it.second->UpdateRetransRequestInfo(ranks, id, genId, all_prev_acked);
+		brr_it.second->CheckReqRetrans(id, genId, all_prev_acked);
 }
 /*
  * OUTPUTS
@@ -382,14 +382,14 @@ bool MulticastBrr::NeedGen() {
 
 	return true;
 }
-uint32_t MulticastBrr::GetNumGreedyGen() {
+uint32_t MulticastBrr::GetFreeBufferSize() {
 
 	//
 	// select the minimum of that is required for each destination
 	//
 	uint32_t num = std::numeric_limits < uint32_t > ::max();
 	for (auto brr_it : m_brr) {
-		auto v = brr_it.second->GetNumGreedyGen();
+		auto v = brr_it.second->GetFreeBufferSize();
 		num = (num > v) ? v : num;
 	}
 	return num;

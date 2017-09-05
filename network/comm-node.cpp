@@ -55,7 +55,7 @@ void CommNode::Configure(NodeType type, std::vector<UanAddress> dst) {
 		//
 		// fill the encoder buffer
 		//
-		m_trafGen->Start(m_sp.genSize * (m_sp.numGenBuffering + 1));
+		m_trafGen->Start(m_sp.genSize * m_brr->GetFreeBufferSize());
 
 		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " type " << m_nodeType);
 	} else {
@@ -218,7 +218,7 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 #ifdef HASH_VECTOR_FEEDBACK_ART
 		m_brr->AddRcvdCcack(genId, ExtractCodingVector(pkt.GetData(), m_sp.genSize));
 #endif
-		m_brr->UpdateRetransRequestInfo(m_decQueue->get_ranks(), input->v_, genId, plan_item.all_prev_acked);
+		m_brr->CheckReqRetrans(input->v_, genId, plan_item.all_prev_acked);
 
 	} else {
 
@@ -230,7 +230,7 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 
 		if (m_nodeType == SOURCE_NODE_TYPE) {
 			if (m_brr->NeedGen()) {
-				m_trafGen->Start(m_sp.genSize);
+				m_trafGen->Start(m_sp.genSize * m_brr->GetFreeBufferSize());
 			}
 		}
 	}

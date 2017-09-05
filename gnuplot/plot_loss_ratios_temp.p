@@ -16,7 +16,7 @@ set grid xtics ytics back lw 1 lc rgb "#AFAFAF"
 set key right top
 
 
-set output './Results/loss_ratios_7.svg'
-plot "./gnuplot/data.txt" using 1:(($2==7&&$3==4) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 5 pt 7 ps 0.3 title "edge=<7,4>",\
-"./gnuplot/data.txt" using 1:(($2==7&&$3==6) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 7 pt 7 ps 0.3 title "edge=<7,6>",\
-"./gnuplot/data.txt" using 1:(($2==7&&$3==8) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 9 pt 7 ps 0.3 title "edge=<7,8>"
+set output './Results/loss_ratios_2.svg'
+plot "./gnuplot/data.txt" using 1:(($2==2&&$3==0) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 1 pt 7 ps 0.3 title "edge=<2,0>",\
+"./gnuplot/data.txt" using 1:(($2==2&&$3==1) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 2 pt 7 ps 0.3 title "edge=<2,1>",\
+"./gnuplot/data.txt" using 1:(($2==2&&$3==3) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 4 pt 7 ps 0.3 title "edge=<2,3>"

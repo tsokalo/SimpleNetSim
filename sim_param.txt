@@ -7,7 +7,7 @@ Number of buffering generations (Tx)	1
 Number of generations before soft ACK	1
 Number of ReqPtpAck before ReqEteAck	2
 Number of ACK retransmission (+1)		3
-Number of TXOP before NetDisc			5
+Number of TXOP before NetDisc			20
 Number of generations before RR			1
 Number of generations in a single MPDU	20
 Field size / power of 2					8

@@ -18,5 +18,5 @@ set grid xtics ytics back lw 1 lc rgb "#AFAFAF"
 set key right top
 
 
-set output '/home/tsokalo/workspace/SnsMulticast/Results/retrans_requests.svg'
-plot "/home/tsokalo/workspace/SnsMulticast/gnuplot/data.txt" using 2:xticlabels(1) with boxes ls 1 lw 1 linecolor 3 notitle
+set output './Results/retrans_requests.svg'
+plot "./gnuplot/data.txt" using 2:xticlabels(1) with boxes ls 1 lw 1 linecolor 3 notitle
