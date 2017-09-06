@@ -40,7 +40,7 @@
 		// 											|---numGenRetrans---|~~~~~~~~~~~~~~|					//
 		// 													 	   		|-numGenPtpAck-|					//		
 		// 	W_{softAck}:													 	   	 |-----sGen-----|		//
-		// 	W_{hardAck}:													 	   	 |~~~~~~~~~~~~~~-hGen|	//	
+		// 	W_{hardAck}:													 	   	 |~~~~~~~~~~~~~~hGen|	//	
 		//		
 		// s - subject for the soft ACK request; it becomes also a subject for the hard ACK request when certain counter expires
 		// h - subject for the hard ACK request

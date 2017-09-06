@@ -80,7 +80,6 @@ public:
 		}
 		return false;
 	}
-
 	bool assign_if(const ServiceMessType_& c, const ServiceMessType_& other) {
 
 		if (this->t != NONE) if (this->t != c) return false;

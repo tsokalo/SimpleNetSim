@@ -10,47 +10,47 @@
 
 #include <iostream>
 
-#define COMM_NET_LOG            0
-#define COMM_NODE_LOG           0
-#define EDGE_LOG                0
-#define LOSS_PROCESS_LOG        0
-#define NC_SYMBOL_LOG           0
-#define NC_POLICY_LOG           0
-#define GOD_VIEW                0
-#define EXOR_SOLVER_LOG         0
-#define BRR_LOG                 0
-#define ARQ_LOG                 0
-#define FILTER_LOG              0
-#define SC_POL_LOG              0
-#define TRAF_GEN_LOG            0
-#define CODER_LOG				0
-#define SIMULATOR_LOG			0
-#define GRAPH_LOG     			0
-#define LPSOLVER_LOG    		0
-#define CCACK_LOG	    		0
-#define TEMP_LOG				0
-#define BRRM_LOG				0
-
-//#define COMM_NET_LOG            1
-//#define COMM_NODE_LOG           1
-//#define EDGE_LOG                1
-//#define LOSS_PROCESS_LOG        1
-//#define NC_SYMBOL_LOG           1
-//#define NC_POLICY_LOG           1
+//#define COMM_NET_LOG            0
+//#define COMM_NODE_LOG           0
+//#define EDGE_LOG                0
+//#define LOSS_PROCESS_LOG        0
+//#define NC_SYMBOL_LOG           0
+//#define NC_POLICY_LOG           0
+//#define GOD_VIEW                0
+//#define EXOR_SOLVER_LOG         0
+//#define BRR_LOG                 0
+//#define ARQ_LOG                 0
 //#define FILTER_LOG              0
-//#define SC_POL_LOG              1
-//#define GOD_VIEW                1
-//#define EXOR_SOLVER_LOG         1
-//#define BRR_LOG                 1
-//#define ARQ_LOG                 1
-//#define TRAF_GEN_LOG            1
-//#define CODER_LOG				1
-//#define SIMULATOR_LOG			1
+//#define SC_POL_LOG              0
+//#define TRAF_GEN_LOG            0
+//#define CODER_LOG				0
+//#define SIMULATOR_LOG			0
 //#define GRAPH_LOG     			0
 //#define LPSOLVER_LOG    		0
-//#define CCACK_LOG	    		1
+//#define CCACK_LOG	    		0
 //#define TEMP_LOG				0
-//#define BRRM_LOG				1
+//#define BRRM_LOG				0
+
+#define COMM_NET_LOG            1
+#define COMM_NODE_LOG           1
+#define EDGE_LOG                1
+#define LOSS_PROCESS_LOG        1
+#define NC_SYMBOL_LOG           1
+#define NC_POLICY_LOG           1
+#define FILTER_LOG              0
+#define SC_POL_LOG              1
+#define GOD_VIEW                1
+#define EXOR_SOLVER_LOG         1
+#define BRR_LOG                 1
+#define ARQ_LOG                 1
+#define TRAF_GEN_LOG            1
+#define CODER_LOG				1
+#define SIMULATOR_LOG			1
+#define GRAPH_LOG     			0
+#define LPSOLVER_LOG    		0
+#define CCACK_LOG	    		1
+#define TEMP_LOG				0
+#define BRRM_LOG				1
 
 #define SIM_LOG(condition, message) \
     do { \

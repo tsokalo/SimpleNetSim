@@ -378,6 +378,9 @@ void NcRoutingRules::CheckGeneralFeedback() {
 
 			return (m_dis(m_gen) < m_feedbackP);
 		};
+
+	m_f.type.assign_if(ServiceMessType::REGULAR, ServiceMessType::NONE);
+
 	if (check()) {
 		if (m_f.type.assign(ServiceMessType::REGULAR)) m_f.ttl = -1;
 	}
@@ -399,6 +402,8 @@ void NcRoutingRules::CheckReqPtpAck() {
 		}
 		return false;
 	};
+
+	m_f.type.assign_if(ServiceMessType::REQ_PTP_ACK, ServiceMessType::NONE);
 
 	WorkInPtpAckRange(func);
 }
@@ -488,6 +493,8 @@ void NcRoutingRules::CheckReqEteAckI() {
 		return false;
 	};
 
+	m_f.type.assign_if(ServiceMessType::REQ_ETE_ACK, ServiceMessType::NONE);
+
 	WorkInEteAckRange(func);
 }
 
@@ -553,7 +560,10 @@ void NcRoutingRules::CheckNetDisc() {
 //			return (m_dis(m_gen) < m_netDiscP);
 		};
 
+	m_f.type.assign_if(ServiceMessType::NET_DISC, ServiceMessType::NONE);
+
 	if (check()) {
+
 		if (m_f.type.assign(ServiceMessType::NET_DISC)) m_f.ttl = m_maxTtl;
 	}
 }
@@ -624,12 +634,17 @@ void NcRoutingRules::ProcessRegularFeedback(FeedbackInfo l) {
 void NcRoutingRules::ProcessReqPtpAck(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
+	m_f.type.assign_if(ServiceMessType::RESP_PTP_ACK, ServiceMessType::NONE);
+
 	if (DoesItCooperate(f.addr)) return;
 
 	if (m_f.type.assign(ServiceMessType::RESP_PTP_ACK)) m_f.ttl = -1;
 }
 void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
+
+	m_f.type.assign_if(ServiceMessType::RESP_ETE_ACK, ServiceMessType::NONE);
+	m_f.type.assign_if(ServiceMessType::REQ_ETE_ACK, ServiceMessType::NONE);
 
 	if (DoesItCooperate(f.addr)) return;
 
@@ -656,7 +671,7 @@ void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 					if (m_f.type.assign(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = f.ttl - 1;
 					return;
 				} else {
-					if (m_f.type.assign_if(ServiceMessType::REQ_ETE_ACK, ServiceMessType::NONE)) m_f.ttl = -1;
+					m_f.ttl = -1;
 					return;
 				}
 			}
@@ -673,6 +688,8 @@ void NcRoutingRules::ProcessRespPtpAck(FeedbackInfo f) {
 void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
+	m_f.type.assign_if(ServiceMessType::RESP_ETE_ACK, ServiceMessType::NONE);
+
 	if (DoICooperate(f.addr)) return;
 
 	for (auto r : f.rcvNum) {
@@ -685,7 +702,7 @@ void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
 	if (f.ttl > 0) {
 		if (m_f.type.assign(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = f.ttl - 1;
 	} else {
-		if (m_f.type.assign_if(ServiceMessType::RESP_ETE_ACK, ServiceMessType::NONE)) m_f.ttl = -1;
+		m_f.ttl = -1;
 	}
 }
 void NcRoutingRules::ProcessNetDisc(FeedbackInfo f) {
@@ -780,6 +797,8 @@ void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
 		return false;
 	};
 
+	m_f.type.assign_if(ServiceMessType::REQ_RETRANS, ServiceMessType::NONE);
+
 	if (check(f) && m_nodeType != SOURCE_NODE_TYPE) {
 		if (m_f.type.assign(ServiceMessType::REQ_RETRANS)) m_f.ttl = f.ttl - 1;
 	}
@@ -824,6 +843,8 @@ void NcRoutingRules::CheckReqRetrans(UanAddress id, GenId genId, bool all_prev_a
 //			assert(0);
 //			return false;
 //		};
+
+	m_f.type.assign_if(ServiceMessType::REQ_RETRANS, ServiceMessType::NONE);
 
 	if (MayOrigReqRetrans(genId) && m_nodeType != SOURCE_NODE_TYPE) {
 		if (m_f.type.assign(ServiceMessType::REQ_RETRANS)) m_f.ttl = m_maxTtl;
