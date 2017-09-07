@@ -34,6 +34,7 @@
 #include "utils/retrans-gen-id.h"
 #include "utils/coding-vector.h"
 #include "utils/retrans-request-counter.h"
+#include "utils/brr-service.h"
 #include "ccack/ccack.h"
 
 namespace ncr {
@@ -135,6 +136,7 @@ private:
 	void CheckReqEteAckI();
 	void CheckReqEteAckII();
 	void CheckNetDisc();
+	void CheckServiceMessage();
 	//
 	void ProcessRegularFeedback(FeedbackInfo f);
 	void ProcessReqPtpAck(FeedbackInfo f);
@@ -167,6 +169,7 @@ private:
 	void FormRrInfo(FeedbackInfo fb, std::map<GenId, CoderHelpInfo> helpInfo);
 	void RefineCoderHelpInfo(std::map<GenId, CoderHelpInfo> &helpInfo);
 	bool DoCreateRetransRequest(GenId genId);
+	bool IsRequestedForRetrans(GenId gid);
 	/*
 	 * Acknowledgements
 	 */
@@ -206,6 +209,12 @@ private:
 	bool DoICooperate(UanAddress addr);
 
 	void Overshoot(GenId gid);
+
+	void ValidateReaction(GenId genId, UanAddress id);
+	void ValidateReaction(FeedbackInfo l);
+	void PlanExpectedReaction(GenId genId, UanAddress id);
+	void PlanExpectedReaction(FeedbackInfo l);
+	void PlanExpectedReaction();
 
 	HeaderInfo m_h;
 	FeedbackInfo m_f;
@@ -364,6 +373,11 @@ private:
 	 * counter of Transmission opportunities (TXOPs) for NetDisc
 	 */
 	uint16_t countTxopNetDisc;
+	/*
+	 * sending certain service message applies the requirements on the network reaction
+	 * the service describes the valid sequence of network actions
+	 */
+	BrrService m_service;
 
 	NodeType m_nodeType;
 

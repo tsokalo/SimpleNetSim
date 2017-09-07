@@ -1,0 +1,13 @@
+
+>>>>>>> Start service <<<<<<<<
+
+[STARTED] When getting access and having the service message: GetServiceMessage -> PlanExpactedReaction
+
+>>>>>>>	Repeat service message <<<<<<<<
+
+[PLANNED_FOR_REPETITION] Each time whenever I receive anything: UpdateRcv, ProcessServiceMessage -> ValidateReaction (check necessity of the service message retransmission)
+[REPEATED] Before each broadcast event in the network: MaySend -> CheckServiceMessage
+
+>>>>>>>	Finish service <<<<<<<<
+
+[FINISHED] Each time whenever I receive anything: UpdateRcv, ProcessServiceMessage -> PlanExpectedReaction

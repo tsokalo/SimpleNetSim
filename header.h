@@ -208,8 +208,7 @@ struct ArqWin {
 			{
 		return (l.s_rx == r.s_rx && l.s_tx == r.s_tx && l.e_tx == r.e_tx && l.e_rx == r.e_rx);
 	}
-	bool is_def()
-	{
+	bool is_def() {
 		return (s_rx != MAX_GEN_SSN && s_tx != MAX_GEN_SSN && e_tx != MAX_GEN_SSN && e_rx != MAX_GEN_SSN);
 	}
 	GenId s_rx; //start of RX window

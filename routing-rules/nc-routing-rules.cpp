@@ -160,6 +160,8 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, bool linDep) {
 	SIM_LOG_FUNC(BRR_LOG);
 
 	SetConnected(true);
+	ValidateReaction(genId, id);
+	PlanExpectedReaction(genId, id);
 
 	uint32_t num = 1;
 
@@ -269,7 +271,7 @@ UanAddress NcRoutingRules::GetSinkVertex() {
 FeedbackInfo NcRoutingRules::GetServiceMessage() {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	assert(m_f.type != ServiceMessType::NONE);
+	assert(m_service.ready_to_start());
 
 	//
 	// the most part of the feedback message is already prepared
@@ -290,10 +292,12 @@ FeedbackInfo NcRoutingRules::GetServiceMessage() {
 	//
 	CheckReqEteAckII();
 	//
-	auto f = m_f;
-	if (m_f.type.assign(ServiceMessType::NONE)) m_f.ttl = -1;
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Service message type: " << f.type.GetAsInt());
-	return f;
+	m_f.type.copy(m_service.get_type());
+	//
+	PlanExpectedReaction();
+	//
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Service message type: " << m_f.type.GetAsInt());
+	return m_f;
 }
 bool NcRoutingRules::NeedGen() {
 	SIM_LOG_FUNC(BRR_LOG);
@@ -316,12 +320,7 @@ uint32_t NcRoutingRules::GetFreeBufferSize() {
 bool NcRoutingRules::MaySend(double dr) {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "(1) Service message type: " << m_f.type.GetAsInt());
-	CheckGeneralFeedback();
-	CheckReqPtpAck();
-	CheckReqEteAckI();
-	CheckNetDisc();
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "(2) Service message type: " << m_f.type.GetAsInt());
+	CheckServiceMessage();
 
 	return (MaySendData(dr) || MaySendServiceMessage());
 }
@@ -348,7 +347,7 @@ bool NcRoutingRules::MaySendData(double dr) {
 bool NcRoutingRules::MaySendServiceMessage() {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	return (m_f.type != ServiceMessType::NONE);
+	return m_service.ready_to_start();
 }
 
 void NcRoutingRules::CheckGeneralFeedback() {
@@ -379,10 +378,9 @@ void NcRoutingRules::CheckGeneralFeedback() {
 			return (m_dis(m_gen) < m_feedbackP);
 		};
 
-	m_f.type.assign_if(ServiceMessType::REGULAR, ServiceMessType::NONE);
-
-	if (check()) {
-		if (m_f.type.assign(ServiceMessType::REGULAR)) m_f.ttl = -1;
+	if (m_service.admit(ServiceMessType::REGULAR)) {
+		m_service.set_want_start_service(check());
+		if (m_service.init(ServiceMessType::REGULAR)) m_f.ttl = -1;
 	}
 }
 void NcRoutingRules::CheckReqPtpAck() {
@@ -392,21 +390,125 @@ void NcRoutingRules::CheckReqPtpAck() {
 	{
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Checking ACK");
 		if (!IsSoftAck(gid) && !IsHardAck(gid)) {
-			if (m_dis(m_gen) < 0.2) {
-				if (m_f.type.assign(ServiceMessType::REQ_PTP_ACK))
-				{
-					m_f.ttl = -1;
-				}
-			}
+			m_service.set_want_start_service(true);
 			return true;
 		}
 		return false;
 	};
 
-	m_f.type.assign_if(ServiceMessType::REQ_PTP_ACK, ServiceMessType::NONE);
-
-	WorkInPtpAckRange(func);
+	if (m_service.admit(ServiceMessType::REQ_PTP_ACK)) {
+		WorkInPtpAckRange(func);
+		if (m_service.init(ServiceMessType::REQ_PTP_ACK)) m_f.ttl = -1;
+	}
 }
+
+void NcRoutingRules::CheckReqEteAckI() {
+	SIM_LOG_FUNC(BRR_LOG);
+	//
+	// source does EteAck request instead of sending the Retransmission Requests
+	// other nodes do send these Requests
+	//
+	auto func = [this](GenId gid)->bool
+	{
+		if (!IsSoftAck(gid) && !IsHardAck(gid)) {
+			m_service.set_want_start_service(true);
+			return true;
+		}
+		return false;
+	};
+
+	if (m_service.admit(ServiceMessType::REQ_ETE_ACK)) {
+		WorkInPtpAckRange(func);
+		if (m_service.init(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = m_maxTtl;
+	}
+}
+
+void NcRoutingRules::CheckReqEteAckII() {
+	SIM_LOG_FUNC(BRR_LOG);
+
+	auto dec_count = [this](GenId gid)->bool
+	{
+		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "updating the ReqPtpAck count");
+		assert(m_f.ackInfo.find(gid) != m_f.ackInfo.end());			//because of called after SetAcks
+			if (!m_f.ackInfo[gid]) {
+				if (m_ptpAckCount.find(gid) == m_ptpAckCount.end()) {
+					m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
+				} else {
+					if (m_ptpAckCount[gid]-- == 0) {
+						m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
+						m_service.set_want_start_service(true);
+					}
+				}
+			}
+			return false;		// work for all generation in the PtpAck range
+		};
+	auto make_default = [this](GenId gid)->bool
+	{
+		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "defaulting the ReqPtpAck count");
+		m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
+		return false;			// work for all generation in the PtpAck range
+		};
+
+	if (m_f.type == ServiceMessType::REQ_PTP_ACK) {
+		if (m_service.admit(ServiceMessType::REQ_ETE_ACK)) {
+			WorkInPtpAckRange(dec_count);
+			if (m_service.init(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = m_maxTtl;
+		}
+	} else {
+		WorkInPtpAckRange(make_default);
+	}
+}
+
+void NcRoutingRules::CheckNetDisc() {
+	SIM_LOG_FUNC(BRR_LOG);
+
+	auto check = [this]()->bool
+	{
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Node type: " << m_nodeType << ", coalition size: " << m_coalition.size());
+
+//		//
+//		// source never sends the network discovery messages
+//		//
+//			if (m_nodeType == SOURCE_NODE_TYPE) return false;
+
+			//
+			// if the current node has at least anybody in its coalition, it does not need explore the network
+			// by sending the network discovery message; instead it has an opportunity to send the data packets
+			// and can receive the feedback for them, which gives to the current node the same information as the
+			// response on the network discovery message
+			//
+			if (!m_coalition.empty()) return false;
+//			//
+//			// the destination does not need to explore the network itself; it should only respond on the
+//			// network discovery messages
+//			//
+//			if (m_id == m_dst) return false;
+
+			if(!IsConnected())
+			{
+				SetConnected(true);			// assume to be connected after sending the network discovery message
+				return true;
+			}
+			return false;
+//			return (m_dis(m_gen) < m_netDiscP);
+		};
+
+	if (m_service.admit(ServiceMessType::NET_DISC)) {
+		m_service.set_want_start_service(check());
+		if (m_service.init(ServiceMessType::REGULAR)) m_f.ttl = m_maxTtl;
+	}
+}
+void NcRoutingRules::CheckServiceMessage() {
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "(1) Service message type: " << m_f.type.GetAsInt());
+
+	CheckGeneralFeedback();
+	CheckReqPtpAck();
+	CheckReqEteAckI();
+	CheckNetDisc();
+
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "(2) Service message type: " << m_f.type.GetAsInt());
+}
+
 void NcRoutingRules::WorkInPtpAckRange(std::function<bool(GenId)> func) {
 	SIM_LOG_FUNC(BRR_LOG);
 	//
@@ -476,102 +578,13 @@ void NcRoutingRules::WorkInRetransRange(std::function<bool(GenId)> func) {
 		// do nothing
 	}
 }
-void NcRoutingRules::CheckReqEteAckI() {
-	SIM_LOG_FUNC(BRR_LOG);
-	//
-	// source does EteAck request instead of sending the Retransmission Requests
-	// other nodes do send these Requests
-	//
-	auto func = [this](GenId gid)->bool
-	{
-		if (!IsSoftAck(gid) && !IsHardAck(gid)) {
-			if (m_dis(m_gen) < 0.2 || GetActualTxWinSize() == 0) {
-				if (m_f.type.assign(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = m_maxTtl;
-			}
-			return true;
-		}
-		return false;
-	};
-
-	m_f.type.assign_if(ServiceMessType::REQ_ETE_ACK, ServiceMessType::NONE);
-
-	WorkInEteAckRange(func);
-}
-
-void NcRoutingRules::CheckReqEteAckII() {
-	SIM_LOG_FUNC(BRR_LOG);
-
-	auto update_count = [this](GenId gid)->bool
-	{
-		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "updating the count");
-		assert(m_f.ackInfo.find(gid) != m_f.ackInfo.end());			//because of called after SetAcks
-			if (!m_f.ackInfo[gid]) {
-				if (m_ptpAckCount.find(gid) == m_ptpAckCount.end()) {
-					m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
-				} else {
-					if (m_ptpAckCount[gid]-- == 0) {
-						m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
-						if (m_f.type.assign(ServiceMessType::REQ_ETE_ACK)) {
-							m_f.ttl = m_maxTtl;
-						}
-					}
-				}
-			}
-			return false;			// work for all generation in the PtpAck range
-		};
-
-	if (m_f.type == ServiceMessType::REQ_PTP_ACK) {
-
-		WorkInPtpAckRange(update_count);
-	}
-}
-
-void NcRoutingRules::CheckNetDisc() {
-	SIM_LOG_FUNC(BRR_LOG);
-
-	auto check = [this]()->bool
-	{
-		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Node type: " << m_nodeType << ", coalition size: " << m_coalition.size());
-
-//		//
-//		// source never sends the network discovery messages
-//		//
-//			if (m_nodeType == SOURCE_NODE_TYPE) return false;
-
-			//
-			// if the current node has at least anybody in its coalition, it does not need explore the network
-			// by sending the network discovery message; instead it has an opportunity to send the data packets
-			// and can receive the feedback for them, which gives to the current node the same information as the
-			// response on the network discovery message
-			//
-			if (!m_coalition.empty()) return false;
-//			//
-//			// the destination does not need to explore the network itself; it should only respond on the
-//			// network discovery messages
-//			//
-//			if (m_id == m_dst) return false;
-
-			if(!IsConnected())
-			{
-				SetConnected(true);			// assume to be connected after sending the network discovery message
-				return true;
-			}
-			return false;
-//			return (m_dis(m_gen) < m_netDiscP);
-		};
-
-	m_f.type.assign_if(ServiceMessType::NET_DISC, ServiceMessType::NONE);
-
-	if (check()) {
-
-		if (m_f.type.assign(ServiceMessType::NET_DISC)) m_f.ttl = m_maxTtl;
-	}
-}
 void NcRoutingRules::ProcessServiceMessage(FeedbackInfo f) {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
 	SetConnected(true);
+	ValidateReaction(f);
+	PlanExpectedReaction(f);
 
 	ProcessRegularFeedback(f);
 
@@ -594,11 +607,11 @@ void NcRoutingRules::ProcessServiceMessage(FeedbackInfo f) {
 		ProcessRespEteAck(f);
 		return;
 	}
-	if (f.type == ServiceMessType::NET_DISC) {
+	if (f.type == ServiceMessType::NET_DISC || f.type == ServiceMessType::REP_NET_DISC) {
 		ProcessNetDisc(f);
 		return;
 	}
-	if (f.type == ServiceMessType::REQ_RETRANS) {
+	if (f.type == ServiceMessType::REQ_RETRANS || f.type == ServiceMessType::REP_REQ_RETRANS) {
 		ProcessReqRetrans(f);
 		return;
 	}
@@ -634,19 +647,15 @@ void NcRoutingRules::ProcessRegularFeedback(FeedbackInfo l) {
 void NcRoutingRules::ProcessReqPtpAck(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	m_f.type.assign_if(ServiceMessType::RESP_PTP_ACK, ServiceMessType::NONE);
-
-	if (DoesItCooperate(f.addr)) return;
-
-	if (m_f.type.assign(ServiceMessType::RESP_PTP_ACK)) m_f.ttl = -1;
+	if (m_service.admit(ServiceMessType::RESP_PTP_ACK)) {
+		m_service.set_want_start_service(DoICooperate(f.addr));
+		if (m_service.init(ServiceMessType::RESP_PTP_ACK)) m_f.ttl = -1;
+	}
 }
 void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	m_f.type.assign_if(ServiceMessType::RESP_ETE_ACK, ServiceMessType::NONE);
-	m_f.type.assign_if(ServiceMessType::REQ_ETE_ACK, ServiceMessType::NONE);
-
-	if (DoesItCooperate(f.addr)) return;
+	if (!DoICooperate(f.addr)) return;
 
 	for (auto r : f.rcvNum) {
 		auto gid = r.first;
@@ -656,7 +665,10 @@ void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 
 	if (m_nodeType == DESTINATION_NODE_TYPE) {
 
-		if (m_f.type.assign(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = m_maxTtl;
+		if (m_service.admit(ServiceMessType::RESP_PTP_ACK)) {
+			m_service.set_want_start_service(true);
+			if (m_service.init(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = m_maxTtl;
+		}
 
 	} else {
 
@@ -667,17 +679,13 @@ void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 		for (auto r : f.rcvNum) {
 			auto gid = r.first;
 			if (!m_f.ackInfo[gid]) {
-				if (f.ttl > 0) {
-					if (m_f.type.assign(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = f.ttl - 1;
-					return;
-				} else {
-					m_f.ttl = -1;
-					return;
+				if (m_service.admit(ServiceMessType::REQ_ETE_ACK)) {
+					m_service.set_want_start_service(f.ttl > 0);
+					if (m_service.init(ServiceMessType::REQ_ETE_ACK)) m_f.ttl = f.ttl - 1;
 				}
+				return;
 			}
 		}
-
-		if (m_f.type.assign(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = m_maxTtl;
 	}
 }
 void NcRoutingRules::ProcessRespPtpAck(FeedbackInfo f) {
@@ -688,8 +696,6 @@ void NcRoutingRules::ProcessRespPtpAck(FeedbackInfo f) {
 void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	m_f.type.assign_if(ServiceMessType::RESP_ETE_ACK, ServiceMessType::NONE);
-
 	if (DoICooperate(f.addr)) return;
 
 	for (auto r : f.rcvNum) {
@@ -699,10 +705,9 @@ void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
 	//
 	// forward the response
 	//
-	if (f.ttl > 0) {
-		if (m_f.type.assign(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = f.ttl - 1;
-	} else {
-		m_f.ttl = -1;
+	if (m_service.admit(ServiceMessType::RESP_PTP_ACK)) {
+		m_service.set_want_start_service(f.ttl > 0);
+		if (m_service.init(ServiceMessType::RESP_ETE_ACK)) m_f.ttl = f.ttl - 1;
 	}
 }
 void NcRoutingRules::ProcessNetDisc(FeedbackInfo f) {
@@ -712,19 +717,16 @@ void NcRoutingRules::ProcessNetDisc(FeedbackInfo f) {
 	// source and destination does not forward the network discovery message
 	//
 	if (m_nodeType == SOURCE_NODE_TYPE || m_nodeType == DESTINATION_NODE_TYPE) {
-		if (m_f.type.assign_if(ServiceMessType::NET_DISC, ServiceMessType::NONE)) m_f.ttl = -1;
 		return;
 	}
 
 //	if (!m_coalition.empty()) {
-//		if (m_f.type.assign_if(ServiceMessType::NET_DISC, ServiceMessType::NONE)) m_f.ttl = -1;
+//		if (m_service.prepare(ServiceMessType::NET_DISC, ServiceMessType::NONE)) m_f.ttl = -1;
 //		return;
 //	}
-
-	if (f.ttl > 0) {
-		if (m_f.type.assign(ServiceMessType::NET_DISC)) m_f.ttl = f.ttl - 1;
-	} else {
-		if (m_f.type.assign_if(ServiceMessType::NET_DISC, ServiceMessType::NONE)) m_f.ttl = -1;
+	if (m_service.admit(ServiceMessType::REP_NET_DISC)) {
+		m_service.set_want_start_service(f.ttl > 0);
+		if (m_service.init(ServiceMessType::REP_NET_DISC)) m_f.ttl = f.ttl - 1;
 	}
 }
 void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
@@ -742,7 +744,7 @@ void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
 			return false;
 		}
 
-		if (f.p < m_p) {
+		if (DoICooperate(f.addr)) {
 			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Ignore RR from the node with priority " << f.p);
 			//
 			// check if the request is old
@@ -797,10 +799,9 @@ void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
 		return false;
 	};
 
-	m_f.type.assign_if(ServiceMessType::REQ_RETRANS, ServiceMessType::NONE);
-
-	if (check(f) && m_nodeType != SOURCE_NODE_TYPE) {
-		if (m_f.type.assign(ServiceMessType::REQ_RETRANS)) m_f.ttl = f.ttl - 1;
+	if (m_service.admit(ServiceMessType::REP_REQ_RETRANS)) {
+		m_service.set_want_start_service(check(f) && m_nodeType != SOURCE_NODE_TYPE);
+		if (m_service.init(ServiceMessType::REP_REQ_RETRANS)) m_f.ttl = f.ttl - 1;
 	}
 }
 
@@ -809,7 +810,6 @@ bool NcRoutingRules::IsConnected() {
 }
 void NcRoutingRules::SetConnected(bool v) {
 	countTxopNetDisc = v ? 0 : m_sp.numTxopNetDisc;
-	if (v) if (m_f.type.assign_if(ServiceMessType::NET_DISC, ServiceMessType::NONE)) m_f.ttl = -1;
 }
 void NcRoutingRules::CheckReqRetrans(UanAddress id, GenId genId, bool all_prev_acked) {
 
@@ -844,10 +844,9 @@ void NcRoutingRules::CheckReqRetrans(UanAddress id, GenId genId, bool all_prev_a
 //			return false;
 //		};
 
-	m_f.type.assign_if(ServiceMessType::REQ_RETRANS, ServiceMessType::NONE);
-
-	if (MayOrigReqRetrans(genId) && m_nodeType != SOURCE_NODE_TYPE) {
-		if (m_f.type.assign(ServiceMessType::REQ_RETRANS)) m_f.ttl = m_maxTtl;
+	if (m_service.admit(ServiceMessType::REQ_RETRANS)) {
+		m_service.set_want_start_service(MayOrigReqRetrans(genId) && m_nodeType != SOURCE_NODE_TYPE);
+		if (m_service.init(ServiceMessType::REQ_RETRANS)) m_f.ttl = m_maxTtl;
 	}
 }
 bool NcRoutingRules::MayOrigReqRetrans(GenId genId) {
@@ -2361,15 +2360,7 @@ bool NcRoutingRules::DoCreateRetransRequest(GenId newGid) {
 	// do not send RR for the generation if just received the symbol from the actually requesting
 	// or old generation
 	//
-	bool b = false;
-	for (auto r : m_f.rrInfo) {
-		auto gid = r.first;
-		if (gen_ssn_t(gid) >= gen_ssn_t(newGid)) b = true;
-	}
-	if (b) {
-		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Receiving actual info. No RR is needed");
-		return false;
-	}
+	if (!IsRequestedForRetrans(newGid)) return false;
 
 	if (!m_f.rrInfo.empty()) {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say YES to sending of RR");
@@ -2379,6 +2370,19 @@ bool NcRoutingRules::DoCreateRetransRequest(GenId newGid) {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say NO to sending of RR. I have not sufficient generations in memory");
 		return false;
 	}
+}
+bool NcRoutingRules::IsRequestedForRetrans(GenId newGid) {
+
+	SIM_LOG_FUNC(BRR_LOG);
+
+	assert(!m_f.rrInfo.empty());
+
+	bool b = false;
+	for (auto r : m_f.rrInfo) {
+		auto gid = r.first;
+		if (gen_ssn_t(gid) >= gen_ssn_t(newGid)) b = true;
+	}
+	return b;
 }
 void NcRoutingRules::Reset() {
 	//
@@ -2485,6 +2489,85 @@ void NcRoutingRules::Overshoot(GenId gid) {
 				DoUpdateForwardPlan();
 			}
 		}
+	}
+}
+void NcRoutingRules::ValidateReaction(GenId genId, UanAddress id) {
+
+	m_service.set_repeat(false);	// be optimistic by default
+
+	if (m_service.get_type() == ServiceMessType::REQ_PTP_ACK) {
+		if (DoesItCooperate(id)) m_service.set_repeat(true);
+		return;
+	}
+	if (m_service.get_type() == ServiceMessType::REQ_ETE_ACK) {
+		if (DoesItCooperate(id)) m_service.set_repeat(true);
+		return;
+	}
+	if (m_service.get_type() == ServiceMessType::REQ_RETRANS || m_service.get_type() == ServiceMessType::REP_REQ_RETRANS) {
+		if (DoICooperate(id)) if (!IsRequestedForRetrans(genId)) m_service.set_repeat(true);
+		return;
+	}
+
+}
+void NcRoutingRules::ValidateReaction(FeedbackInfo l) {
+
+	auto react_bad_if_higher_prior = [this](FeedbackInfo l)
+	{
+		if (!l.type.is_higher_prior(m_service.get_type())) {
+			m_service.set_repeat(true);
+			return;
+		}
+	};
+
+	m_service.set_repeat(false);	// be optimistic by default
+
+	if (m_service.get_type() == ServiceMessType::REQ_PTP_ACK) {
+		if (DoesItCooperate(l.addr)) react_bad_if_higher_prior(l);
+		return;
+	}
+	if (m_service.get_type() == ServiceMessType::REQ_ETE_ACK) {
+		if (DoesItCooperate(l.addr)) react_bad_if_higher_prior(l);
+		return;
+	}
+}
+void NcRoutingRules::PlanExpectedReaction(GenId genId, UanAddress id) {
+
+	if (m_service.get_type() == ServiceMessType::REQ_RETRANS || m_service.get_type() == ServiceMessType::REP_REQ_RETRANS) {
+		if (DoICooperate(id)) if (IsRequestedForRetrans(genId)) m_service.stop();
+		return;
+	}
+}
+void NcRoutingRules::PlanExpectedReaction(FeedbackInfo l) {
+
+	if (m_service.get_type() == ServiceMessType::REQ_PTP_ACK) {
+		if (DoesItCooperate(l.addr)) {
+			if (l.type == ServiceMessType::RESP_PTP_ACK || l.type == ServiceMessType::REGULAR) {
+				m_service.stop();
+			}
+		}
+		return;
+	}
+	if (m_service.get_type() == ServiceMessType::REQ_ETE_ACK) {
+		if (DoesItCooperate(l.addr)) {
+			if (l.type == ServiceMessType::RESP_ETE_ACK) {
+				m_service.stop();
+			}
+		}
+		return;
+	}
+}
+void NcRoutingRules::PlanExpectedReaction() {
+
+	m_service.start();
+
+	if (m_service.get_type() == ServiceMessType::REGULAR || m_service.get_type() == ServiceMessType::RESP_PTP_ACK
+			|| m_service.get_type() == ServiceMessType::RESP_ETE_ACK || m_service.get_type() == ServiceMessType::NET_DISC
+			|| m_service.get_type() == ServiceMessType::REP_NET_DISC) {
+		//
+		// expect no reaction
+		//
+		m_service.stop();
+		return;
 	}
 }
 } //ncr
