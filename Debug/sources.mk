@@ -12,9 +12,9 @@ CPP_SRCS :=
 C_SRCS := 
 O_SRCS := 
 S_UPPER_SRCS := 
+LIBRARIES := 
 CC_DEPS := 
 C++_DEPS := 
-EXECUTABLES := 
 C_UPPER_DEPS := 
 CXX_DEPS := 
 OBJS := 
@@ -23,23 +23,23 @@ C_DEPS :=
 
 # Every subdirectory with source files must be described here
 SUBDIRS := \
-utils \
-traffic \
-test \
-routing-rules \
-old-stuff \
-network \
-. \
-lp-solver \
-galois-field \
-ccack \
-build/utils \
-build/traffic \
-build/test \
-build/routing-rules \
-build/network \
-build \
-build/lp-solver \
-build/galois-field \
 build/ccack \
+build/galois-field \
+build/lp-solver \
+build \
+build/network \
+build/routing-rules \
+build/test \
+build/traffic \
+build/utils \
+ccack \
+galois-field \
+lp-solver \
+. \
+network \
+old-stuff \
+routing-rules \
+test \
+traffic \
+utils \
 

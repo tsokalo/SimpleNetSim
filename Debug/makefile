@@ -55,19 +55,19 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: SnsMulticast
+all: libSnsMulticast
 
 # Tool invocations
-SnsMulticast: $(OBJS) $(USER_OBJS)
+libSnsMulticast: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	g++  -o "SnsMulticast" $(OBJS) $(USER_OBJS) $(LIBS)
+	g++ -L/usr/lib/ -L/usr/local/lib/ -shared -o "libSnsMulticast" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(CC_DEPS)$(C++_DEPS)$(EXECUTABLES)$(C_UPPER_DEPS)$(CXX_DEPS)$(OBJS)$(CPP_DEPS)$(C_DEPS) SnsMulticast
+	-$(RM) $(LIBRARIES)$(CC_DEPS)$(C++_DEPS)$(C_UPPER_DEPS)$(CXX_DEPS)$(OBJS)$(CPP_DEPS)$(C_DEPS) libSnsMulticast
 	-@echo ' '
 
 .PHONY: all clean dependents

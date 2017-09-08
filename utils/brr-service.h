@@ -9,7 +9,9 @@
 #define UTILS_BRR_SERVICE_H_
 
 #include "utils/service-messtype.h"
+#include "utils/log.h"
 #include <assert.h>
+#include <iostream>
 
 namespace ncr {
 /*
@@ -27,50 +29,78 @@ struct BrrService {
 	}
 
 	bool admit(ServiceMessType::ServiceMessType_ t) {
+
+		SIM_LOG_FUNC(BRR_LOG);
+
+		messTypeAdmitted.assign(ServiceMessType::NONE);
+		want_start_service = false;
 		//
 		// the new service will not be admitted if the currently running service has the higher priority
 		//
-		return (!messType.is_higher_prior(t));
+		bool b = (!messType.is_higher_prior(t));
+		if (b) messTypeAdmitted.assign(t);
+		SIM_LOG(BRR_LOG, "Current service " << messType.GetAsInt() << " , new service " << (uint16_t) t << ": admit " << b);
+
+		return b;
 	}
-	bool init(ServiceMessType::ServiceMessType_ t) {
+	bool init() {
+
+		SIM_LOG_FUNC(BRR_LOG);
+
+		SIM_LOG(BRR_LOG,
+				"Current service " << messType.GetAsInt() << " , admitted service " << messTypeAdmitted.GetAsInt() << ": case " << want_start_service << "," << (messType == messTypeAdmitted));
+
+		SIM_ASSERT_MSG(messTypeAdmitted != ServiceMessType::NONE, "Call admit before init / init cannot be called if admit was successful");
 
 		bool ret = false;
 
 		//
 		// if no more need to run the currently running service
 		//
-		if (!want_start_service && messType == t) stop();
+		if (!want_start_service && messType == messTypeAdmitted) stop();
 		//
 		// if want to start a new service
 		//
-		if (want_start_service && messType != t) {
-			if (messType.assign(t)) {
+		if (want_start_service && messType != messTypeAdmitted) {
+			if (messType.assign(messTypeAdmitted)) {
+				set_status(FINISHED_ASSIGNED_HIGHER);
 				set_status(INITIALIZED);
 				ret = true;
 			} else {
 				assert(0); // because of calling admit beforehand
 			}
-		}
-		//
-		// if want to re-send the service message of the currently running service
-		//
-		if (want_start_service && messType == t) {
-			ret = need_repeat();
+		} else {
+			//
+			// if want to re-send the service message of the currently running service
+			// or send it the first time if it was not sent yet (status INITIALIZED)
+			//
+			if (want_start_service && messType == messTypeAdmitted) {
+				ret = ready_to_start();
+			}
 		}
 
+		messTypeAdmitted.assign(ServiceMessType::NONE);
 		want_start_service = false;
 		return ret;
 	}
 
 	void set_want_start_service(bool v) {
+
+		SIM_LOG_FUNC(BRR_LOG);
+		SIM_LOG(BRR_LOG, "Current service " << messType.GetAsInt() << " want start " << v);
 		want_start_service = v;
 	}
 
 	bool ready_to_start() {
+
+		SIM_LOG_FUNC(BRR_LOG);
+
 		return (status == INITIALIZED || status == PLANNED_FOR_REPETITION);
 	}
 
 	void start() {
+
+		SIM_LOG_FUNC(BRR_LOG);
 
 		if (this->status == PLANNED_FOR_REPETITION) {
 			set_status(REPEATED);
@@ -83,10 +113,24 @@ struct BrrService {
 		return messType;
 	}
 	void stop() {
-		set_status(NONE);
+
+		SIM_LOG_FUNC(BRR_LOG);
+
+		set_status(FINISHED_NORMAL);
 		messType.assign(ServiceMessType::NONE);
+		messTypeAdmitted.assign(ServiceMessType::NONE);
+		want_start_service = false;
+	}
+	void stop_if(ServiceMessType::ServiceMessType_ t) {
+		if (messType == t) {
+			stop();
+		}
 	}
 	void set_status(BrrServiceStatus status) {
+
+		SIM_LOG_FUNC(BRR_LOG);
+
+		SIM_LOG(BRR_LOG, "Current service " << messType.GetAsInt() << " , current status " << (uint16_t) this->status << ", new status " << (uint16_t) status);
 
 		switch (status) {
 		case INITIALIZED: {
@@ -98,6 +142,7 @@ struct BrrService {
 			break;
 		}
 		case PLANNED_FOR_REPETITION: {
+			if (this->status == INITIALIZED)break;
 			assert(this->status == STARTED || this->status == PLANNED_FOR_REPETITION || this->status == REPEATED);
 			break;
 		}
@@ -107,7 +152,6 @@ struct BrrService {
 		}
 		case FINISHED_NORMAL:
 		case FINISHED_ASSIGNED_HIGHER: {
-			assert(this->status == STARTED || this->status == PLANNED_FOR_REPETITION || this->status == REPEATED);
 			break;
 		}
 		case NONE: {
@@ -120,10 +164,24 @@ struct BrrService {
 		this->status = status;
 	}
 	void set_repeat(bool b) {
+
+		SIM_LOG_FUNC(BRR_LOG);
+
+		SIM_LOG(BRR_LOG, "Current service " << messType.GetAsInt() << " , current status " << (uint16_t) this->status << ", set repeat " << b);
+
 		if (b) set_status(PLANNED_FOR_REPETITION);
 	}
 	bool need_repeat() {
+
+		SIM_LOG_FUNC(BRR_LOG);
+
 		return (status == PLANNED_FOR_REPETITION);
+	}
+
+	friend std::ostream& operator<<(std::ostream& o, BrrService& m) {
+
+		o << "Service: " << m.messType.GetAsInt() << " / " << (uint16_t) m.status << " / " << m.messTypeAdmitted.GetAsInt() << " / " << m.want_start_service;
+		return o;
 	}
 
 private:
@@ -133,6 +191,7 @@ private:
 	 * the service message with higher priority can rewrite this variable
 	 */
 	ServiceMessType messType;
+	ServiceMessType messTypeAdmitted;
 	bool want_start_service;
 	BrrServiceStatus status;
 
