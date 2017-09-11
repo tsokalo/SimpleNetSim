@@ -202,7 +202,10 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 		GenId genId = txPlan.begin()->first;
 		auto plan_item = txPlan.begin()->second;
 
-		if (m_nodeType == SOURCE_NODE_TYPE) return;
+		if (m_nodeType == SOURCE_NODE_TYPE) {
+			m_brr->UpdateRcvd(genId, input->v_, true);
+			return;
+		}
 
 		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receives packet from generation " << genId);
 
@@ -223,8 +226,7 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 	} else {
 
 		auto f = pkt.GetFeedback();
-		SIM_LOG(COMM_NODE_LOG,
-				"Node " << m_id << " receive service message " << f.type.GetAsInt() << ", TTL " << f.ttl);
+		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receive service message " << f.type.GetAsInt() << ", TTL " << f.ttl);
 
 		m_brr->ProcessServiceMessage(f);
 

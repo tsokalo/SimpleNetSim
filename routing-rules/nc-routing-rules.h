@@ -29,6 +29,7 @@
 #include "utils/feedback-estimator.h"
 #include "utils/sim-parameters.h"
 #include "utils/brr-header.h"
+#include "utils/soft-ack-info.h"
 #include "utils/ack-backlog.h"
 #include "utils/ack-countdown.h"
 #include "utils/retrans-gen-id.h"
@@ -368,7 +369,7 @@ private:
 	/*
 	 * soft ACK information
 	 */
-	AckInfo softAckInfo;
+	SoftAckInfo softAckInfo;
 	/*
 	 * counter of Transmission opportunities (TXOPs) for NetDisc
 	 */

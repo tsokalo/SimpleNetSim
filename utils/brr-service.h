@@ -13,6 +13,8 @@
 #include <assert.h>
 #include <iostream>
 
+#define INVALID_TIMER_VALUE	-1
+
 namespace ncr {
 /*
  * it is possible to run only one service at a time
@@ -22,10 +24,22 @@ struct BrrService {
 	enum BrrServiceStatus {
 		INITIALIZED, STARTED, PLANNED_FOR_REPETITION, REPEATED, FINISHED_NORMAL, FINISHED_ASSIGNED_HIGHER, NONE
 	};
+	typedef std::map<uint16_t, int16_t> Timer;
 
 	BrrService() {
 		status = NONE;
 		want_start_service = false;
+		timerPeriod[ServiceMessType::REP_NET_DISC] = INVALID_TIMER_VALUE;
+		timerPeriod[ServiceMessType::NET_DISC] = INVALID_TIMER_VALUE;
+		timerPeriod[ServiceMessType::RESP_ETE_ACK] = INVALID_TIMER_VALUE;
+		timerPeriod[ServiceMessType::REQ_ETE_ACK] = 3;
+		timerPeriod[ServiceMessType::REP_REQ_RETRANS] = INVALID_TIMER_VALUE;
+		timerPeriod[ServiceMessType::REQ_RETRANS] = 3;
+		timerPeriod[ServiceMessType::RESP_PTP_ACK] = INVALID_TIMER_VALUE;
+		timerPeriod[ServiceMessType::REQ_PTP_ACK] = 3;
+		timerPeriod[ServiceMessType::REGULAR] = INVALID_TIMER_VALUE;
+		timerPeriod[ServiceMessType::NONE] = INVALID_TIMER_VALUE;
+		timer = INVALID_TIMER_VALUE;
 	}
 
 	bool admit(ServiceMessType::ServiceMessType_ t) {
@@ -47,9 +61,6 @@ struct BrrService {
 
 		SIM_LOG_FUNC(BRR_LOG);
 
-		SIM_LOG(BRR_LOG,
-				"Current service " << messType.GetAsInt() << " , admitted service " << messTypeAdmitted.GetAsInt() << ": case " << want_start_service << "," << (messType == messTypeAdmitted));
-
 		SIM_ASSERT_MSG(messTypeAdmitted != ServiceMessType::NONE, "Call admit before init / init cannot be called if admit was successful");
 
 		bool ret = false;
@@ -63,6 +74,7 @@ struct BrrService {
 		//
 		if (want_start_service && messType != messTypeAdmitted) {
 			if (messType.assign(messTypeAdmitted)) {
+				timer = INVALID_TIMER_VALUE;
 				set_status(FINISHED_ASSIGNED_HIGHER);
 				set_status(INITIALIZED);
 				ret = true;
@@ -79,9 +91,25 @@ struct BrrService {
 			}
 		}
 
+		if (ret) timer = timerPeriod[messType.GetAsInt()]; // reset the timer
+
+		SIM_LOG(BRR_LOG,
+				"Current service " << messType.GetAsInt() << ", admitted service " << messTypeAdmitted.GetAsInt() << ": case " << want_start_service << "," << (messType == messTypeAdmitted) << ", ret " << ret << ", timer " << timer);
+
 		messTypeAdmitted.assign(ServiceMessType::NONE);
 		want_start_service = false;
 		return ret;
+	}
+	void tic() {
+
+		SIM_LOG_FUNC(BRR_LOG);
+
+		timer = (is_timeout() || timer == INVALID_TIMER_VALUE) ? timer : timer - 1;
+		if (is_timeout()) set_repeat(true);
+	}
+
+	bool is_timeout() {
+		return (timer == 0);
 	}
 
 	void set_want_start_service(bool v) {
@@ -116,12 +144,16 @@ struct BrrService {
 
 		SIM_LOG_FUNC(BRR_LOG);
 
+		timer = INVALID_TIMER_VALUE;
 		set_status(FINISHED_NORMAL);
 		messType.assign(ServiceMessType::NONE);
 		messTypeAdmitted.assign(ServiceMessType::NONE);
 		want_start_service = false;
 	}
 	void stop_if(ServiceMessType::ServiceMessType_ t) {
+
+		SIM_LOG_FUNC(BRR_LOG);
+
 		if (messType == t) {
 			stop();
 		}
@@ -142,7 +174,7 @@ struct BrrService {
 			break;
 		}
 		case PLANNED_FOR_REPETITION: {
-			if (this->status == INITIALIZED)break;
+			if (this->status == INITIALIZED) break;
 			assert(this->status == STARTED || this->status == PLANNED_FOR_REPETITION || this->status == REPEATED);
 			break;
 		}
@@ -194,6 +226,8 @@ private:
 	ServiceMessType messTypeAdmitted;
 	bool want_start_service;
 	BrrServiceStatus status;
+	Timer timerPeriod;
+	int16_t timer;
 
 }
 ;
