@@ -468,6 +468,7 @@ void NcRoutingRules::CheckReqEteAckII() {
 		//
 			if(!softAckInfo.is_acked(gid) && softAckInfo.is_up_to_date(gid))
 			{
+				SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Got the feedback from all neighbors but no soft ACK is possible");
 				m_service.set_want_start_service(true);
 				return false;
 			}
@@ -482,6 +483,7 @@ void NcRoutingRules::CheckReqEteAckII() {
 				} else {
 					if (m_ptpAckCount[gid]-- == 0) {
 						m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
+						SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Maximum number of ReqPtpAck is sent");
 						m_service.set_want_start_service(true);
 					}
 				}
@@ -1333,8 +1335,24 @@ void NcRoutingRules::DoCalcRedundancy() {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
+	m_cr = DoCalcRedundancy(m_coalition);
+
+	assert(geq(m_cr, 1));
+
+	SIM_LOG_NPD(BRR_LOG && 0, m_id, m_p, m_dst, "coding rate " << m_cr);
+
+	m_logItem.cr = m_cr;
+	if (m_addLog) m_addLog(m_logItem, m_id);
+
+}
+double NcRoutingRules::DoCalcRedundancy(node_map_t coalition) {
+	SIM_LOG_FUNC(BRR_LOG);
+
+	assert(!coalition.empty());
+
+	double cr = 1;
 	FilterArithmetics arith;
-	for (node_map_it it = m_coalition.begin(); it != m_coalition.end(); it++) {
+	for (node_map_it it = coalition.begin(); it != coalition.end(); it++) {
 		arith.add(m_outRcvMap[it->first]);
 	}
 	if (arith.check_sync()) {
@@ -1343,7 +1361,7 @@ void NcRoutingRules::DoCalcRedundancy() {
 
 		switch (m_sp.crCalcWay) {
 		case EXACT_EXPECTATION_REDANDANCY: {
-			m_cr = 1 / (1 - eps);
+			cr = 1 / (1 - eps);
 			break;
 		}
 		case PLUS_SIGMA_REDUNDANCY: {
@@ -1352,11 +1370,11 @@ void NcRoutingRules::DoCalcRedundancy() {
 			gamma = (gamma > 1) ? 1 : gamma;
 			double alpha = 1 + 2 * sqrt(gamma * (gamma + 1));
 
-			m_cr = alpha / (1 - eps);
+			cr = alpha / (1 - eps);
 			break;
 		}
 		case MINUS_DELTA_REDUNDANCY: {
-			m_cr = 1 + (1 / (1 - eps) - 1) * m_sp.crReducFactor;
+			cr = 1 + (1 / (1 - eps) - 1) * m_sp.crReducFactor;
 			break;
 		}
 		default: {
@@ -1364,17 +1382,14 @@ void NcRoutingRules::DoCalcRedundancy() {
 		}
 		}
 
-		SIM_LOG_NPD(BRR_LOG && 0, m_id, m_p, m_dst, "" << 1/ (1 - eps) << "\t" << m_cr);
+		SIM_LOG_NPD(BRR_LOG && 0, m_id, m_p, m_dst, "" << 1/ (1 - eps) << "\t" << cr);
 	} else {
-		m_cr = 1;
+		cr = 1;
 	}
 
-	assert(geq(m_cr, 1));
+	assert(geq(cr, 1));
 
-	SIM_LOG_NPD(BRR_LOG && 0, m_id, m_p, m_dst, "coding rate " << m_cr);
-
-	m_logItem.cr = m_cr;
-	if (m_addLog) m_addLog(m_logItem, m_id);
+	return cr;
 
 }
 void NcRoutingRules::DoUpdateTxPlan() {
@@ -1638,8 +1653,6 @@ void NcRoutingRules::DoUpdateCoalition() {
 }
 void NcRoutingRules::DoUpdateForwardPlan() {
 
-	auto t = m_forwardPlan;
-
 	m_forwardPlan.clear();
 
 	for (auto p : m_filteredPlan) {
@@ -1669,13 +1682,14 @@ void NcRoutingRules::DoUpdateForwardPlan() {
 		if (eq(m_forwardPlan[genId], 0)) m_forwardPlan.erase(genId);
 	}
 
-	for (auto f : m_forwardPlan) {
-		auto gid = f.first;
+	for (auto s : softAckInfo) {
+		auto gid = s.first;
 		//
 		// if some new data to forward has appeared then the soft ACK info is no more up-to-date (even if it was before)
 		//
-		if (t.find(gid) != t.end()) {
-			if (eq(t[gid], 0)) softAckInfo.set_up_to_date(gid, false);
+		if (m_forwardPlan.is_in(gid)) if (!eq(m_forwardPlan[gid], 0)) {
+			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Some new data to forward has appeared then the soft ACK info is no more up-to-date");
+			softAckInfo.set_up_to_date(gid, false);
 		}
 	}
 
@@ -2138,6 +2152,7 @@ void NcRoutingRules::EvaluateSoftAck() {
 	// 1. Estimate the number of coded packets that will be forwarded by the cooperating nodes
 	//
 	std::map<GenId, double> r;
+	std::map<GenId, node_map_t> subCoalition;
 	//
 	// for each generation in the receive buffer
 	//
@@ -2162,20 +2177,19 @@ void NcRoutingRules::EvaluateSoftAck() {
 		//
 		// find cooperating nodes that sent the feedback
 		//
-		std::vector<UanAddress> neighbors;
 		for (auto i : m_coalition) {
 			UanAddress id = i.first;
 			auto it = m_outRcvNum.find(gid);
 			if (it != m_outRcvNum.end()) {
 				auto itt = it->second.find(id);
 				if (itt != it->second.end()) {
-					neighbors.push_back(id);
+					subCoalition[gid].add(i);
 					r[gid] += itt->second * (1 - m_outF[id]);
 					SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Neighbor " << id << " RCVD " << itt->second << ", pf " << m_outF[id]);
 				}
 			}
 		}
-		softAckInfo.set_up_to_date(gid, neighbors.size() == m_coalition.size());
+		softAckInfo.set_up_to_date(gid, subCoalition[gid].size() == m_coalition.size());
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Received soft ACK feedback from " << (softAckInfo.is_up_to_date(gid) ? "" : "not ") << "all cooperating nodes");
 	}
 
@@ -2193,8 +2207,9 @@ void NcRoutingRules::EvaluateSoftAck() {
 		auto it = m_sentNum.find(gid);
 		// this gid MUST be in the sender buffer since it is present in the receiver buffer
 		assert(it != m_sentNum.end());
-		s[gid] = it->second / m_cr;
-		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "E-RCVD " << it->second << ", cr " << m_cr);
+		auto cr = DoCalcRedundancy(subCoalition[gid]);
+		s[gid] = it->second / cr;
+		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "E-RCVD " << it->second << ", cr " << cr);
 	}
 
 	for (auto v : r) {

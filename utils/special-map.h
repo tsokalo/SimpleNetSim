@@ -154,6 +154,11 @@ struct special_map: public std::unordered_map<Key, T> {
 		return gids;
 	}
 
+	bool is_in(Key k)
+	{
+		return (this->find(k) != this->end());
+	}
+
 protected:
 
 	std::vector<Key> m_keys;

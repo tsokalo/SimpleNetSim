@@ -122,6 +122,7 @@ private:
 	void DoFilter();
 	void DoUpdateFilter();
 	void DoCalcRedundancy();
+	double DoCalcRedundancy(node_map_t coalition);
 	void DoUpdateTxPlan();
 	void DoUpdatePriority(node_map_t outputs);
 	void DoUpdateCoalition();
