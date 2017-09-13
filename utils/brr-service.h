@@ -65,6 +65,7 @@ struct BrrService {
 
 		bool ret = false;
 
+		if(messType == messTypeAdmitted && this->is_running())return false;
 		//
 		// if no more need to run the currently running service
 		//
@@ -110,6 +111,12 @@ struct BrrService {
 
 	bool is_timeout() {
 		return (timer == 0);
+	}
+	bool is_running()
+	{
+		SIM_LOG_FUNC(BRR_LOG);
+
+		return (status == INITIALIZED || status == STARTED || status == PLANNED_FOR_REPETITION || status == REPEATED) && !is_timeout();
 	}
 
 	void set_want_start_service(bool v) {

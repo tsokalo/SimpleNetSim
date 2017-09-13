@@ -151,6 +151,8 @@ private:
 	void WorkInPtpAckRange(std::function<bool(GenId)> func);
 	void WorkInEteAckRange(std::function<bool(GenId)> func);
 	void WorkInRetransRange(std::function<bool(GenId)> func);
+	void WorkInBufferingRange(std::function<bool(GenId)> func);
+	bool IsInBufferingRange(GenId gid);
 	//
 	void OriginateReqPtpAck();
 	void OriginateReqEteAck();

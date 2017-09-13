@@ -91,7 +91,7 @@ void NcRoutingRules::ProcessHeaderInfo(HeaderInfo l) {
 		UpdateCoalition();
 	}
 	if (l.pf.find(m_id) != l.pf.end()) {
-		SIM_LOG_NPD(BRR_LOG && 0, m_id, m_p, m_dst, "save input filter: " << l.pf.at(m_id));
+		SIM_LOG_NPD(BRR_LOG && 0, m_id, m_p, m_dst, "save input filter from " << l.addr);
 		m_inF[l.addr] = l.pf.at(m_id);
 		m_logItem.fp[l.addr] = m_inF[l.addr];
 		if (m_addLog) m_addLog(m_logItem, m_id);
@@ -99,6 +99,7 @@ void NcRoutingRules::ProcessHeaderInfo(HeaderInfo l) {
 		//
 		// if the node with address l.addr does not cooperate with me
 		//
+		SIM_LOG_NPD(BRR_LOG && 0, m_id, m_p, m_dst, "forget input filter from node " << l.addr);
 		if (m_inF.find(l.addr) != m_inF.end()) {
 			m_inF.erase(l.addr);
 			m_logItem.fp.erase(l.addr);
@@ -265,16 +266,11 @@ HeaderInfo NcRoutingRules::GetHeaderInfo() {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	DoUpdateFilter();
-
 	return m_h;
 }
 HeaderInfo NcRoutingRules::GetHeaderInfo(TxPlan txPlan) {
 
 	SIM_LOG_FUNC(BRR_LOG);
-
-	DoUpdateFilter();
-
 	m_h.txPlan = txPlan;
 
 	return m_h;
@@ -350,6 +346,12 @@ uint32_t NcRoutingRules::GetFreeBufferSize() {
 bool NcRoutingRules::MaySend(double dr) {
 	SIM_LOG_FUNC(BRR_LOG);
 
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "My cooperation group " << m_coalition);
+	node_map_t i_cooperate_with;
+	for (auto p : m_inF)
+		i_cooperate_with.add(p);
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "I cooperate with " << i_cooperate_with);
+
 	CheckServiceMessage();
 
 	return (MaySendServiceMessage() || MaySendData(dr));
@@ -357,8 +359,6 @@ bool NcRoutingRules::MaySend(double dr) {
 bool NcRoutingRules::MaySendData(double dr) {
 
 	SIM_LOG_FUNC(BRR_LOG);
-
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "My cooperation group " << m_coalition);
 
 	if (m_coalition.empty()) return false;
 
@@ -637,6 +637,24 @@ void NcRoutingRules::WorkInRetransRange(std::function<bool(GenId)> func) {
 		// do nothing
 	}
 }
+void NcRoutingRules::WorkInBufferingRange(std::function<bool(GenId)> func) {
+	auto Wr = GetActualRxWinSize();
+	auto rs = std::max(0, Wr - m_sp.numGenBuffering);
+	auto re = Wr;
+	auto gids = m_inRcvNum.get_key_range(rs, re);
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "key range [" << rs << "," << re << ")");
+	for (auto gid : gids) {
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "work for generation " << gid);
+		if (func(gid)) return;
+	}
+}
+bool NcRoutingRules::IsInBufferingRange(GenId gid) {
+	auto Wr = GetActualRxWinSize();
+	auto rs = std::max(0, Wr - m_sp.numGenBuffering);
+	auto re = Wr;
+	auto gids = m_inRcvNum.get_key_range(rs, re);
+	return (std::find(gids.begin(), gids.end(), gid) != gids.end());
+}
 void NcRoutingRules::ProcessServiceMessage(FeedbackInfo f) {
 
 	SIM_LOG_FUNC(BRR_LOG);
@@ -708,6 +726,8 @@ void NcRoutingRules::ProcessRegularFeedback(FeedbackInfo l) {
 void NcRoutingRules::ProcessReqPtpAck(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
+	if (!DoICooperate(f.addr)) return;
+
 	if (m_service.admit(ServiceMessType::RESP_PTP_ACK)) {
 		m_service.set_want_start_service(DoICooperate(f.addr));
 		if (m_service.init()) m_f.ttl = -1;
@@ -723,10 +743,12 @@ void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 		assert(f.ackInfo.find(gid) != f.ackInfo.end());
 		m_f.ackInfo[gid] = f.ackInfo[gid] ? f.ackInfo[gid] : m_f.ackInfo[gid];
 	}
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACK info in received message " << f.ackInfo);
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACK info in the message to be sent " << m_f.ackInfo);
 
 	if (m_nodeType == DESTINATION_NODE_TYPE) {
 
-		if (m_service.admit(ServiceMessType::RESP_PTP_ACK)) {
+		if (m_service.admit(ServiceMessType::RESP_ETE_ACK)) {
 			m_service.set_want_start_service(true);
 			if (m_service.init()) m_f.ttl = m_maxTtl;
 		}
@@ -734,7 +756,6 @@ void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 	} else {
 
 		//
-		// we send the response only if all generations are positively ACKed;
 		// until TTL expires we forward the request
 		//
 		for (auto r : f.rcvNum) {
@@ -747,26 +768,35 @@ void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 				return;
 			}
 		}
+		//
+		// if all generations are positively ACKed then the relay node can respond the ETE ACK request
+		//
+		if (m_service.admit(ServiceMessType::RESP_ETE_ACK)) {
+			m_service.set_want_start_service(true);
+			if (m_service.init()) m_f.ttl = m_maxTtl - f.ttl + 1;
+		}
 	}
 }
 void NcRoutingRules::ProcessRespPtpAck(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	// do nothing; it is sufficient to process the regular feedback containing in this service message
+	// do nothing; it is sufficient to process the regular feedback contained in this service message
 }
 void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	if (DoICooperate(f.addr)) return;
+	if (!DoesItCooperate(f.addr)) return;
 
 	for (auto r : f.rcvNum) {
 		auto gid = r.first;
 		m_f.ackInfo[gid] = f.ackInfo[gid] ? f.ackInfo[gid] : m_f.ackInfo[gid];
 	}
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACK info in received message " << f.ackInfo);
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACK info in the message to be sent " << m_f.ackInfo);
 	//
 	// forward the response
 	//
-	if (m_service.admit(ServiceMessType::RESP_PTP_ACK)) {
+	if (m_service.admit(ServiceMessType::RESP_ETE_ACK)) {
 		m_service.set_want_start_service(f.ttl > 0);
 		if (m_service.init()) m_f.ttl = f.ttl - 1;
 	}
@@ -1163,10 +1193,20 @@ GenId NcRoutingRules::GetActualTxWinSize() {
 }
 bool NcRoutingRules::DoesItCooperate(UanAddress addr) {
 	//return m_p < m_outputs.at(addr);
+	if (m_coalition.is_in(addr)) {
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Have node " << addr << " in my cooperation group");
+		assert((m_outF.find(addr) != m_outF.end()) == m_coalition.is_in(addr));
+	}
+	assert((m_outF.find(addr) != m_outF.end()) == m_coalition.is_in(addr));
 	return m_coalition.is_in(addr);
 }
 bool NcRoutingRules::DoICooperate(UanAddress addr) {
-	// return m_p > m_outputs.at(addr);
+
+	SIM_LOG_FUNC(BRR_LOG);
+
+	if (m_inF.find(addr) != m_inF.end()) {
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Have input filter from " << addr << ":" << m_inF[addr]);
+	}
 	return (m_inF.find(addr) != m_inF.end());
 }
 void NcRoutingRules::SetSendingRate(Datarate d) {
@@ -1306,27 +1346,28 @@ void NcRoutingRules::DoUpdateFilter() {
 
 	FilterArithmetics arith;
 	m_outF.clear();
-
-	for (node_map_it it = m_outputs.begin(); it != m_outputs.end(); it++) {
-		if (m_coalition.find(it->first) == m_coalition.end()) {
-			m_outF[it->first] = 1;
-		}
-	}
+//
+//	for (node_map_it it = m_outputs.begin(); it != m_outputs.end(); it++) {
+//		if (m_coalition.find(it->first) == m_coalition.end()) {
+//			m_outF[it->first] = 1;
+//		}
+//	}
 
 	for (node_map_it it = m_coalition.begin(); it != m_coalition.end(); it++) {
+		auto addr = it->first;
 		double e = 1;
 		//
 		// e is always zero for the sink node of the first edge in the coalition
 		//
 		if (arith.check_sync()) e = arith.do_and().val_unrel();
-		m_outF[it->first] = 1 - e;
-		SIM_LOG_NPD(BRR_LOG && 0, m_id, m_p, m_dst, "Address " << it->first << ", filter probability " << m_outF[it->first]);
+		m_outF[addr] = 1 - e;
+		SIM_LOG_NPD(BRR_LOG && 0, m_id, m_p, m_dst, "Address " << addr << ", filter probability " << m_outF[addr]);
 		//
 		// if no receiving map is present consider the link without losses
 		// which means that the remaining nodes have to drop all received data
 		//
-		if (m_outRcvMap.find(it->first) == m_outRcvMap.end()) break;
-		arith.add(m_outRcvMap.at(it->first));
+		if (m_outRcvMap.find(addr) == m_outRcvMap.end()) break;
+		arith.add(m_outRcvMap.at(addr));
 	}
 	m_h.pf = m_outF;
 
@@ -1335,7 +1376,7 @@ void NcRoutingRules::DoCalcRedundancy() {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	m_cr = DoCalcRedundancy(m_coalition);
+	if (!m_coalition.empty()) m_cr = DoCalcRedundancy(m_coalition);
 
 	assert(geq(m_cr, 1));
 
@@ -1649,6 +1690,8 @@ void NcRoutingRules::DoUpdateCoalition() {
 
 	if (m_coalition.size() > m_sp.maxCoalitionSize) m_coalition.resize(m_sp.maxCoalitionSize);
 
+	DoUpdateFilter();
+
 	SIM_LOG_NPD(BRR_LOG && 0, m_id, m_p, m_dst, "Coalition " << m_coalition);
 }
 void NcRoutingRules::DoUpdateForwardPlan() {
@@ -1688,7 +1731,7 @@ void NcRoutingRules::DoUpdateForwardPlan() {
 		// if some new data to forward has appeared then the soft ACK info is no more up-to-date (even if it was before)
 		//
 		if (m_forwardPlan.is_in(gid)) if (!eq(m_forwardPlan[gid], 0)) {
-			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Some new data to forward has appeared then the soft ACK info is no more up-to-date");
+			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Some new data to forward has appeared, the soft ACK info is no more up-to-date");
 			softAckInfo.set_up_to_date(gid, false);
 		}
 	}
@@ -2144,6 +2187,8 @@ void NcRoutingRules::EvaluateSoftAck() {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
+	if (m_nodeType == DESTINATION_NODE_TYPE) return;
+
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "IN: " << m_inRcvNum);
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "OUT: " << m_outRcvNum);
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "My coalition " << m_coalition);
@@ -2160,15 +2205,24 @@ void NcRoutingRules::EvaluateSoftAck() {
 
 		auto gid = rcv_buffer.first;
 		//
+		// the generation can be not included in the forwarding plan:
+		//  - due to buffering
+		//  - when all data is sent
+		//
+		if (IsInBufferingRange(gid)) {
+			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "GID " << gid << " is not in the forwarding planning due to buffering. Skip it");
+			continue;
+		}
+		if (m_forwardPlan.find(gid) == m_forwardPlan.end()) assert(m_sentNum.find(gid) != m_sentNum.end());
+		//
 		// exclude the generation if not all data was sent yet
 		//
-		assert(m_forwardPlan.find(gid) != m_forwardPlan.end());
-		if (eq(m_forwardPlan[gid], 0)) {
+		if (m_forwardPlan.find(gid) != m_forwardPlan.end()) if (eq(m_forwardPlan[gid], 0)) {
 			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Not all data is forwarded for GID " << gid << " yet. Skip it");
 			continue;
 		}
 		//
-		// do not repeat the request for PtP ACK if it was already requested and no new data is received inbetween
+		// do not repeat the request for PtP ACK if it was already requested and no new data is received in-between
 		//
 		if (softAckInfo.is_up_to_date(gid)) {
 			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "PtpAck for GID " << gid << " has been already requested");
@@ -2207,9 +2261,8 @@ void NcRoutingRules::EvaluateSoftAck() {
 		auto it = m_sentNum.find(gid);
 		// this gid MUST be in the sender buffer since it is present in the receiver buffer
 		assert(it != m_sentNum.end());
-		auto cr = DoCalcRedundancy(subCoalition[gid]);
-		s[gid] = it->second / cr;
-		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "E-RCVD " << it->second << ", cr " << cr);
+		s[gid] = it->second / m_cr;
+		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "E-RCVD " << it->second << ", cr " << m_cr);
 	}
 
 	for (auto v : r) {
@@ -2530,26 +2583,12 @@ void NcRoutingRules::CheckBuffering() {
 	//
 	// form set of generations that should buffer
 	//
-	std::vector<gen_ssn_t> buf_gens;
-	for (uint16_t i = 0; i < m_sp.numGenBuffering; i++) {
-		buf_gens.push_back(last);
-		last--;
-	}
-
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "[last_act " << last_act << "],[last_acked " << last_acked << "]");
-
-	std::vector<gen_ssn_t> gens;
-	for (auto f : m_forwardPlan) {
-		auto gid = f.first;
-		if (std::find(buf_gens.begin(), buf_gens.end(), gid) != buf_gens.end()) {
-			gens.push_back(gid);
-		}
-	}
-	for (auto gen : gens) {
-		auto gid = gen.val();
+	auto func = [this](GenId gid)->bool
+	{
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Erase from forwarding due to buffering");
 		m_forwardPlan.erase(gid);
-	}
+	};
+	WorkInBufferingRange(func);
 
 	//
 	//
