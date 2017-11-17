@@ -19,6 +19,13 @@ struct CoderHelpInfo {
 		finRank = 0;
 		origRank = 0;
 	}
+	CoderHelpInfo(CodingMatrix m, CoderInfo c, CodingVector hashVec) {
+		this->m = m;
+		this->c = c;
+		this->hashVec = hashVec;
+		finRank = 0;
+		origRank = 0;
+	}
 	CoderHelpInfo& operator=(const CoderHelpInfo& other) // copy assignment
 			{
 		if (this != &other) { // self-assignment check expected

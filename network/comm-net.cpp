@@ -116,6 +116,7 @@ void CommNet::Run(int64_t cycles) {
 //		if (m_logger) m_logger->IncTime();
 	}
 }
+
 /*
  * only one source is possible
  */

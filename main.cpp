@@ -140,6 +140,18 @@ void CreateDiamondScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net->PrintNet();
 }
 
+void CreateReducedDiamondScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
+	net = std::shared_ptr<CommNet>(new CommNet(4, sp));
+	net->ConnectNodes(0, 1, 0.2);
+	net->ConnectNodes(0, 2, 0.4);
+	net->ConnectNodes(1, 3, 0);
+	net->ConnectNodes(2, 3, 0);
+	net->SetSource(0);
+	net->SetDestination(3);
+	net->Configure();
+	net->PrintNet();
+}
+
 void CreateStackScenario(std::shared_ptr<CommNet> &net, uint16_t deepness, SimParameters sp) {
 
 	uint16_t num_nodes = deepness + 2;
@@ -259,10 +271,10 @@ int main(int argc, char *argv[]) {
 
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
-//	CreateStackScenario(net, 8, sim_par);
+	CreateStackScenario(net, 1, sim_par);
 //	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
-	CreateDiamondScenario(net, sim_par);
+//	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);
 
@@ -369,27 +381,8 @@ int main(int argc, char *argv[]) {
 
 	} else if (m == TEST_MODE) {
 
-		std::string f = folder + GetLogFileName();
-		std::cout << "Using file " << f << std::endl;
-		LogBank lb = ReadLogBank(f);
+		TestFeedbackAccuracy();
 
-		//
-		// setup your filter
-		//
-		UanAddress s = 0;
-
-		if (lb.find(s) == lb.end()) {
-			std::cout << "Found no data for the sender " << s << std::endl;
-		}
-
-		for (auto v : lb[s]) {
-			//
-			// select only those entries that correspond to the sending event
-			//
-			if (v.log.ns == 1) {
-				std::cout << v.t << "\t" << v.m << "\t" << v.log << std::endl;
-			}
-		}
 	}
 
 	std::cout << std::endl << "Finished successfully" << std::endl;

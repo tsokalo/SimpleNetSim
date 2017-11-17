@@ -1,5 +1,5 @@
 /*
- * GodViewRoutingRules.cpp
+ * UniPriorCalc.cpp
  *
  *  Created on: 27.10.2016
  *      Author: tsokalo
@@ -17,7 +17,146 @@
 #define CALC_ACCURACY       0.00001
 
 namespace ncr {
+
 GodViewRoutingRules::GodViewRoutingRules(comm_net_ptr commNet) {
+	m_commNet = commNet;
+
+	CalculatePriorities();
+}
+virtual GodViewRoutingRules::~GodViewRoutingRules() {
+
+}
+void GodViewRoutingRules::CalculatePriorities() {
+	std::vector<UanAddress> dsts = m_commNet->GetDstIds();
+	for (auto node : m_commNet->GetNodes()) {
+		if (node->GetNodeType() == DESTINATION_NODE_TYPE) {
+			dsts.push_back(node->GetId());
+			node->SetNodeType(RELAY_NODE_TYPE);
+		}
+	}
+
+	for (auto dst : dsts) {
+		CalculateUnicastPriorities(dst);
+	}
+
+	CalculateMulticastPriorities();
+}
+
+void GodViewRoutingRules::CalculateUnicastPriorities(UanAddress dst) {
+
+	for (auto node : m_commNet->GetNodes()) {
+
+		double p;
+		//
+		// ...
+		//
+
+		auto src = node->GetId();
+		m_p[dst][src] = p;
+	}
+}
+void GodViewRoutingRules::CalculateMulticastPriorities() {
+
+	auto dsts = m_commNet->GetDstIds();
+	for (auto node : m_commNet->GetNodes()) {
+
+		auto id = node->GetId();
+		//
+		// form the set of destinations without including myself
+		//
+		auto dsts_prime = dsts;
+		auto it = std::find(dsts_prime.begin(), dsts_prime.end(), id);
+		if (it != dsts_prime.end()) dsts_prime.erase(it, it + 1);
+		//
+		// form the set of cooperating nodes for each destination
+		//
+		std::map<UanAddress, node_map_t> coalitions;
+		for (auto edge : node->GetOuts()) {
+			auto neighbor = edge->v_;
+			assert(neighbor != node);
+			for (auto dst : dsts_prime) {
+				if (m_p[dst][id] < m_p[dst][neighbor]) coalitions[dst].add(neighbor, m_p[dst][neighbor]);
+			}
+		}
+
+		//
+		// The nodes from all coalitions for each destination
+		//
+		node_map_t big_coalition;
+
+		for (auto edge : node->GetOuts()) {
+
+			auto neighbor = edge->v_;
+
+			for (auto coalition_p : coalitions) {
+				auto dst = coalition_p.first;
+				auto coalition = coalition_p.second;
+				if (coalition.find(neighbor) != coalition.end()) {
+					big_coalition.add(neighbor, m_p[dst][neighbor]);
+				}
+			}
+		}
+
+		auto a = [&](node_map_t coalition)->double
+		{
+			double v = 1;
+			for (auto edge : node->GetOuts()) {
+
+				auto neighbor = edge->v_;
+				if(!coalition.is_in(neighbor))continue;
+				v *= edge->GetLossProcess()->GetMean();
+			}
+			return 1 - v;
+		};
+
+		auto multi_a = [&]()->double
+		{
+			double v = 1;
+			for (auto coalition_p : coalitions) {
+				auto dst = coalition_p.first;
+				auto coalition = coalition_p.second;
+				double w = a(coalition);
+				v = v > w ? w : v;
+			}
+			return v;
+		};
+
+		auto b = [&](node_map_t coalition, UanAddress neighbor, UanAddress dst)->double
+		{
+			double v = 1;
+			for (auto edge : node->GetOuts()) {
+
+				auto neighbor2 = edge->v_;
+				if(!coalition.is_in(neighbor2))continue;
+				if(neighbor == neighbor2)v *= (1 - edge->GetLossProcess()->GetMean());
+
+				if(m_p[dst][neighbor2] < m_p[dst][neighbor])continue;
+				v *= edge->GetLossProcess()->GetMean();
+			}
+			return v;
+		};
+
+		auto multi_b = [&](UanAddress neighbor)->double
+		{
+			double v = 0;
+			for (auto coalition_p : coalitions) {
+				auto dst = coalition_p.first;
+				auto coalition = coalition_p.second;
+				double w = b(coalition, neighbor, dst)/m_p[dst][neighbor];
+				v = v < w ? w : v;
+			}
+			return v;
+		};
+
+		double t = 1;
+		for (auto it : big_coalition) {
+			t += multi_b(id, it.first, big_coalition, subset_dsts);
+		}
+		m_multi_p[id] = multi_a() / t;
+	}
+}
+
+UniPriorCalc::UniPriorCalc(comm_net_ptr commNet) {
 
 	m_commNet = commNet;
 	m_p.resize(m_commNet->GetNodes().size(), 0);
@@ -27,16 +166,16 @@ GodViewRoutingRules::GodViewRoutingRules(comm_net_ptr commNet) {
 	;
 }
 
-GodViewRoutingRules::~GodViewRoutingRules() {
+UniPriorCalc::~UniPriorCalc() {
 
 }
-double GodViewRoutingRules::GetOptChannelUses() {
+double UniPriorCalc::GetOptChannelUses() {
 	UpdatePriorities();
 	PrintPriorities();
 	return m_p.at(m_commNet->GetSrc()).val() / m_d.at(m_commNet->GetSrc());
 }
 
-void GodViewRoutingRules::UpdatePriorities() {
+void UniPriorCalc::UpdatePriorities() {
 
 	priorities_t p_old(m_p.begin(), m_p.end()), p_new(m_p.size());
 
@@ -48,7 +187,7 @@ void GodViewRoutingRules::UpdatePriorities() {
 		// function UpdatePriority() launches recursively not one instance of itself but a bunch of instances:
 		// each node starts UpdatePriority() for each of its in-coming edges
 		//
-		m_acBuf.push_back(std::bind(&GodViewRoutingRules::UpdatePriority, this, m_commNet->GetDst(), &p_old, &p_new, &updated));
+		m_acBuf.push_back(std::bind(&UniPriorCalc::UpdatePriority, this, m_commNet->GetDst(), &p_old, &p_new, &updated));
 
 		while (!m_acBuf.empty()) {
 			(*(m_acBuf.begin()))();
@@ -59,8 +198,7 @@ void GodViewRoutingRules::UpdatePriorities() {
 		auto p_old_it = p_old.begin();
 		auto p_it = m_p.begin();
 		while (p_old_it != p_old.end()) {
-			if (*p_it != DESTINATION_PRIORITY && *p_old_it != DESTINATION_PRIORITY)
-				change += fabs(*p_it - *p_old_it);
+			if (*p_it != DESTINATION_PRIORITY && *p_old_it != DESTINATION_PRIORITY) change += fabs(*p_it - *p_old_it);
 			p_old_it++;
 			p_it++;
 		}
@@ -80,9 +218,8 @@ void GodViewRoutingRules::UpdatePriorities() {
 			edge->SetMarked(false);
 	;
 }
-void GodViewRoutingRules::UpdatePriority(int16_t nodeId, priorities_t *p_old, priorities_t *p_new, std::vector<bool> *updated) {
-	if (updated->at(nodeId))
-		return;
+void UniPriorCalc::UpdatePriority(int16_t nodeId, priorities_t *p_old, priorities_t *p_new, std::vector<bool> *updated) {
+	if (updated->at(nodeId)) return;
 
 	SIM_LOG(GOD_VIEW, "Updating priority of node " << nodeId);
 	SIM_LOG(GOD_VIEW, "Using the following priorities: ");
@@ -98,12 +235,12 @@ void GodViewRoutingRules::UpdatePriority(int16_t nodeId, priorities_t *p_old, pr
 	uint16_t groupSize = 0;
 	for (auto i_edge : m_commNet->GetNodes().at(nodeId)->GetIns()) {
 		if (!updated->at(i_edge->v_)) {
-			m_acBuf.push_back(std::bind(&GodViewRoutingRules::UpdatePriority, this, i_edge->v_, p_old, p_new, updated));
+			m_acBuf.push_back(std::bind(&UniPriorCalc::UpdatePriority, this, i_edge->v_, p_old, p_new, updated));
 			groupSize++;
 		}
 	};;
 }
-void GodViewRoutingRules::DeequalizePriorities(priorities_t &p) {
+void UniPriorCalc::DeequalizePriorities(priorities_t &p) {
 	//	SIM_LOG(GOD_VIEW, "De-equalizing priorities");
 	//	double s = std::accumulate(p.begin(), p.end(), 0.0);
 	//	for (uint16_t i = 0; i < p.size(); i++)
@@ -124,12 +261,12 @@ void GodViewRoutingRules::DeequalizePriorities(priorities_t &p) {
 	//		SIM_LOG(GOD_VIEW, "Priority of node " << i << " is " << p.at(i));
 	//	}
 }
-void GodViewRoutingRules::PrintPriorities() {
+void UniPriorCalc::PrintPriorities() {
 	for (uint16_t i = 0; i < m_p.size(); i++) {
 		SIM_LOG(GOD_VIEW, "Node " << i << " has priority: " << m_p.at (i));
 	}
 }
-Edges GodViewRoutingRules::SortEdges(Edges edges) {
+Edges UniPriorCalc::SortEdges(Edges edges) {
 	std::sort(edges.begin(), edges.end(), [&](Edge_ptr a, Edge_ptr b)
 	{
 		return m_p.at (a->v_) > m_p.at (b->v_);
@@ -142,7 +279,7 @@ Edges GodViewRoutingRules::SortEdges(Edges edges) {
 
 	return edges;
 }
-priority_t GodViewRoutingRules::CalcPriority(UanAddress id, priorities_t p_old) {
+priority_t UniPriorCalc::CalcPriority(UanAddress id, priorities_t p_old) {
 
 	SIM_LOG(GOD_VIEW, "======>>>>>>>>>>>> Calculate priority for node " << id);
 	SIM_LOG_FUNC(GOD_VIEW);
@@ -200,8 +337,7 @@ priority_t GodViewRoutingRules::CalcPriority(UanAddress id, priorities_t p_old) 
 
 	Edges outs = SortEdges(m_commNet->GetNodes().at(id)->GetOuts());
 	for (auto edge : outs) {
-		if (p_old[id] >= p_old[edge->v_])
-			break;
+		if (p_old[id] >= p_old[edge->v_]) break;
 		double bb = b(edge->v_, m_commNet);
 		denominator += bb / p_old[edge->v_];
 		SIM_LOG_NP(GOD_VIEW, id, p_old[id], "sink node " << edge->v_ << ", priority " << p_old[edge->v_] << ", b coefficient " << bb);
@@ -215,7 +351,7 @@ priority_t GodViewRoutingRules::CalcPriority(UanAddress id, priorities_t p_old) 
 
 	return new_p;
 }
-TdmAccessPlan GodViewRoutingRules::CalcTdmAccessPlan() {
+TdmAccessPlan UniPriorCalc::CalcTdmAccessPlan() {
 
 	//
 	// check nodes, which consist in the coalition of at least one another node
@@ -400,13 +536,13 @@ TdmAccessPlan GodViewRoutingRules::CalcTdmAccessPlan() {
 	return plan;
 }
 
-double GodViewRoutingRules::GetOptDatarate() {
+double UniPriorCalc::GetOptDatarate() {
 	UpdatePriorities();
 
 	return m_p.at(m_commNet->GetSrc()).val();
 }
 
-double GodViewRoutingRules::GetSinglePathDatarate() {
+double UniPriorCalc::GetSinglePathDatarate() {
 
 //	auto src = std::function<UanAddress()>([this] {for (auto n : m_commNet->GetNodes())if (n->GetNodeType() == SOURCE_NODE_TYPE)return n->GetId();})();
 //
@@ -483,7 +619,7 @@ double GodViewRoutingRules::GetSinglePathDatarate() {
 
 	return max_rate;
 }
-GodViewRoutingRules::graph_ptr GodViewRoutingRules::ConstructGraph(UanAddress s, UanAddress d) {
+UniPriorCalc::graph_ptr UniPriorCalc::ConstructGraph(UanAddress s, UanAddress d) {
 
 	graph_ptr graph = graph_ptr(new lps::Graph(m_commNet->GetNodes().size(), s, d));
 
@@ -497,7 +633,7 @@ GodViewRoutingRules::graph_ptr GodViewRoutingRules::ConstructGraph(UanAddress s,
 	return graph;
 }
 
-TreeDesc GodViewRoutingRules::GetTreeDesc(UanAddress s, UanAddress d) {
+TreeDesc UniPriorCalc::GetTreeDesc(UanAddress s, UanAddress d) {
 
 	TreeDesc td;
 
@@ -521,7 +657,7 @@ TreeDesc GodViewRoutingRules::GetTreeDesc(UanAddress s, UanAddress d) {
 	return td;
 }
 
-double GodViewRoutingRules::GetPathCost(lps::EPath path) {
+double UniPriorCalc::GetPathCost(lps::EPath path) {
 
 	auto get_loss_ratio = [this](UanAddress from, UanAddress to)->double
 	{
@@ -541,14 +677,11 @@ double GodViewRoutingRules::GetPathCost(lps::EPath path) {
 	for (auto e : path) {
 
 		auto l = get_loss_ratio(e.from, e.to);
-		if (eq(l, 1.0))
-			continue;
+		if (eq(l, 1.0)) continue;
 		v += 1 / (1 - l) / m_commNet->GetNode(e.from)->GetDatarate();
-		if (GOD_VIEW)
-			std::cout << "Edge<" << e.from << "," << e.to << "> : " << m_commNet->GetNode(e.from)->GetDatarate() * (1 - l) << " / ";
+		if (GOD_VIEW) std::cout << "Edge<" << e.from << "," << e.to << "> : " << m_commNet->GetNode(e.from)->GetDatarate() * (1 - l) << " / ";
 	}
-	if (GOD_VIEW)
-		std::cout << std::endl;
+	if (GOD_VIEW) std::cout << std::endl;
 	return 1 / v;
 
 }

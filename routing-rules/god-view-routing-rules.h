@@ -74,6 +74,54 @@ public:
 	virtual
 	~GodViewRoutingRules();
 
+//	/*
+//	 * returns the optimal average number of channel uses (data packets sent) per one new (not a copy of previously received) packet
+//	 * received by the destination
+//	 *
+//	 * consider single sending data rate for all senders
+//	 */
+//	double GetOptChannelUses();
+//
+//	/*
+//	 * if the indivisible time slot value approaches zero, the number of optimal TDM access plans approaches infinity
+//	 *
+//	 * The function below gives one of them
+//	 */
+//	TdmAccessPlan CalcTdmAccessPlan();
+//
+//	/*
+//	 * get the upper bound of achievable data rate
+//	 */
+//	double GetOptDatarate();
+//	/*
+//	 * get highest achievable data rate with single-path routing
+//	 */
+//	double GetSinglePathDatarate();
+
+private:
+
+	void CalculatePriorities();
+	void CalculateUnicastPriorities(UanAddress dst);
+	void CalculateMulticastPriorities();
+
+	comm_net_ptr m_commNet;
+	// <DST> <SRC>
+	std::map<UanAddress, std::map<UanAddress, priority_t> > m_p;
+	std::map<UanAddress, priority_t> m_multi_p;
+};
+
+class UniPriorCalc {
+	typedef std::shared_ptr<CommNet> comm_net_ptr;
+	typedef std::function<void()> Action;
+	typedef std::deque<Action> ActionBuffer;
+	typedef std::vector<priority_t> priorities_t;
+	typedef std::shared_ptr<lps::Graph> graph_ptr;
+
+public:
+
+	UniPriorCalc(comm_net_ptr commNet);virtual
+	~UniPriorCalc();
+
 	/*
 	 * returns the optimal average number of channel uses (data packets sent) per one new (not a copy of previously received) packet
 	 * received by the destination
@@ -112,8 +160,6 @@ private:
 	graph_ptr ConstructGraph(UanAddress s, UanAddress d);
 	double GetPathCost(lps::EPath path);
 
-//	void CalcTdmRecursive(UanAddress id, TdmAccessPlan &plan, std::map<UanAddress, bool> checkStatus);
-
 	comm_net_ptr m_commNet;
 	priorities_t m_p;
 	std::map<UanAddress, Datarate> m_d;
@@ -124,7 +170,6 @@ private:
 	LogBank m_logBank;
 
 	std::ofstream m_outFile;
-
 };
 }
 

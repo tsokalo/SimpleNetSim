@@ -16,6 +16,6 @@ set grid xtics ytics back lw 1 lc rgb "#AFAFAF"
 set key right bottom
 
 
-set output './Results/input_filters_3_3.svg'
-plot "./gnuplot/data.txt" every 10 using 1:(($2==3&&$3==1) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 2 pt 7 ps 0.3 title "edge=<1,3>",\
-"./gnuplot/data.txt" every 10 using 1:(($2==3&&$3==2) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 3 pt 7 ps 0.3 title "edge=<2,3>"
+set output './Results/input_filters_2_2.svg'
+plot "./gnuplot/data.txt" every 10 using 1:(($2==2&&$3==0) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 1 pt 7 ps 0.3 title "edge=<0,2>",\
+"./gnuplot/data.txt" every 10 using 1:(($2==2&&$3==1) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 2 pt 7 ps 0.3 title "edge=<1,2>"

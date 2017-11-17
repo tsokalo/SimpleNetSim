@@ -100,9 +100,7 @@ public:
 	void
 	EnableLog(std::string path);
 
-	SimParameters
-	GetSimParameters()
-	{
+	SimParameters GetSimParameters() {
 		return m_sp;
 	}
 

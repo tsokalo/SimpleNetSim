@@ -2567,29 +2567,31 @@ void NcRoutingRules::CheckBuffering() {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	if (m_inRcvNum.empty()) return;
-	//
-	// get the ID of the newest generation currently in buffer
-	//
-	auto last_act = gen_ssn_t(m_inRcvNum.last_orig_order()->first);
-	//
-	// get the ID of the newest generation that is already ACKed
-	//
-	auto last_acked = gen_ssn_t(*(m_outdatedGens.last()));
-	//
-	// take the newest one
-	//
-	auto last = (last_act > last_acked) ? last_act : last_acked;
-	//
-	// form set of generations that should buffer
-	//
 	auto func = [this](GenId gid)->bool
 	{
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Erase from forwarding due to buffering");
 		m_forwardPlan.erase(gid);
+		return false;
 	};
 	WorkInBufferingRange(func);
 
+//	if (m_inRcvNum.empty()) return;
+//	//
+//	// get the ID of the newest generation currently in buffer
+//	//
+//	auto last_act = gen_ssn_t(m_inRcvNum.last_orig_order()->first);
+//	//
+//	// get the ID of the newest generation that is already ACKed
+//	//
+//	auto last_acked = gen_ssn_t(*(m_outdatedGens.last()));
+//	//
+//	// take the newest one
+//	//
+//	auto last = (last_act > last_acked) ? last_act : last_acked;
+
+	//
+	// form set of generations that should buffer
+	//
 	//
 	//
 	//	std::vector<gen_ssn_t> s;

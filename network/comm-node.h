@@ -96,6 +96,7 @@ public:
 		return m_sp.apiRate;
 	}
 	NodeType GetNodeType(){return m_nodeType;}
+	void SetNodeType(NodeType t){m_nodeType = t;}
 
 	void SetMessTypeCallback(set_msg_type_func f);
 

@@ -14,8 +14,12 @@
 		// 	W_{softAck}:									 		 |-----sGen-----|						//		
 		// 	W_{hardAck}:											 |~~~~~~~~~~~~~~|						//
 		//
-		// W_r is the actual reception buffer size
-		// W_t is the actual transmission buffer size
+		// W_r - actual reception buffer size
+		// W_t - actual transmission buffer size
+		// W_{buf} - buffering window
+		// W_{rr} - retransmission request window
+		// W_{softAck} - soft acknowledgement window
+		// W_{hardAck} - hard acknowledgement window
 		// s - subject for the soft ACK request; it becomes also a subject for the hard ACK request when certain counter expires
 		// r - subject for the retransmission request
 		//
