@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/zsh
 
 if [ $# -ne 1 ]; then
     echo "$0: usage: commit.sh <git comment for the commit>"
