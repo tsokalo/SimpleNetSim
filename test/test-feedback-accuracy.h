@@ -60,6 +60,9 @@ public:
 	bool IsComplete() {
 		return m_coder->rank() == m_genSize;
 	}
+	uint16_t Rank() {
+		return m_coder->rank();
+	}
 
 protected:
 
@@ -74,9 +77,9 @@ protected:
 					v = 0;
 			}
 			m.push_back(symbol_coefficients);
-			for (auto c : symbol_coefficients)
-				std::cout << (uint16_t) c << "\t";
-			std::cout << std::endl;
+//			for (auto c : symbol_coefficients)
+//				std::cout << (uint16_t) c << "\t";
+//			std::cout << std::endl;
 		}
 
 		return m;
@@ -116,6 +119,16 @@ public:
 		m_coder = m_encFactory.build();
 		m_payload.resize(m_coder->payload_size());
 		kodo_core::set_systematic_off (*m_coder);
+
+		// Allocate some data to encode. In this case we make a buffer
+		// with the same size as the encoder's block size (the max.
+		// amount a single encoder can encode)
+		std::vector<uint8_t> data_in(m_coder->block_size());
+
+		// Just for fun - fill the data with random data
+		std::generate(data_in.begin(), data_in.end(), rand);
+
+		m_coder->set_const_symbols(storage::storage(data_in));
 	}
 	virtual ~SrcNode() {
 	}
@@ -151,12 +164,17 @@ public:
 		m_payload.resize(m_coder->payload_size());
 		m_numToSend = 0;
 		m_alreadySent = 0;
+		m_id = 0;
 	}
 	virtual ~RelayNode() {
 	}
 
 	void SetFeedbackStrategy(FeedbackStrategy fs) {
 		m_feedbackStrategy = fs;
+	}
+	void SetId(uint16_t id)
+	{
+		m_id = id;
 	}
 	bool IsIdle() {
 		return m_alreadySent >= m_numToSend;
@@ -259,6 +277,7 @@ public:
 			assert(0);
 		}
 		}
+		std::cout << "Relay " << m_id << ": " << m_coder->rank() << " / " << m_numToSend << " / " << m_alreadySent << std::endl;
 	}
 	CoderHelpInfo SendFeedback() {
 		assert(0);
@@ -293,10 +312,12 @@ private:
 			assert(0);
 		}
 		}
+		std::cout << "Relay " << m_id << ": " << m_coder->rank() << " / " << m_numToSend << " / " << m_alreadySent << std::endl;
 	}
 
 	uint16_t m_numToSend;
 	uint16_t m_alreadySent;
+	uint16_t m_id;
 	FeedbackStrategy m_feedbackStrategy;
 };
 
@@ -340,7 +361,7 @@ void TestFeedbackAccuracy() {
 	std::default_random_engine generator(r());
 	std::uniform_real_distribution<double> distribution(0.0, 1.0);
 
-	uint32_t gen_size = 64;
+	uint32_t gen_size = 6;
 	uint32_t symbol_size = 5;
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
@@ -351,12 +372,14 @@ void TestFeedbackAccuracy() {
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create relays
 	//
+	auto relayStrategy = RelayNode::ALWAYS_SEND;
 	std::vector < std::shared_ptr<RelayNode> > relays;
 	uint16_t num_relays = 2;
 	for (auto i = 0; i < num_relays; i++) {
 		auto relay = std::shared_ptr < RelayNode > (new RelayNode(gen_size, symbol_size));
 		relays.push_back(relay);
-		relay->SetFeedbackStrategy(RelayNode::ALWAYS_SEND);
+		relay->SetFeedbackStrategy(relayStrategy);
+		relay->SetId(i);
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
@@ -368,18 +391,25 @@ void TestFeedbackAccuracy() {
 	// create hyper-relay (virtual relay)
 	//
 	auto hrelay = std::shared_ptr < RelayNode > (new RelayNode(gen_size, symbol_size));
+	hrelay->SetFeedbackStrategy(relayStrategy);
+	hrelay->SetId(777);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create channel
 	//
 	std::vector<double> loss_ratio(num_relays, 0.5);
 
+	std::cout << "Created network.." << std::endl;
+
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// define broadcast functions
 	//
+	uint16_t snt_by_src = 0, snt_by_rel = 0, snt_by_dst = 0;
+
 	auto do_broadcast_src = [&]()
 	{
 		auto payload = src->SendData();
+		snt_by_src++;
 
 		for(auto i = 0; i < relays.size(); i++)
 		{
@@ -393,18 +423,23 @@ void TestFeedbackAccuracy() {
 
 	auto do_broadcast_relay = [&](uint16_t i)
 	{
+		std::cout << "Relay " << i << " sends" << std::endl;
 		assert(i < relays.size());
 		auto relay = relays.at(i);
 		if(!relay->IsIdle())
 		{
 			auto payload = relay->SendData();
+			snt_by_rel++;
+
 			dst->RcvData(payload);
 		}
 	};
 
 	auto do_broadcast_dst = [&]()
 	{
+		std::cout << "Destination sends" << std::endl;
 		auto feedback = dst->SendFeedback();
+		snt_by_dst++;
 		for(auto relay : relays) relay->RcvFeedback(feedback);
 	};
 
@@ -416,23 +451,21 @@ void TestFeedbackAccuracy() {
 		SEND_EXACT_SUFFICIENT_STRATEGY, SEND_P_SUFFICIENT_STRATEGY
 	};
 
-	SrcStrategy srcS = SEND_EXACT_SUFFICIENT_STRATEGY;
-	uint16_t snt_by_src = 0;
+	SrcStrategy srcStrategy = SEND_EXACT_SUFFICIENT_STRATEGY;
 	//
 	// source sends till the rest subnetwork gets sufficient packets to decode the complete generation
 	//
-	if (srcS == SEND_EXACT_SUFFICIENT_STRATEGY) {
+	if (srcStrategy == SEND_EXACT_SUFFICIENT_STRATEGY) {
 
 		while (!hrelay->IsComplete()) {
 			do_broadcast_src();
-			snt_by_src++;
 		}
 	}
 
 	//
 	// source sends till the rest subnetwork gets sufficient packets to decode the complete generation with probability p
 	//
-	if (srcS == SEND_P_SUFFICIENT_STRATEGY) {
+	if (srcStrategy == SEND_P_SUFFICIENT_STRATEGY) {
 		double p = 0.99;
 
 		auto get_suff_p_pkts = [&]()->int16_t
@@ -442,6 +475,7 @@ void TestFeedbackAccuracy() {
 			{
 				eps *= loss_ratio.at(i);
 			}
+
 			double numStd = 3;
 			double gamma = pow(numStd, 2) * eps / (double) gen_size / 4.0;
 			gamma = (gamma > 1) ? 1 : gamma;
@@ -449,34 +483,33 @@ void TestFeedbackAccuracy() {
 
 			double cr = alpha / (1 - eps);
 
-			return (int16_t)(gen_size * (cr - 1));
+			std::cout << "Using coding rate: " << cr << std::endl;
+
+			return (int16_t)(gen_size * cr);
 		};
 
 		auto n = get_suff_p_pkts();
 		while (n-- > 0) {
 			do_broadcast_src();
-			snt_by_src++;
 		}
 	}
-
-	std::cout << "SRC sent:\t" << snt_by_src << " symbols" << std::endl;
 
 	enum DstStrategy {
 		FEEDBACK_REGULAR, FEEDBACK_RANDOM
 	};
 
-	DstStrategy dstS = FEEDBACK_REGULAR;
+	DstStrategy dstStrategy = FEEDBACK_REGULAR;
 	//
 	// relays send coded packets and the destination send the feedbacks till the destination has the full rank
 	//
 	uint16_t kMax = 1;
-	uint16_t k = 0;
+	uint16_t k = kMax;
 	std::default_random_engine gen(r());
 	std::uniform_int_distribution<> dis_without_dst(0, num_relays - 1);
 	std::uniform_int_distribution<> dis_with_dst(0, num_relays);
 	while (1) {
-		if (k-- == 0) k = kMax;
-		if (dstS == FEEDBACK_REGULAR) {
+
+		if (dstStrategy == FEEDBACK_REGULAR) {
 
 			//
 			// a randomly selected relay sends
@@ -486,16 +519,18 @@ void TestFeedbackAccuracy() {
 			//
 			// destination sends the feedback after each k packets sent by relays
 			//
-			if (k == 0) {
+			if (--k == 0) {
 				do_broadcast_dst();
+				k = kMax;
 			}
 
 			//
-			// finish if the destination has the full rank
+			// if source adds not sufficient redundancy then the destination cannot get the full rank
+			// finish when the relay group has transferred all information that it could
 			//
-			if (dst->IsComplete()) break;
+			if (dst->Rank() == hrelay->Rank()) break;
 		}
-		if (dstS == FEEDBACK_RANDOM) {
+		if (dstStrategy == FEEDBACK_RANDOM) {
 			//
 			// a randomly selected relay or the destination sends
 			//
@@ -504,11 +539,21 @@ void TestFeedbackAccuracy() {
 			else do_broadcast_relay(id);
 
 			//
-			// finish if the destination has the full rank
+			// if source adds not sufficient redundancy then the destination cannot get the full rank
+			// finish when the relay group has transferred all information that it could
 			//
-			if (dst->IsComplete()) break;
+			if (dst->Rank() == hrelay->Rank()) break;
 		}
 	}
+	std::cout << "SRC sent:\t" << snt_by_src << " symbols" << std::endl;
+	std::cout << "REL sent:\t" << snt_by_rel << " symbols" << std::endl;
+	std::cout << "DST sent:\t" << snt_by_dst << " symbols" << std::endl;
+	std::cout << "DST A-rank:\t" << hrelay->Rank() << std::endl;			// achievable ranks of destination
+
+	std::cout << (uint16_t) relayStrategy << "\t" << (uint16_t) srcStrategy << "\t" << (uint16_t) dstStrategy << "\t"
+			<< gen_size << "\t" << snt_by_src << "\t" << snt_by_rel
+			<< "\t" << snt_by_dst << "\t" << hrelay->Rank() << std::endl;
+
 }
 
 }
