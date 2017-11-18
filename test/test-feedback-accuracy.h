@@ -5,8 +5,8 @@
  *      Author: tsokalo
  */
 
-#ifndef TEST_TEST_FEEDBACK_ESTIMATOR_H_
-#define TEST_TEST_FEEDBACK_ESTIMATOR_H_
+#ifndef TEST_FEEDBACK_ACCURACY_H_
+#define TEST_FEEDBACK_ACCURACY_H_
 
 // Copyright Steinwurf ApS 2014.
 // Distributed under the "STEINWURF RESEARCH LICENSE 1.0".
@@ -35,45 +35,13 @@
 
 namespace ncr {
 
-//
-// calculates mean and confidence interval using T-Student theorem and 95% confidence probability
-//
-std::pair<double, double> CalcStats(std::vector<double> vals) {
-	uint16_t num_batches = 20;
-	std::size_t batch_size = floor((double) vals.size() / (double) (num_batches + 1)), j = 0;
-	std::vector<double> v;
-
-	//
-	// ignore the first batch as the warm up period
-	//
-	while (j++ < num_batches) {
-		v.push_back(std::accumulate(vals.begin() + j * batch_size, vals.begin() + (j + 1) * batch_size, 0.0) / (double) batch_size);
-	}
-
-	double mean = std::accumulate(v.begin(), v.end(), 0.0) / v.size();
-	double stdev = std::sqrt(std::inner_product(v.begin(), v.end(), v.begin(), 0.0) / v.size() - mean * mean);
-
-	using boost::math::quantile;
-	using boost::math::complement;
-
-	const double alpha = 1 - 0.95;
-	const boost::math::students_t dist(num_batches - 1);
-
-	double T = quantile(complement(dist, alpha / 2));
-	//
-	// Calculate width of interval (one sided)
-	//
-	double confInterval = T * stdev / sqrt((double) num_batches);
-
-	return std::pair<double, double>(mean, confInterval);
-}
 template<class T>
-class NodeT {
+class NodeObject {
 
 	typedef std::shared_ptr<Ccack> ccack_ptr;
 
 public:
-	NodeT(uint16_t genSize, uint16_t symbolSize) :
+	NodeObject(uint16_t genSize, uint16_t symbolSize) :
 			m_encFactory(genSize, symbolSize), m_decFactory(genSize, symbolSize) {
 		m_genSize = genSize;
 		m_symbolSize = symbolSize;
@@ -81,16 +49,15 @@ public:
 		m_hashMatrixSet = hash_matrix_set_ptr(new HashMatrixSet(2, genSize, 8));
 		m_ccack = ccack_ptr(new Ccack(genSize, m_hashMatrixSet));
 	}
-	virtual ~NodeT() {
+	virtual ~NodeObject() {
 	}
 
 	virtual std::vector<uint8_t> SendData() = 0;
-	virtual void RcvData() = 0;
+	virtual void RcvData(std::vector<uint8_t> payload) = 0;
 	virtual void RcvFeedback(CoderHelpInfo chi) = 0;
 	virtual CoderHelpInfo SendFeedback() = 0;
 
-	bool IsComplete()
-	{
+	bool IsComplete() {
 		return m_coder->rank() == m_genSize;
 	}
 
@@ -118,7 +85,6 @@ protected:
 	CodingVector GetCcackInfo() {
 		return m_ccack->GetHashVector();
 	}
-	;
 
 	CoderInfo GetCoderInfo() {
 		DecodedMap dm;
@@ -129,7 +95,6 @@ protected:
 			sm.push_back(m_coder->is_symbol_pivot(i));
 		return CoderInfo(m_coder->rank(), m_genSize, sm, dm);
 	}
-	;
 
 	encoder::factory m_encFactory;
 	decoder::factory m_decFactory;
@@ -143,16 +108,14 @@ private:
 	hash_matrix_set_ptr m_hashMatrixSet;
 };
 
-class SrcNode: public NodeT<encoder_ptr> {
+class SrcNode: public NodeObject<encoder_ptr> {
 public:
 	SrcNode(uint16_t genSize, uint16_t symbolSize) :
-			NodeT(genSize, symbolSize), m_coder(m_encFactory.build()), m_payload(m_coder->payload_size(), 0) {
+			NodeObject(genSize, symbolSize) {
 
-		std::vector<uint8_t> data_in(m_symbolSize * m_genSize, 0);
-		std::generate(data_in.begin(), data_in.end(), rand);
-		m_coder->set_const_gen_size(storage::storage(data_in));
+		m_coder = m_encFactory.build();
+		m_payload.resize(m_coder->payload_size());
 		kodo_core::set_systematic_off (*m_coder);
-		m_sendToChannel = sendToChannel;
 	}
 	virtual ~SrcNode() {
 	}
@@ -161,7 +124,7 @@ public:
 		m_coder->write_payload(m_payload.data());
 		return m_payload;
 	}
-	void RcvData() {
+	void RcvData(std::vector<uint8_t> payload) {
 		assert(0);
 	}
 	void RcvFeedback(CoderHelpInfo chi) {
@@ -169,17 +132,23 @@ public:
 	}
 	CoderHelpInfo SendFeedback() {
 		assert(0);
+		return CoderHelpInfo();
 	}
 };
 
-class RelayNode: public NodeT<decoder_ptr> {
+class RelayNode: public NodeObject<decoder_ptr> {
+
+public:
+
 	enum FeedbackStrategy {
 		ALWAYS_SEND, NOT_MORE_THAN_RANK, SUBS_DECODED, SUBS_PIVOTS, MIN_MAX, CCACK, ALL_VECTORS
 	};
 
-public:
 	RelayNode(uint16_t genSize, uint16_t symbolSize) :
-			NodeT(genSize, symbolSize), m_coder(m_decFactory.build()), m_payload(m_coder->payload_size(), 0) {
+			NodeObject(genSize, symbolSize) {
+
+		m_coder = m_decFactory.build();
+		m_payload.resize(m_coder->payload_size());
 		m_numToSend = 0;
 		m_alreadySent = 0;
 	}
@@ -298,7 +267,7 @@ public:
 private:
 
 	CoderHelpInfo GetCoderHelpInfo() {
-		return CoderHelpInfo(GetCodingMatrix(), GetCcackInfo(), GetCoderInfo());
+		return CoderHelpInfo(GetCodingMatrix(), GetCoderInfo(), GetCcackInfo());
 	}
 
 	void UpdateNumToSend(uint16_t rank_diff) {
@@ -331,16 +300,20 @@ private:
 	FeedbackStrategy m_feedbackStrategy;
 };
 
-class DstNode: public NodeT<decoder_ptr> {
+class DstNode: public NodeObject<decoder_ptr> {
 public:
 	DstNode(uint16_t genSize, uint16_t symbolSize) :
-			NodeT(genSize, symbolSize), m_coder(m_decFactory.build()), m_payload(m_coder->payload_size(), 0) {
+			NodeObject(genSize, symbolSize) {
+
+		m_coder = m_decFactory.build();
+		m_payload.resize(m_coder->payload_size());
 	}
 	virtual ~DstNode() {
 	}
 
-	void SendData() {
+	std::vector<uint8_t> SendData() {
 		assert(0);
+		return std::vector<uint8_t>();
 	}
 
 	void RcvData(std::vector<uint8_t> payload) {
@@ -353,9 +326,9 @@ public:
 	}
 	CoderHelpInfo SendFeedback() {
 		CoderHelpInfo chi;
-		chi.codingCoefs = GetCodingMatrix();
-		chi.hashVector = GetCcackInfo();
-		chi.coderInfo = GetCoderInfo();
+		chi.m = GetCodingMatrix();
+		chi.hashVec = GetCcackInfo();
+		chi.c = GetCoderInfo();
 
 		return chi;
 	}
@@ -373,16 +346,15 @@ void TestFeedbackAccuracy() {
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create source node
 	//
-
-	auto src = std::shared_ptr<SrcNode>(new SrcNode(gen_size, symbol_size));
+	auto src = std::shared_ptr < SrcNode > (new SrcNode(gen_size, symbol_size));
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create relays
 	//
-	std::vector<std::shared_ptr<RelayNode> > relays;
+	std::vector < std::shared_ptr<RelayNode> > relays;
 	uint16_t num_relays = 2;
 	for (auto i = 0; i < num_relays; i++) {
-		auto relay = std::shared_ptr<RelayNode>(new RelayNode(gen_size, symbol_size));
+		auto relay = std::shared_ptr < RelayNode > (new RelayNode(gen_size, symbol_size));
 		relays.push_back(relay);
 		relay->SetFeedbackStrategy(RelayNode::ALWAYS_SEND);
 	}
@@ -390,12 +362,12 @@ void TestFeedbackAccuracy() {
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create destination
 	//
-	auto dst = std::shared_ptr<DstNode>(new DstNode(gen_size, symbol_size));
+	auto dst = std::shared_ptr < DstNode > (new DstNode(gen_size, symbol_size));
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create hyper-relay (virtual relay)
 	//
-	auto hrelay = std::shared_ptr<RelayNode>(new RelayNode(gen_size, symbol_size));
+	auto hrelay = std::shared_ptr < RelayNode > (new RelayNode(gen_size, symbol_size));
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create channel
@@ -435,6 +407,10 @@ void TestFeedbackAccuracy() {
 		auto feedback = dst->SendFeedback();
 		for(auto relay : relays) relay->RcvFeedback(feedback);
 	};
+
+	///////////////////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////		Simulation start		///////////////////////////////////////////
+	///////////////////////////////////////////////////////////////////////////////////////////////////////
 
 	enum SrcStrategy {
 		SEND_EXACT_SUFFICIENT_STRATEGY, SEND_P_SUFFICIENT_STRATEGY
@@ -495,21 +471,17 @@ void TestFeedbackAccuracy() {
 	//
 	uint16_t kMax = 1;
 	uint16_t k = 0;
+	std::default_random_engine gen(r());
+	std::uniform_int_distribution<> dis_without_dst(0, num_relays - 1);
+	std::uniform_int_distribution<> dis_with_dst(0, num_relays);
 	while (1) {
 		if (k-- == 0) k = kMax;
 		if (dstS == FEEDBACK_REGULAR) {
 
-			std::default_random_engine gen(r());
-			std::uniform_int_distribution<> dis(0, num_relays - 1);
 			//
 			// a randomly selected relay sends
 			//
-			auto select = [this]()
-			{
-				return dis(gen);
-			};
-
-			do_broadcast_relay(select());
+			do_broadcast_relay(dis_without_dst(gen));
 
 			//
 			// destination sends the feedback after each k packets sent by relays
@@ -521,148 +493,23 @@ void TestFeedbackAccuracy() {
 			//
 			// finish if the destination has the full rank
 			//
-			auto can_dst_decode = [&](CommNet *commnet)
-			{
-				return false;
-			};
-			if (can_dst_decode(this)) break;
+			if (dst->IsComplete()) break;
 		}
 		if (dstS == FEEDBACK_RANDOM) {
 			//
 			// a randomly selected relay or the destination sends
 			//
-			auto select = [this]()
-			{
-				std::vector<uint16_t> v;
-				uint16_t i = 0;
+			auto id = dis_with_dst(gen);
+			if (id == num_relays) do_broadcast_dst();
+			else do_broadcast_relay(id);
 
-				for (std::vector<node_ptr>::iterator it = m_nodes.begin(); it != m_nodes.end(); it++) {
-					auto id = (*it)->GetId();
-					if(id != GetSrc()) v.push_back(std::distance(m_nodes.begin(), it));
-				}
-
-				std::uniform_int_distribution<> dis(0, v.size() - 1);
-				return m_nodes.at(v.at(dis(m_gen)));
-			};
-
-			DoBroadcast(select());
-			m_simulator->Execute();
 			//
 			// finish if the destination has the full rank
 			//
-			auto can_dst_decode = [&](CommNet *commnet)
-			{
-				return false;
-			};
-			if (can_dst_decode(this)) break;
+			if (dst->IsComplete()) break;
 		}
 	}
 }
 
-void TestFeedbackEstimator() {
-	std::random_device r;
-
-	std::default_random_engine generator(r());
-	std::uniform_real_distribution<double> distribution(0.0, 1.0);
-	std::default_random_engine generator2(r());
-	std::uniform_real_distribution<double> distribution2(0.0, 1.0);
-
-	// Set the number of gen_size (i.e. the generation size in RLNC
-	// terminology) and the size of a symbol in bytes
-	uint32_t gen_size = 64;
-	uint32_t symbol_size = 5;
-
-	bool trace_enabled = true;
-
-	// Typdefs for the encoder/decoder type we wish to use
-	using rlnc_encoder = kodo_rlnc::full_vector_encoder<fifi_field>;
-	using rlnc_decoder = kodo_rlnc::full_vector_decoder<fifi_field>;
-	rlnc_encoder::factory m_encFactory(gen_size, symbol_size);
-	rlnc_decoder::factory m_decFactory(gen_size, symbol_size);
-	std::vector<uint8_t> data_in(symbol_size * gen_size);
-	std::generate(data_in.begin(), data_in.end(), rand);
-
-	uint16_t e_levels = 10;
-	for (uint16_t ei = 0; ei < e_levels; ei++) {
-		double e = (ei + 1) / (double) (e_levels + 1);
-		uint32_t num_iter = 1000;
-
-		std::vector<double> lb, tb, cv, rv, pv;
-		while (num_iter-- != 0) {
-			//
-			// Initialization
-			//
-
-			auto encoder = m_encFactory.build();
-			auto decoder_local = m_decFactory.build();
-			auto decoder_remote = m_decFactory.build();
-			std::vector<uint8_t> payload(encoder->payload_size());
-			std::vector<uint8_t> payload(encoder->payload_size());
-			encoder->set_const_gen_size(storage::storage(data_in));
-			kodo_core::set_systematic_off(*encoder);
-
-			//
-			// source works
-			//
-
-			for (uint16_t i = 0; i < gen_size; i++) {
-				encoder->write_payload(payload.data());
-				if (distribution(generator) < e) decoder_local->read_payload(payload.data());
-				if (distribution2(generator2) < e) decoder_remote->read_payload(payload.data());
-			}
-
-			//
-			// calculating limits
-			//
-
-			DecodedMap dm1, dm2;
-			for (uint32_t i = 0; i < decoder_local->gen_size(); ++i)
-				dm1.push_back(decoder_local->is_symbol_uncoded(i));
-			for (uint32_t i = 0; i < decoder_remote->gen_size(); ++i)
-				dm2.push_back(decoder_remote->is_symbol_uncoded(i));
-			SeenMap sm1, sm2;
-			for (uint32_t i = 0; i < decoder_local->gen_size(); ++i)
-				sm1.push_back(decoder_local->is_symbol_pivot(i));
-			for (uint32_t i = 0; i < decoder_remote->gen_size(); ++i)
-				sm2.push_back(decoder_remote->is_symbol_pivot(i));
-
-			CoderInfo group_local(decoder_local->rank(), decoder_local->gen_size(), sm1, dm1);
-			CoderInfo group_remote(decoder_remote->rank(), decoder_remote->gen_size(), sm2, dm2);
-
-			FeedbackEstimator est(group_local, group_remote);
-
-			//
-			// find real value
-			//
-
-			uint16_t n_real = decoder_remote->rank();
-			uint16_t ncr = 100;
-			while (ncr != 0) {
-				uint16_t temp = decoder_remote->rank();
-				decoder_local->write_payload(payload.data());
-				decoder_remote->read_payload(payload.data());
-				if (temp == decoder_remote->rank()) ncr--;
-			}
-			n_real = decoder_remote->rank() - n_real;
-
-			lb.push_back(est.GetLowBound());
-			tb.push_back(est.GetTopBound());
-			cv.push_back(est.GetN());
-			rv.push_back(n_real);
-			pv.push_back(est.GetP());
-		}
-
-		auto lb_a = CalcStats(lb);
-		auto tb_a = CalcStats(tb);
-		auto cv_a = CalcStats(cv);
-		auto rv_a = CalcStats(rv);
-		auto pv_a = CalcStats(pv);
-
-		std::cout << e << "\t" << lb_a.first << "\t" << lb_a.second << "\t" << tb_a.first << "\t" << tb_a.second << "\t" << cv_a.first << "\t" << cv_a.second
-				<< "\t" << rv_a.first << "\t" << rv_a.second << "\t" << pv_a.first << "\t" << pv_a.second << std::endl;
-	}
-
 }
-
-}
-#endif /* TEST_TEST_FEEDBACK_ESTIMATOR_H_ */
+#endif /* TEST_FEEDBACK_ACCURACY_H_ */

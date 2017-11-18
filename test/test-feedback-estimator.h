@@ -80,8 +80,6 @@ void TestFeedbackEstimator() {
 	uint32_t symbols = 64;
 	uint32_t symbol_size = 5;
 
-	bool trace_enabled = true;
-
 	// Typdefs for the encoder/decoder type we wish to use
 	using rlnc_encoder = kodo_rlnc::full_vector_encoder<fifi_field>;
 	using rlnc_decoder = kodo_rlnc::full_vector_decoder<fifi_field>;

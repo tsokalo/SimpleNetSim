@@ -18,12 +18,12 @@
 
 namespace ncr {
 
-GodViewRoutingRules::GodViewRoutingRules(comm_net_ptr commNet) {
+GodViewRoutingRules::GodViewRoutingRules(comm_net_ptr commNet) : UniPriorCalc(commNet) {
 	m_commNet = commNet;
 
 	CalculatePriorities();
 }
-virtual GodViewRoutingRules::~GodViewRoutingRules() {
+GodViewRoutingRules::~GodViewRoutingRules() {
 
 }
 void GodViewRoutingRules::CalculatePriorities() {
@@ -57,103 +57,103 @@ void GodViewRoutingRules::CalculateUnicastPriorities(UanAddress dst) {
 }
 void GodViewRoutingRules::CalculateMulticastPriorities() {
 
-	auto dsts = m_commNet->GetDstIds();
-	for (auto node : m_commNet->GetNodes()) {
-
-		auto id = node->GetId();
-		//
-		// form the set of destinations without including myself
-		//
-		auto dsts_prime = dsts;
-		auto it = std::find(dsts_prime.begin(), dsts_prime.end(), id);
-		if (it != dsts_prime.end()) dsts_prime.erase(it, it + 1);
-		//
-		// form the set of cooperating nodes for each destination
-		//
-		std::map<UanAddress, node_map_t> coalitions;
-		for (auto edge : node->GetOuts()) {
-			auto neighbor = edge->v_;
-			assert(neighbor != node);
-			for (auto dst : dsts_prime) {
-				if (m_p[dst][id] < m_p[dst][neighbor]) coalitions[dst].add(neighbor, m_p[dst][neighbor]);
-			}
-		}
-
-		//
-		// The nodes from all coalitions for each destination
-		//
-		node_map_t big_coalition;
-
-		for (auto edge : node->GetOuts()) {
-
-			auto neighbor = edge->v_;
-
-			for (auto coalition_p : coalitions) {
-				auto dst = coalition_p.first;
-				auto coalition = coalition_p.second;
-				if (coalition.find(neighbor) != coalition.end()) {
-					big_coalition.add(neighbor, m_p[dst][neighbor]);
-				}
-			}
-		}
-
-		auto a = [&](node_map_t coalition)->double
-		{
-			double v = 1;
-			for (auto edge : node->GetOuts()) {
-
-				auto neighbor = edge->v_;
-				if(!coalition.is_in(neighbor))continue;
-				v *= edge->GetLossProcess()->GetMean();
-			}
-			return 1 - v;
-		};
-
-		auto multi_a = [&]()->double
-		{
-			double v = 1;
-			for (auto coalition_p : coalitions) {
-				auto dst = coalition_p.first;
-				auto coalition = coalition_p.second;
-				double w = a(coalition);
-				v = v > w ? w : v;
-			}
-			return v;
-		};
-
-		auto b = [&](node_map_t coalition, UanAddress neighbor, UanAddress dst)->double
-		{
-			double v = 1;
-			for (auto edge : node->GetOuts()) {
-
-				auto neighbor2 = edge->v_;
-				if(!coalition.is_in(neighbor2))continue;
-				if(neighbor == neighbor2)v *= (1 - edge->GetLossProcess()->GetMean());
-
-				if(m_p[dst][neighbor2] < m_p[dst][neighbor])continue;
-				v *= edge->GetLossProcess()->GetMean();
-			}
-			return v;
-		};
-
-		auto multi_b = [&](UanAddress neighbor)->double
-		{
-			double v = 0;
-			for (auto coalition_p : coalitions) {
-				auto dst = coalition_p.first;
-				auto coalition = coalition_p.second;
-				double w = b(coalition, neighbor, dst)/m_p[dst][neighbor];
-				v = v < w ? w : v;
-			}
-			return v;
-		};
-
-		double t = 1;
-		for (auto it : big_coalition) {
-			t += multi_b(id, it.first, big_coalition, subset_dsts);
-		}
-		m_multi_p[id] = multi_a() / t;
-	}
+//	auto dsts = m_commNet->GetDstIds();
+//	for (auto node : m_commNet->GetNodes()) {
+//
+//		auto id = node->GetId();
+//		//
+//		// form the set of destinations without including myself
+//		//
+//		auto dsts_prime = dsts;
+//		auto it = std::find(dsts_prime.begin(), dsts_prime.end(), id);
+//		if (it != dsts_prime.end()) dsts_prime.erase(it, it + 1);
+//		//
+//		// form the set of cooperating nodes for each destination
+//		//
+//		std::map<UanAddress, node_map_t> coalitions;
+//		for (auto edge : node->GetOuts()) {
+//			auto neighbor = edge->v_;
+//			assert(neighbor != node);
+//			for (auto dst : dsts_prime) {
+//				if (m_p[dst][id] < m_p[dst][neighbor]) coalitions[dst].add(neighbor, m_p[dst][neighbor]);
+//			}
+//		}
+//
+//		//
+//		// The nodes from all coalitions for each destination
+//		//
+//		node_map_t big_coalition;
+//
+//		for (auto edge : node->GetOuts()) {
+//
+//			auto neighbor = edge->v_;
+//
+//			for (auto coalition_p : coalitions) {
+//				auto dst = coalition_p.first;
+//				auto coalition = coalition_p.second;
+//				if (coalition.find(neighbor) != coalition.end()) {
+//					big_coalition.add(neighbor, m_p[dst][neighbor]);
+//				}
+//			}
+//		}
+//
+//		auto a = [&](node_map_t coalition)->double
+//		{
+//			double v = 1;
+//			for (auto edge : node->GetOuts()) {
+//
+//				auto neighbor = edge->v_;
+//				if(!coalition.is_in(neighbor))continue;
+//				v *= edge->GetLossProcess()->GetMean();
+//			}
+//			return 1 - v;
+//		};
+//
+//		auto multi_a = [&]()->double
+//		{
+//			double v = 1;
+//			for (auto coalition_p : coalitions) {
+//				auto dst = coalition_p.first;
+//				auto coalition = coalition_p.second;
+//				double w = a(coalition);
+//				v = v > w ? w : v;
+//			}
+//			return v;
+//		};
+//
+//		auto b = [&](node_map_t coalition, UanAddress neighbor, UanAddress dst)->double
+//		{
+//			double v = 1;
+//			for (auto edge : node->GetOuts()) {
+//
+//				auto neighbor2 = edge->v_;
+//				if(!coalition.is_in(neighbor2))continue;
+//				if(neighbor == neighbor2)v *= (1 - edge->GetLossProcess()->GetMean());
+//
+//				if(m_p[dst][neighbor2] < m_p[dst][neighbor])continue;
+//				v *= edge->GetLossProcess()->GetMean();
+//			}
+//			return v;
+//		};
+//
+//		auto multi_b = [&](UanAddress neighbor)->double
+//		{
+//			double v = 0;
+//			for (auto coalition_p : coalitions) {
+//				auto dst = coalition_p.first;
+//				auto coalition = coalition_p.second;
+//				double w = b(coalition, neighbor, dst)/m_p[dst][neighbor];
+//				v = v < w ? w : v;
+//			}
+//			return v;
+//		};
+//
+//		double t = 1;
+//		for (auto it : big_coalition) {
+//			t += multi_b(id, it.first, big_coalition, subset_dsts);
+//		}
+//		m_multi_p[id] = multi_a() / t;
+//	}
 }
 
 UniPriorCalc::UniPriorCalc(comm_net_ptr commNet) {

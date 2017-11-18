@@ -381,6 +381,10 @@ int main(int argc, char *argv[]) {
 
 	} else if (m == TEST_MODE) {
 
+		std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
+		std::cout << "TEST MODE" << std::endl;
+		std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
+
 		TestFeedbackAccuracy();
 
 	}
