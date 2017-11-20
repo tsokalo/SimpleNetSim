@@ -31,6 +31,7 @@
 #include <boost/algorithm/minmax_element.hpp>
 
 #include "utils/coder.h"
+#include "utils/log.h"
 #include "utils/feedback-estimator.h"
 
 namespace ncr {
@@ -113,6 +114,11 @@ private:
 
 class SrcNode: public NodeObject<encoder_ptr> {
 public:
+
+	enum Strategy {
+		SEND_EXACT_SUFFICIENT_STRATEGY, SEND_P_SUFFICIENT_STRATEGY
+	};
+
 	SrcNode(uint16_t genSize, uint16_t symbolSize) :
 			NodeObject(genSize, symbolSize) {
 
@@ -153,7 +159,7 @@ class RelayNode: public NodeObject<decoder_ptr> {
 
 public:
 
-	enum FeedbackStrategy {
+	enum Strategy {
 		ALWAYS_SEND, NOT_MORE_THAN_RANK, SUBS_DECODED, SUBS_PIVOTS, MIN_MAX, CCACK, ALL_VECTORS
 	};
 
@@ -169,11 +175,10 @@ public:
 	virtual ~RelayNode() {
 	}
 
-	void SetFeedbackStrategy(FeedbackStrategy fs) {
+	void SetStrategy(Strategy fs) {
 		m_feedbackStrategy = fs;
 	}
-	void SetId(uint16_t id)
-	{
+	void SetId(uint16_t id) {
 		m_id = id;
 	}
 	bool IsIdle() {
@@ -277,7 +282,9 @@ public:
 			assert(0);
 		}
 		}
-		std::cout << "Relay " << m_id << ": " << m_coder->rank() << " / " << m_numToSend << " / " << m_alreadySent << std::endl;
+
+		SIM_LOG(TEST_LOG, "Relay " << m_id << ": " << m_coder->rank() << " / " << m_numToSend << " / " << m_alreadySent);
+
 	}
 	CoderHelpInfo SendFeedback() {
 		assert(0);
@@ -312,17 +319,22 @@ private:
 			assert(0);
 		}
 		}
-		std::cout << "Relay " << m_id << ": " << m_coder->rank() << " / " << m_numToSend << " / " << m_alreadySent << std::endl;
+		SIM_LOG(TEST_LOG, "Relay " << m_id << ": " << m_coder->rank() << " / " << m_numToSend << " / " << m_alreadySent);
 	}
 
 	uint16_t m_numToSend;
 	uint16_t m_alreadySent;
 	uint16_t m_id;
-	FeedbackStrategy m_feedbackStrategy;
+	Strategy m_feedbackStrategy;
 };
 
 class DstNode: public NodeObject<decoder_ptr> {
 public:
+
+	enum Strategy {
+		FEEDBACK_REGULAR, FEEDBACK_RANDOM
+	};
+
 	DstNode(uint16_t genSize, uint16_t symbolSize) :
 			NodeObject(genSize, symbolSize) {
 
@@ -355,43 +367,73 @@ public:
 	}
 };
 
-void TestFeedbackAccuracy() {
+struct FALogItem {
+
+	RelayNode::Strategy relayStrategy;
+	SrcNode::Strategy srcStrategy;
+	DstNode::Strategy dstStrategy;
+
+	uint16_t genSize;
+
+	uint32_t sntBySrc;
+	uint32_t sntByRel;
+	uint32_t sntByDst;
+
+	uint16_t aRank; // achievable rank of the hyper-relay
+
+	friend std::ostream& operator<<(std::ostream& o, FALogItem& m) {
+
+		o << (uint16_t) m.relayStrategy << "\t" << (uint16_t) m.srcStrategy << "\t" << (uint16_t) m.dstStrategy << "\t" << m.genSize << "\t" << m.sntBySrc
+				<< "\t" << m.sntByRel << "\t" << m.sntByDst << "\t" << m.aRank;
+		return o;
+	}
+};
+
+struct FAConfig {
+	uint16_t numRelays;
+	std::vector<double> lossRatios;
+	uint32_t genSize;
+	uint32_t symSize;
+	SrcNode::Strategy srcStrategy;
+	double numStd;
+	RelayNode::Strategy relayStrategy;
+	DstNode::Strategy dstStrategy;
+	uint16_t kMax;
+};
+
+FALogItem RunFATest(FAConfig fac) {
 	std::random_device r;
 
 	std::default_random_engine generator(r());
 	std::uniform_real_distribution<double> distribution(0.0, 1.0);
 
-	uint32_t gen_size = 6;
-	uint32_t symbol_size = 5;
-
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create source node
 	//
-	auto src = std::shared_ptr < SrcNode > (new SrcNode(gen_size, symbol_size));
+	auto src = std::shared_ptr<SrcNode>(new SrcNode(fac.genSize, fac.symSize));
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create relays
 	//
-	auto relayStrategy = RelayNode::ALWAYS_SEND;
-	std::vector < std::shared_ptr<RelayNode> > relays;
+	std::vector<std::shared_ptr<RelayNode> > relays;
 	uint16_t num_relays = 2;
 	for (auto i = 0; i < num_relays; i++) {
-		auto relay = std::shared_ptr < RelayNode > (new RelayNode(gen_size, symbol_size));
+		auto relay = std::shared_ptr<RelayNode>(new RelayNode(fac.genSize, fac.symSize));
 		relays.push_back(relay);
-		relay->SetFeedbackStrategy(relayStrategy);
+		relay->SetStrategy(fac.relayStrategy);
 		relay->SetId(i);
 	}
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create destination
 	//
-	auto dst = std::shared_ptr < DstNode > (new DstNode(gen_size, symbol_size));
+	auto dst = std::shared_ptr<DstNode>(new DstNode(fac.genSize, fac.symSize));
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create hyper-relay (virtual relay)
 	//
-	auto hrelay = std::shared_ptr < RelayNode > (new RelayNode(gen_size, symbol_size));
-	hrelay->SetFeedbackStrategy(relayStrategy);
+	auto hrelay = std::shared_ptr<RelayNode>(new RelayNode(fac.genSize, fac.symSize));
+	hrelay->SetStrategy(fac.relayStrategy);
 	hrelay->SetId(777);
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
@@ -399,12 +441,12 @@ void TestFeedbackAccuracy() {
 	//
 	std::vector<double> loss_ratio(num_relays, 0.5);
 
-	std::cout << "Created network.." << std::endl;
+	SIM_LOG(TEST_LOG, "Created network..");
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// define broadcast functions
 	//
-	uint16_t snt_by_src = 0, snt_by_rel = 0, snt_by_dst = 0;
+	uint32_t snt_by_src = 0, snt_by_rel = 0, snt_by_dst = 0;
 
 	auto do_broadcast_src = [&]()
 	{
@@ -421,23 +463,25 @@ void TestFeedbackAccuracy() {
 		}
 	};
 
-	auto do_broadcast_relay = [&](uint16_t i)
+	auto do_broadcast_relay = [&](uint16_t i)->bool
 	{
-		std::cout << "Relay " << i << " sends" << std::endl;
 		assert(i < relays.size());
 		auto relay = relays.at(i);
 		if(!relay->IsIdle())
 		{
+			SIM_LOG(TEST_LOG, "Relay " << i << " sends");
 			auto payload = relay->SendData();
 			snt_by_rel++;
 
 			dst->RcvData(payload);
+			return true;
 		}
+		return false;
 	};
 
 	auto do_broadcast_dst = [&]()
 	{
-		std::cout << "Destination sends" << std::endl;
+		SIM_LOG(TEST_LOG, "Destination sends");
 		auto feedback = dst->SendFeedback();
 		snt_by_dst++;
 		for(auto relay : relays) relay->RcvFeedback(feedback);
@@ -447,15 +491,10 @@ void TestFeedbackAccuracy() {
 	////////////////////////////		Simulation start		///////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////////////////////////////////////////
 
-	enum SrcStrategy {
-		SEND_EXACT_SUFFICIENT_STRATEGY, SEND_P_SUFFICIENT_STRATEGY
-	};
-
-	SrcStrategy srcStrategy = SEND_EXACT_SUFFICIENT_STRATEGY;
 	//
 	// source sends till the rest subnetwork gets sufficient packets to decode the complete generation
 	//
-	if (srcStrategy == SEND_EXACT_SUFFICIENT_STRATEGY) {
+	if (fac.srcStrategy == SrcNode::SEND_EXACT_SUFFICIENT_STRATEGY) {
 
 		while (!hrelay->IsComplete()) {
 			do_broadcast_src();
@@ -465,7 +504,7 @@ void TestFeedbackAccuracy() {
 	//
 	// source sends till the rest subnetwork gets sufficient packets to decode the complete generation with probability p
 	//
-	if (srcStrategy == SEND_P_SUFFICIENT_STRATEGY) {
+	if (fac.srcStrategy == SrcNode::SEND_P_SUFFICIENT_STRATEGY) {
 		double p = 0.99;
 
 		auto get_suff_p_pkts = [&]()->int16_t
@@ -476,16 +515,15 @@ void TestFeedbackAccuracy() {
 				eps *= loss_ratio.at(i);
 			}
 
-			double numStd = 3;
-			double gamma = pow(numStd, 2) * eps / (double) gen_size / 4.0;
+			double gamma = pow(fac.numStd, 2) * eps / (double) fac.genSize / 4.0;
 			gamma = (gamma > 1) ? 1 : gamma;
 			double alpha = 1 + 2 * sqrt(gamma * (gamma + 1));
 
 			double cr = alpha / (1 - eps);
 
-			std::cout << "Using coding rate: " << cr << std::endl;
+			SIM_LOG(TEST_LOG, "Using coding rate: " << cr);
 
-			return (int16_t)(gen_size * cr);
+			return (int16_t)(fac.genSize * cr);
 		};
 
 		auto n = get_suff_p_pkts();
@@ -494,43 +532,38 @@ void TestFeedbackAccuracy() {
 		}
 	}
 
-	enum DstStrategy {
-		FEEDBACK_REGULAR, FEEDBACK_RANDOM
-	};
-
-	DstStrategy dstStrategy = FEEDBACK_REGULAR;
 	//
 	// relays send coded packets and the destination send the feedbacks till the destination has the full rank
 	//
-	uint16_t kMax = 1;
-	uint16_t k = kMax;
+	uint16_t k = fac.kMax;
 	std::default_random_engine gen(r());
 	std::uniform_int_distribution<> dis_without_dst(0, num_relays - 1);
 	std::uniform_int_distribution<> dis_with_dst(0, num_relays);
 	while (1) {
 
-		if (dstStrategy == FEEDBACK_REGULAR) {
+		if (fac.dstStrategy == DstNode::FEEDBACK_REGULAR) {
 
 			//
 			// a randomly selected relay sends
 			//
-			do_broadcast_relay(dis_without_dst(gen));
+			if (!do_broadcast_relay(dis_without_dst(gen))) continue;
 
 			//
 			// destination sends the feedback after each k packets sent by relays
 			//
 			if (--k == 0) {
 				do_broadcast_dst();
-				k = kMax;
+				k = fac.kMax;
 			}
 
 			//
 			// if source adds not sufficient redundancy then the destination cannot get the full rank
 			// finish when the relay group has transferred all information that it could
 			//
+			SIM_LOG(TEST_LOG, "DST rank: " << dst->Rank());
 			if (dst->Rank() == hrelay->Rank()) break;
 		}
-		if (dstStrategy == FEEDBACK_RANDOM) {
+		if (fac.dstStrategy == DstNode::FEEDBACK_RANDOM) {
 			//
 			// a randomly selected relay or the destination sends
 			//
@@ -545,16 +578,71 @@ void TestFeedbackAccuracy() {
 			if (dst->Rank() == hrelay->Rank()) break;
 		}
 	}
-	std::cout << "SRC sent:\t" << snt_by_src << " symbols" << std::endl;
-	std::cout << "REL sent:\t" << snt_by_rel << " symbols" << std::endl;
-	std::cout << "DST sent:\t" << snt_by_dst << " symbols" << std::endl;
-	std::cout << "DST A-rank:\t" << hrelay->Rank() << std::endl;			// achievable ranks of destination
+	SIM_LOG(TEST_LOG, "SRC sent:\t" << snt_by_src << " symbols");
+	SIM_LOG(TEST_LOG, "REL sent:\t" << snt_by_rel << " symbols");
+	SIM_LOG(TEST_LOG, "DST sent:\t" << snt_by_dst << " symbols");
+	SIM_LOG(TEST_LOG, "DST A-rank:\t" << hrelay->Rank());			// achievable ranks of destination
 
-	std::cout << (uint16_t) relayStrategy << "\t" << (uint16_t) srcStrategy << "\t" << (uint16_t) dstStrategy << "\t"
-			<< gen_size << "\t" << snt_by_src << "\t" << snt_by_rel
-			<< "\t" << snt_by_dst << "\t" << hrelay->Rank() << std::endl;
+	FALogItem fali;
+	fali.srcStrategy = fac.srcStrategy;
+	fali.relayStrategy = fac.relayStrategy;
+	fali.dstStrategy = fac.dstStrategy;
 
+	fali.genSize = fac.genSize;
+
+	fali.sntByDst = snt_by_dst;
+	fali.sntByRel = snt_by_rel;
+	fali.sntBySrc = snt_by_src;
+
+	fali.aRank = hrelay->Rank();
+
+	return fali;
 }
 
+struct FAEvalLog {
+	double macEff;
+};
+
+void TestFeedbackAccuracy() {
+
+	FAConfig fac;
+	fac.numRelays = 2;
+	for (auto i = 0; i < fac.numRelays; i++) {
+		fac.lossRatios.push_back(0.5 / (double) (i + 1));
+	}
+	fac.genSize = 8;
+	fac.symSize = 1;
+	fac.srcStrategy = SrcNode::SEND_P_SUFFICIENT_STRATEGY;
+	fac.relayStrategy = RelayNode::NOT_MORE_THAN_RANK;
+	fac.dstStrategy = DstNode::FEEDBACK_REGULAR;
+	fac.numStd = 0;
+	fac.kMax = 1;
+
+	std::vector<uint16_t> genSizes = { 8, 16, 32 };
+	std::vector<RelayNode::Strategy> relStrategies = { RelayNode::ALWAYS_SEND, RelayNode::NOT_MORE_THAN_RANK };
+
+	for (auto genSize : genSizes) {
+		for (auto relStrategy : relStrategies) {
+			std::vector<uint16_t> kMaxs = { 1, 2 };
+			kMaxs.push_back(genSize);
+			for (auto kMax : kMaxs) {
+				fac.genSize = genSize;
+				fac.relayStrategy = relStrategy;
+				fac.kMax = kMax;
+
+				uint32_t num_iter = 100, c = 0;
+
+				while (c++ != num_iter) {
+					auto log = RunFATest(fac);
+					// simulation for number of iterations 100, generation size {8,16,32}, relay strategy {0,1}, frequency of feedback {1,2, generation size}
+					// relay strategy: {0 - always send; 1 - send not more than the rank}
+					// line format: iteration number|frequency of feedback|relay strategy|source strategy|destination strategy|generation size|sent by source|sent by relays|sent by destination|destination achievable rank
+					std::cout << c << "\t" << fac.kMax << "\t" << log << std::endl;
+				}
+			}
+		}
+	}
+
+}
 }
 #endif /* TEST_FEEDBACK_ACCURACY_H_ */
