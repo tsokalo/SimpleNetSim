@@ -11,6 +11,7 @@
 #include "test-ccack.h"
 #include "test-feedback-estimator.h"
 #include "test-feedback-accuracy.h"
+#include "test-feedback-accuracy2.h"
 #include "test-bit-set.h"
 #include "test-channel-capacity.h"
 

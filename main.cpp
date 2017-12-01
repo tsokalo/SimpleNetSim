@@ -234,7 +234,6 @@ int main(int argc, char *argv[]) {
 
 	std::string path = argv[0];
 	size_t position = path.rfind("/build");
-	std::cout << "see position " << position << std::endl;
 	std::string subpath = path.substr(0, position + 1);
 
 	if (subpath.empty()) {
@@ -259,25 +258,24 @@ int main(int argc, char *argv[]) {
 
 	std::shared_ptr<CommNet> net;
 
-	std::cout << "see position " << position << std::endl;
-
 	SimParameters sim_par(subpath + GetSimParamFileName());
 
 	//
 	// using default parameters
 	//
+	if (m == RUN_MODE || m == EVAL_MODE) {
 //	CreateAutoSquareScenario(net, sim_par, 3);
 //	CreateBetaSquareScenario(net, sim_par, 3);
 
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
-	CreateStackScenario(net, 1, sim_par);
+		CreateStackScenario(net, 1, sim_par);
 //	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);
-
+	}
 	if (m == RUN_MODE) {
 		RemoveDirectory(folder);
 		CreateDirectory(folder);
@@ -385,7 +383,10 @@ int main(int argc, char *argv[]) {
 		std::cout << "TEST MODE" << std::endl;
 		std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
 
-		TestFeedbackAccuracy();
+		TestFeedbackAccuracy2();
+//		for (uint16_t i = 0; i < 20; i++)
+//			TestCcackSimpleMonteCarlo();
+//		TestCcack2Relay();
 
 	}
 
