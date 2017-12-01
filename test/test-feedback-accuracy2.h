@@ -67,7 +67,7 @@ struct FAConfig {
 	double numStd;
 	RelayStrategy relayStrategy;
 	uint16_t feedbackF; // number of received data packets per one sent feedback
-	uint16_t vDof;// number of DOF conveyed between encoder and decoder
+	uint16_t vDof; // number of DOF conveyed between encoder and decoder
 
 	FAConfig& operator=(const FAConfig& other) // copy assignment
 			{
@@ -109,8 +109,8 @@ public:
 	virtual ~NodeObject() {
 	}
 
-	virtual std::vector<uint8_t> SendData() = 0;
-	virtual void RcvData(std::vector<uint8_t> payload) = 0;
+	virtual std::vector<uint8_t> SendData(bool force = true) = 0;
+	virtual void RcvData(std::vector<uint8_t> payload, uint16_t id = 0) = 0;
 	virtual void RcvFeedback(CoderHelpInfo chi, uint16_t id) = 0;
 	virtual CoderHelpInfo SendFeedback() = 0;
 
@@ -163,6 +163,7 @@ protected:
 	decoder::factory m_decFactory;
 	FAConfig m_fac;
 	ccack_ptr m_ccack;
+//	std::map<uint16_t, ccack_ptr> m_ccacks;// for CCACK_SEPARATE
 	std::vector<uint8_t> m_payload;
 	T m_coder;
 	uint16_t m_id;
@@ -194,11 +195,11 @@ public:
 	virtual ~SrcNode() {
 	}
 
-	std::vector<uint8_t> SendData() {
+	std::vector<uint8_t> SendData(bool force = true) {
 		m_coder->write_payload(m_payload.data());
 		return m_payload;
 	}
-	void RcvData(std::vector<uint8_t> payload) {
+	void RcvData(std::vector<uint8_t> payload, uint16_t id = 0) {
 		assert(0);
 	}
 	void RcvFeedback(CoderHelpInfo chi, uint16_t id) {
@@ -252,24 +253,36 @@ public:
 		m_strategyOption = so;
 	}
 	bool HasData() {
+
+		if(m_id == 2)return false;
+
 		if (m_strategyOption == NO_DATA) return false;
-		return (m_numToSend != 0);
+		return (m_numToSend > 0);
 	}
 	bool HasFeedback() {
-		if (m_strategyOption == NO_FEEDBACK) return false;
+		if (m_strategyOption == NO_FEEDBACK || m_strategy == EXPECTATION) return false;
 		return (m_feedbackTimer == 0);
 	}
-	std::vector<uint8_t> SendData() {
+	std::vector<uint8_t> SendData(bool force = false) {
+
+		SIM_LOG(TEST_LOG, "Relay " << m_id << " remains to send " << m_numToSend);
+
 		m_coder->write_payload(m_payload.data());
 		m_ccack->SaveSnt(ExtractCodingVector(m_payload, m_fac.genSize));
-		assert(m_numToSend > 0);
-		m_numToSend--;
+		if (!force) {
+			assert(m_numToSend > 0);
+			m_numToSend--;
+		}
 		return m_payload;
 	}
-	void RcvData(std::vector<uint8_t> payload) {
+	void RcvData(std::vector<uint8_t> payload, uint16_t id = 0) {
+
 		m_coder->read_payload(payload.data());
 		m_ccack->SaveRcv(ExtractCodingVector(payload, m_fac.genSize));
 		m_feedbackTimer = (m_feedbackTimer == 0) ? 0 : m_feedbackTimer - 1;
+		rcvd[id]++;
+
+		SIM_LOG(TEST_LOG, "Relay " << m_id << " rank " << Rank());
 	}
 	//
 	// the node does not decide itself when the received data should be forwarded
@@ -281,8 +294,14 @@ public:
 
 		m_numForward++;
 		m_aNumForward = m_numForward;
+		UpdateNumToSend();
+	}
+	uint16_t GetNumForward() {
+		return m_numForward;
 	}
 	void RcvFeedback(CoderHelpInfo chi, uint16_t id) {
+
+		SIM_LOG(TEST_LOG, "Relay " << m_id);
 
 		assert(m_strategyOption != NO_DATA);
 		assert(m_strategy != EXPECTATION);
@@ -291,10 +310,14 @@ public:
 		UpdateActToForward();
 	}
 	CoderHelpInfo SendFeedback() {
+
+		SIM_LOG(TEST_LOG, "Relay " << m_id);
+
 		CoderHelpInfo chi;
 		chi.m = GetCodingMatrix();
 		chi.hashVec = GetCcackInfo();
 		chi.c = GetCoderInfo();
+		chi.rcvd = rcvd;
 		m_feedbackTimer = m_fac.feedbackF;
 
 		return chi;
@@ -324,7 +347,7 @@ private:
 
 		auto get_merged_seen = [this, &merge_maps]()
 		{
-			SeenMap mutual;
+			SeenMap mutual(m_fac.genSize, 0);
 			for (auto it : m_feedbacks) {
 				auto t = it.second.c.seen;
 				merge_maps(mutual, t);
@@ -333,7 +356,7 @@ private:
 		};
 		auto get_merged_decoded = [this, &merge_maps]()
 		{
-			SeenMap mutual;
+			SeenMap mutual(m_fac.genSize, 0);
 			for (auto it : m_feedbacks) {
 				auto t = it.second.c.decoded;
 				merge_maps(mutual, t);
@@ -359,11 +382,13 @@ private:
 
 			m_aNumForward = 0;
 			auto e = pow(m_fac.lossRatio, 1 / (double) m_fac.numRelays);
-			auto expectedToRcv = m_numForward * m_cr * (1 - e);
+			auto expectedToRcv = ceil(m_numForward * m_cr * (1 - e));
 			for (auto it : m_feedbacks) {
-				auto s = (it.second.c.rank >= expectedToRcv) ? 0 : expectedToRcv - it.second.c.rank;
+				auto s = (it.second.rcvd[m_id] > expectedToRcv) ? 0 : expectedToRcv - it.second.rcvd[m_id];
 				m_aNumForward = (s > m_aNumForward) ? s : m_aNumForward;
 			}
+
+			SIM_LOG(TEST_LOG, "Relay " << m_id << " expected to receive " << expectedToRcv << ", remaining to forward " << m_aNumForward);
 			break;
 		}
 		case PIVOTS: {
@@ -474,6 +499,7 @@ private:
 	double m_cr;
 
 	std::map<uint16_t, CoderHelpInfo> m_feedbacks;
+	std::map<uint16_t, uint16_t> rcvd;// <from node> <number>
 };
 
 struct FALogItem {
@@ -523,7 +549,7 @@ FALogItem RunFA2Test(FAConfig fac) {
 	for (auto i = 0; i < fac.numRelays; i++) {
 		auto relay = relay_ptr(new RelayNode(fac));
 		us.push_back(relay);
-		relay->SetId(i + 2);
+		relay->SetId(i + 3);
 		relay->SetStrategyOption(RelayNode::NO_DATA);
 	}
 
@@ -547,13 +573,15 @@ FALogItem RunFA2Test(FAConfig fac) {
 	//
 	for (uint16_t i = 0; i < fac.vDof; i++) {
 		v->RcvData(src->SendData());
+		v->IncForward();
 	}
+	SIM_LOG(TEST_LOG, "Rank of v: " << v->Rank());
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// configure relays v_1 and v_2
 	//
 	while (hv->Rank() != v->Rank()) {
-		auto payload = v->SendData();
+		auto payload = v->SendData(true);
 		auto a = distribution(generator) < 0.5;
 		auto b = distribution(generator) < 0.5;
 
@@ -569,6 +597,11 @@ FALogItem RunFA2Test(FAConfig fac) {
 		if (a || a & b) v1->IncForward();
 		if (b && !a) v2->IncForward();
 	}
+
+	SIM_LOG(TEST_LOG, "Rank of v1: " << v1->Rank() << ", number to forward: " << v1->GetNumForward());
+	SIM_LOG(TEST_LOG, "Rank of v2: " << v2->Rank() << ", number to forward: " << v2->GetNumForward());
+	SIM_LOG(TEST_LOG, "Rank of hv: " << hv->Rank());
+
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// define broadcast functions
 	//
@@ -593,7 +626,7 @@ FALogItem RunFA2Test(FAConfig fac) {
 		for(auto u : us)
 		{
 			if (distribution(generator) > loss_ratio) {
-				u->RcvData(payload);
+				u->RcvData(payload, v->GetId());
 				hu->RcvData(payload);
 				do_broadcast_us(u);
 			}
@@ -604,6 +637,10 @@ FALogItem RunFA2Test(FAConfig fac) {
 	///////////////////////////////////////////////////////////////////////////////////////////////////////
 	//////////////////////////////////////		Test start		///////////////////////////////////////////
 	///////////////////////////////////////////////////////////////////////////////////////////////////////
+
+	SIM_LOG(TEST_LOG, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+	SIM_LOG(TEST_LOG, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
+	SIM_LOG(TEST_LOG, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>");
 
 	while (v1->HasData() || v2->HasData()) {
 
@@ -640,10 +677,11 @@ void TestFeedbackAccuracy2() {
 	fac.numRelays = 2;
 	fac.genSize = 8;
 	fac.symSize = 1;
-	fac.relayStrategy = EXPECTATION;
+	fac.relayStrategy = CCACK;
 	fac.numStd = 0;
 	fac.lossRatio = 0.2;
 	fac.feedbackF = 1;
+	fac.vDof = 6;
 
 	RunFA2Test(fac);
 

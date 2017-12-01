@@ -34,6 +34,7 @@ struct CoderHelpInfo {
 			this->hashVec = other.hashVec;
 			this->finRank = other.finRank;
 			this->origRank = other.origRank;
+			this->rcvd = other.rcvd;
 		}
 		return *this;
 	}
@@ -46,6 +47,8 @@ struct CoderHelpInfo {
 
 	uint32_t finRank;
 	uint32_t origRank;
+
+	std::map<uint16_t, uint16_t> rcvd;// <from node> <number>
 };
 }
 
