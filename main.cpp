@@ -383,7 +383,9 @@ int main(int argc, char *argv[]) {
 		std::cout << "TEST MODE" << std::endl;
 		std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
 
-		TestFeedbackAccuracy2();
+		TestRedundancy();
+//		TestFeedbackAccuracy2();
+//		TestCcackSimple();
 //		for (uint16_t i = 0; i < 20; i++)
 //			TestCcackSimpleMonteCarlo();
 //		TestCcack2Relay();

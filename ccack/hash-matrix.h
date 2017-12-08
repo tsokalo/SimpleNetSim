@@ -94,11 +94,11 @@ private:
 
 	void Generate() {
 
-//		do {
+		do {
 			for (auto &m : m_ms) {
 				m->Generate();
 			}
-//		} while (!Validate());
+		} while (!Validate());
 	}
 
 	bool Validate() {

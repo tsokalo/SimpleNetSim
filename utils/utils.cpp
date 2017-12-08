@@ -1332,6 +1332,9 @@ void ExecuteCommand(const char * cmd) {
 }
 
 CodingVector ExtractCodingVector(std::vector<uint8_t> payload, uint16_t genSize) {
+//	std::cout << "Received coded packet: [";
+//	for(auto v : payload)std::cout << (uint16_t)v << " ";
+//	std::cout << "]" << std::endl;
 	CodingVector cv;
 	cv.insert(cv.begin(), payload.begin() + 1, payload.begin() + 1 + genSize);
 	return cv;

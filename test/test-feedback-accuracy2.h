@@ -29,6 +29,8 @@
 #include <boost/random/normal_distribution.hpp>
 #include <boost/math/distributions/students_t.hpp>
 #include <boost/algorithm/minmax_element.hpp>
+#include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
 
 #include "utils/coder.h"
 #include "utils/log.h"
@@ -68,6 +70,7 @@ struct FAConfig {
 	RelayStrategy relayStrategy;
 	uint16_t feedbackF; // number of received data packets per one sent feedback
 	uint16_t vDof; // number of DOF conveyed between encoder and decoder
+	hash_matrix_set_ptr hashMatrix;
 
 	FAConfig& operator=(const FAConfig& other) // copy assignment
 			{
@@ -80,6 +83,7 @@ struct FAConfig {
 			this->relayStrategy = other.relayStrategy;
 			this->feedbackF = other.feedbackF;
 			this->vDof = other.vDof;
+			this->hashMatrix = other.hashMatrix;
 		}
 		return *this;
 	}
@@ -101,9 +105,7 @@ public:
 	NodeObject(FAConfig fac) :
 			m_encFactory(fac.genSize, fac.symSize), m_decFactory(fac.genSize, fac.symSize) {
 		m_fac = fac;
-
-		m_hashMatrixSet = hash_matrix_set_ptr(new HashMatrixSet(2, m_fac.genSize, 8));
-		m_ccack = ccack_ptr(new Ccack(m_fac.genSize, m_hashMatrixSet));
+		m_ccack = ccack_ptr(new Ccack(m_fac.genSize, m_fac.hashMatrix));
 		m_id = 0;
 	}
 	virtual ~NodeObject() {
@@ -168,8 +170,6 @@ protected:
 	T m_coder;
 	uint16_t m_id;
 
-private:
-	hash_matrix_set_ptr m_hashMatrixSet;
 };
 
 class SrcNode: public NodeObject<encoder_ptr> {
@@ -254,7 +254,7 @@ public:
 	}
 	bool HasData() {
 
-		if(m_id == 2)return false;
+//		if (m_id == 2) return false;
 
 		if (m_strategyOption == NO_DATA) return false;
 		return (m_numToSend > 0);
@@ -277,7 +277,11 @@ public:
 	}
 	void RcvData(std::vector<uint8_t> payload, uint16_t id = 0) {
 
+		auto r1 = m_coder->rank();
 		m_coder->read_payload(payload.data());
+		auto r2 = m_coder->rank();
+		gotLinDep[id] = (r1 == r2) ? true : gotLinDep[id];
+		SIM_LOG(TEST_LOG, "Relay " << m_id << " got " << (gotLinDep[id] ? "lin dep" : "lin indep") << " packet from " << id);
 		m_ccack->SaveRcv(ExtractCodingVector(payload, m_fac.genSize));
 		m_feedbackTimer = (m_feedbackTimer == 0) ? 0 : m_feedbackTimer - 1;
 		rcvd[id]++;
@@ -318,6 +322,7 @@ public:
 		chi.hashVec = GetCcackInfo();
 		chi.c = GetCoderInfo();
 		chi.rcvd = rcvd;
+		chi.gotLinDep = gotLinDep;
 		m_feedbackTimer = m_fac.feedbackF;
 
 		return chi;
@@ -370,6 +375,32 @@ private:
 			return rank;
 		};
 
+		auto all_got_lin_dep = [this]()
+		{
+			if(m_feedbacks.size() < m_fac.numRelays)
+			{
+				SIM_LOG(TEST_LOG, "Relay " << m_id << " did not get the feedbacks from all relays yet");
+				return false;
+			}
+
+			bool b = true;
+			for (auto it : m_feedbacks) {
+				SIM_LOG(TEST_LOG, "Relay " << m_id << " got the feedback from " << it.first << " with lin dep flag " << it.second.gotLinDep[m_id]);
+				if (!it.second.gotLinDep[m_id])
+				{
+					b = false;
+					break;
+				}
+			}
+			return b;
+		};
+		auto vec_to_str = [](BooleanVector vec)
+		{
+			std::string str;
+			for(auto v : vec)str.push_back(v ? '1' : '0');
+			return str;
+		};
+
 		auto own_chi = GetCoderHelpInfo();
 
 		switch (m_strategy) {
@@ -388,6 +419,8 @@ private:
 				m_aNumForward = (s > m_aNumForward) ? s : m_aNumForward;
 			}
 
+			m_aNumForward = all_got_lin_dep() ? 0 : m_aNumForward;
+
 			SIM_LOG(TEST_LOG, "Relay " << m_id << " expected to receive " << expectedToRcv << ", remaining to forward " << m_aNumForward);
 			break;
 		}
@@ -401,18 +434,30 @@ private:
 				c += (rem.at(i) && loc.at(i)) ? 1 : 0;
 			}
 			assert(c <= m_coder->rank());
-			m_aNumForward = m_coder->rank() - c;
+			m_aNumForward = all_got_lin_dep() ? 0 : m_coder->rank() - c;
 			break;
 		}
 		case MIN_MAX: {
 
 			auto rem = own_chi.c;
 			rem.seen = get_merged_seen();
+
+			SIM_LOG(TEST_LOG, "Local seen: " << vec_to_str(own_chi.c.seen));
+			SIM_LOG(TEST_LOG, "Merged seen: " << vec_to_str(rem.seen));
+
 			rem.decoded = get_merged_decoded();
+
+			SIM_LOG(TEST_LOG, "Local decoded: " << vec_to_str(own_chi.c.decoded));
+			SIM_LOG(TEST_LOG, "Merged decoded: " << vec_to_str(rem.decoded));
+
 			rem.rank = get_merged_rank(rem.seen);
+
+			SIM_LOG(TEST_LOG, "Local Rank: " << own_chi.c.rank);
+			SIM_LOG(TEST_LOG, "Rank of merged: " << rem.rank);
+
 			auto loc = own_chi.c;
 			FeedbackEstimator fs(loc, rem);
-			m_aNumForward = fs.GetN();
+			m_aNumForward = all_got_lin_dep() ? 0 : fs.GetN();
 			break;
 		}
 		case CCACK: {
@@ -423,10 +468,12 @@ private:
 				auto chi = it.second;
 				m_ccack->RcvHashVector(chi.hashVec);
 				auto c = m_ccack->GetHeardSymbNum();
-
+				SIM_LOG(TEST_LOG, "Added hash vector from " << it.first << ", heard vectors " << m_ccack->GetHeardSymbNum());
 				auto s = m_coder->rank() > c ? m_coder->rank() - c : 0;
 				m_aNumForward = (s > m_aNumForward) ? s : m_aNumForward;
 			}
+
+			m_aNumForward = all_got_lin_dep() ? 0 : m_aNumForward;
 
 			break;
 		}
@@ -467,9 +514,6 @@ private:
 
 			for (auto it : m_feedbacks) {
 				auto chi = it.second;
-				m_ccack->RcvHashVector(chi.hashVec);
-				auto c = m_ccack->GetHeardSymbNum();
-
 				auto s = get_s(chi);
 				m_aNumForward = (s > m_aNumForward) ? s : m_aNumForward;
 			}
@@ -498,8 +542,11 @@ private:
 	StrategyOption m_strategyOption;
 	double m_cr;
 
+	// feedbacks received
 	std::map<uint16_t, CoderHelpInfo> m_feedbacks;
-	std::map<uint16_t, uint16_t> rcvd;// <from node> <number>
+	// feedbacks to send
+	std::map<uint16_t, uint16_t> rcvd; // <from node> <number>
+	std::map<uint16_t, bool> gotLinDep; // <from node> <received a linear dependent packet>
 };
 
 struct FALogItem {
@@ -671,55 +718,87 @@ FALogItem RunFA2Test(FAConfig fac) {
 	return fali;
 }
 
+boost::mutex io_mutex;
+
+void do_sim(FAConfig fac)
+{
+	uint32_t num_iter = 1000, c = 0;
+
+	while (c++ != num_iter) {
+		auto log = RunFA2Test(fac);
+
+		boost::unique_lock<boost::mutex> scoped_lock(io_mutex);
+		std::cout << c << "\t" << log << std::endl;
+	}
+}
+
 void TestFeedbackAccuracy2() {
 
 	FAConfig fac;
 	fac.numRelays = 2;
 	fac.genSize = 8;
 	fac.symSize = 1;
-	fac.relayStrategy = CCACK;
+	fac.relayStrategy = ALL_VECTORS;	//EXPECTATION, NUMBER_RCVD, PIVOTS, MIN_MAX, CCACK, ALL_VECTORS
 	fac.numStd = 0;
 	fac.lossRatio = 0.2;
 	fac.feedbackF = 1;
-	fac.vDof = 6;
+	fac.vDof = 4;
 
-	RunFA2Test(fac);
+	std::vector<uint16_t> genSizes = { 8, 16, 32 };
+	std::vector<RelayStrategy> relStrategies = { EXPECTATION, NUMBER_RCVD, PIVOTS, MIN_MAX, CCACK, ALL_VECTORS };
+	std::vector<uint16_t> numRelays = { 2, 3, 4 };
+	std::vector<uint16_t> feedbackFs = { 1, 2, 3 };
+	std::vector<uint16_t> vDofS = { 0, 1 };
 
+	typedef boost::shared_ptr<boost::thread> thread_pointer;
+
+
+//	auto do_sim = [&](FAConfig fac)
+//	{
+//		uint32_t num_iter = 20, c = 0;
 //
-//	std::vector<uint16_t> genSizes = { 8, 16, 32 };
-//	std::vector<RelayStrategy> relStrategies = {RelayNode::ALWAYS_SEND, RelayNode::NOT_MORE_THAN_RANK, RelayNode::SUBS_DECODED, RelayNode::SUBS_PIVOTS,
-//		RelayNode::MIN_MAX, RelayNode::CCACK, RelayNode::ALL_VECTORS};
-//	std::vector<uint16_t> numRelays = { 2, 3, 4 };
+//		while (c++ != num_iter) {
+//			auto log = RunFA2Test(fac);
 //
-//	for (auto genSize : genSizes) {
-//		for (auto relStrategy : relStrategies) {
-//			for (auto numRelay : numRelays) {
-//				fac.numRelays = numRelay;
-//				init_channel();
-//
-//				std::vector<uint16_t> kMaxs = { 1, 2 };
-//				kMaxs.push_back(genSize);
-//				for (auto kMax : kMaxs) {
-//					fac.genSize = genSize;
-//					fac.relayStrategy = relStrategy;
-//					fac.kMax = kMax;
-//
-//					uint32_t num_iter = 100, c = 0;
-//
-//					while (c++ != num_iter) {
-//						auto log = RunFA2Test(fac);
-//						// simulation for number of iterations 100, generation size {8,16,32}, number of relays {2, 3, 4}, relay strategy {0,1,...,6}, frequency of feedback {1,2, generation size}, relay strategy option {0}
-//						// relay strategy: {0 - 6} = { RelayNode::ALWAYS_SEND, RelayNode::NOT_MORE_THAN_RANK, RelayNode::SUBS_DECODED, RelayNode::SUBS_PIVOTS,	RelayNode::MIN_MAX, RelayNode::CCACK, RelayNode::ALL_VECTORS}
-//						// relay strategy option: {0, 1} = {RelayNode::SEND_EXACT_AS_STRATEGY_SAYS, RelayNode::SEND_AT_LEAST_ONE_ON_REQUEST}
-//						// line format: iteration number|frequency of feedback|relay strategy|source strategy|
-//						// destination strategy|generation size|sent by source|sent by relays|sent by destination|
-//						// destination achievable rank|relay strategy option|destination achieved rank|number of relays
-//						std::cout << c << "\t" << fac.kMax << "\t" << log << std::endl;
-//					}
-//				}
-//			}
+//			boost::unique_lock<boost::mutex> scoped_lock(io_mutex);
+//			std::cout << c << "\t" << log << std::endl;
 //		}
-//	}
+//	};
+
+//	struct th {
+//	    void operator()();
+//	};
+
+	for (auto genSize : genSizes) {
+		fac.genSize = genSize;
+		fac.hashMatrix = hash_matrix_set_ptr(new HashMatrixSet(2, genSize, 8));
+		for (auto relStrategy : relStrategies) {
+			fac.relayStrategy = relStrategy;
+			for (auto numRelay : numRelays) {
+				fac.numRelays = numRelay;
+
+				boost::thread_group group;
+
+				for (auto feedbackF : feedbackFs) {
+					for (auto vDofS_ : vDofS) {
+						if (feedbackF == 1) fac.feedbackF = fac.genSize;
+						if (feedbackF == 2) fac.feedbackF = fac.genSize >> 1;
+						if (feedbackF == 3) fac.feedbackF = 1;
+						fac.vDof = fac.genSize >> vDofS_;
+
+						group.create_thread(boost::bind(&do_sim, fac));
+					}
+				}
+
+				group.join_all();
+			}
+		}
+	}
+
+	// simulation for number of iterations 100, generation size {8,16,32}, number of relays {2, 3, 4}, relay strategy {0,1,...,5}, frequency of feedback {1,2,4,Gen Size}, group DOF {Gs/2, Gs}
+	// relay strategy: {0 - 5} = { EXPECTATION, NUMBER_RCVD, PIVOTS, MIN_MAX, CCACK, ALL_VECTORS}
+	// line format: iteration number|number of relays|loss ratio|generation size|symbol size|metric for coding rate|relay strategy|feedback frequency|group DOF|
+	// sent by nodes in V|send by nodes in U|rank of v|rank of V|rank of U
 
 }
 }

@@ -35,6 +35,7 @@ struct CoderHelpInfo {
 			this->finRank = other.finRank;
 			this->origRank = other.origRank;
 			this->rcvd = other.rcvd;
+			this->gotLinDep = other.gotLinDep;
 		}
 		return *this;
 	}
@@ -49,6 +50,7 @@ struct CoderHelpInfo {
 	uint32_t origRank;
 
 	std::map<uint16_t, uint16_t> rcvd;// <from node> <number>
+	std::map<uint16_t, bool> gotLinDep;// <from node> <received a linear dependent packet>
 };
 }
 

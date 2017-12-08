@@ -25,7 +25,7 @@ void TestCcackSimple() {
 
 	// Set the number of symbols (i.e. the generation size in RLNC
 	// terminology) and the size of a symbol in bytes
-	uint32_t symbols = 50;
+	uint32_t symbols = 4;
 	uint32_t symbol_size = 5;
 	uint16_t levels = 2;
 	uint16_t fs = 8;
@@ -88,7 +88,7 @@ void TestCcackSimple() {
 		//
 		// Pass that packet to decoder; emulate losses
 		//
-		if ((rand() % 2)) {
+//		if ((rand() % 2)) {
 			decoder->read_payload(payload.data());
 			print_vec("Decoding at D", cv);
 			ccackD.SaveRcv(cv);
@@ -100,7 +100,7 @@ void TestCcackSimple() {
 			// deliver the feedback to the encoder without losses
 			//
 			ccackS.RcvHashVector(hashD);
-		}
+//		}
 	}
 
 	std::vector<uint8_t> data_out(decoder->block_size());

@@ -14,5 +14,6 @@
 #include "test-feedback-accuracy2.h"
 #include "test-bit-set.h"
 #include "test-channel-capacity.h"
+#include "test-redundancy.h"
 
 #endif /* TEST_TEST_H_ */

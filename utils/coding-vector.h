@@ -31,7 +31,7 @@ struct CodingVector: public std::vector<uint8_t> {
 	operator<<(std::ostream& os, const CodingVector& l) {
 		os << "<";
 		for (auto v : l)
-			os << (uint16_t) v << ",";
+			os << (uint16_t) v << " ";
 		os << ">";
 		return os;
 	}

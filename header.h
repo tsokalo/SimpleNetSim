@@ -63,7 +63,7 @@ enum WhoCanSendRr {
 	ALL_WHO_HEAR_LEGAL, ONE_SELECTED_LEGAL
 };
 
-//#define FULL_VECTOR
+#define FULL_VECTOR
 
 /*
  * unit [bps]

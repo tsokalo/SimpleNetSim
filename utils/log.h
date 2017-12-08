@@ -29,7 +29,7 @@
 #define LPSOLVER_LOG    		0
 #define CCACK_LOG	    		0
 #define TEMP_LOG				0
-#define TEST_LOG				1
+#define TEST_LOG				0
 #define BRRM_LOG				0
 
 //#define COMM_NET_LOG            1
