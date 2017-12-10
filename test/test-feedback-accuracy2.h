@@ -17,6 +17,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <map>
 #include <algorithm>
@@ -62,6 +63,22 @@ enum RelayStrategy {
 };
 
 struct FAConfig {
+
+	FAConfig() {
+	}
+	FAConfig(std::stringstream &ss) {
+		ss >> numRelays;
+		ss >> lossRatio;
+		ss >> genSize;
+		ss >> symSize;
+		ss >> numStd;
+		uint16_t v;
+		ss >> v;
+		relayStrategy = RelayStrategy(v);
+		ss >> feedbackF;
+		ss >> vDof;
+	}
+
 	uint16_t numRelays; // decoder x,y,z,...
 	double lossRatio; // from decoder 1,2 to the group x,y,z together
 	uint32_t genSize;
@@ -86,6 +103,19 @@ struct FAConfig {
 			this->hashMatrix = other.hashMatrix;
 		}
 		return *this;
+	}
+
+	inline friend bool operator==(const FAConfig& lhs, const FAConfig& rhs) {
+		if (lhs.numRelays != rhs.numRelays) return false;
+		if (lhs.lossRatio != rhs.lossRatio) return false;
+		if (lhs.genSize != rhs.genSize) return false;
+		if (lhs.symSize != rhs.symSize) return false;
+		if (lhs.numStd != rhs.numStd) return false;
+		if (lhs.relayStrategy != rhs.relayStrategy) return false;
+		if (lhs.feedbackF != rhs.feedbackF) return false;
+		if (lhs.vDof != rhs.vDof) return false;
+
+		return true;
 	}
 
 	friend std::ostream& operator<<(std::ostream& o, FAConfig& m) {
@@ -230,6 +260,7 @@ public:
 		m_strategy = fac.relayStrategy;
 		m_strategyOption = NO_OPTION;
 		m_feedbackTimer = fac.feedbackF;
+		m_numFeedbackSent = 0;
 
 		double eps = m_fac.lossRatio;
 
@@ -251,6 +282,9 @@ public:
 	}
 	void SetStrategyOption(StrategyOption so) {
 		m_strategyOption = so;
+	}
+	uint16_t GetNumFeedbackSnt() {
+		return m_numFeedbackSent;
 	}
 	bool HasData() {
 
@@ -324,6 +358,7 @@ public:
 		chi.rcvd = rcvd;
 		chi.gotLinDep = gotLinDep;
 		m_feedbackTimer = m_fac.feedbackF;
+		m_numFeedbackSent++;
 
 		return chi;
 	}
@@ -475,48 +510,56 @@ private:
 
 			m_aNumForward = all_got_lin_dep() ? 0 : m_aNumForward;
 
+//			m_aNumForward = 0;
+//
+//			for (auto it : m_feedbacks) {
+//				auto chi = it.second;
+//				m_ccack->RcvHashVector(chi.hashVec);
+//				SIM_LOG(TEST_LOG, "Added hash vector from " << it.first << ", heard vectors " << m_ccack->GetHeardSymbNum());
+//			}
+//
+//			auto c = m_ccack->GetHeardSymbNum();
+//			auto s = m_coder->rank() > c ? m_coder->rank() - c : 0;
+//
+//			m_aNumForward = s;
+//			m_aNumForward = all_got_lin_dep() ? 0 : m_aNumForward;
+
 			break;
 		}
 		case ALL_VECTORS: {
 
-			auto get_s = [this](CoderHelpInfo chi)
-			{
-				CodingMatrix m = chi.m;
-				auto dec = m_decFactory.build();
-				//
-				// read all external coding coefficients
-				//
-					std::vector<uint8_t> fake_symbol(dec->symbol_size());
-					for (auto s : m) {
-						dec->read_symbol(fake_symbol.data(), s.data());
-					}
-					auto origRank = dec->rank();
-
-					//
-					// read all own coding coefficients
-					//
-					std::vector<uint8_t> s(m_fac.genSize);
-					auto dec_o = m_coder;
-
-					for (uint16_t i = 0; i < dec_o->coefficient_vector_size(); i++) {
-						uint8_t* coef_vector = dec_o->coefficient_vector_data(i);
-						s.assign(coef_vector, coef_vector + m_fac.genSize);
-						dec->read_symbol(fake_symbol.data(), s.data());
-					}
-					auto finRank = dec->rank();
-
-					assert(finRank >= origRank);
-					auto k = finRank - origRank;
-					return k;
-				};
-
-			m_aNumForward = 0;
-
+			//
+			// read all external coding coefficients
+			//
+			auto dec = m_decFactory.build();
+			std::vector<uint8_t> fake_symbol(dec->symbol_size());
 			for (auto it : m_feedbacks) {
-				auto chi = it.second;
-				auto s = get_s(chi);
-				m_aNumForward = (s > m_aNumForward) ? s : m_aNumForward;
+
+				CodingMatrix m = it.second.m;
+				for (auto s : m) {
+					dec->read_symbol(fake_symbol.data(), s.data());
+				}
 			}
+			auto origRank = dec->rank();
+
+			//
+			// read all own coding coefficients
+			//
+			std::vector<uint8_t> s(m_fac.genSize);
+			auto dec_o = m_coder;
+
+			for (uint16_t i = 0; i < dec_o->coefficient_vector_size(); i++) {
+				uint8_t* coef_vector = dec_o->coefficient_vector_data(i);
+				s.assign(coef_vector, coef_vector + m_fac.genSize);
+				dec->read_symbol(fake_symbol.data(), s.data());
+			}
+			auto finRank = dec->rank();
+
+			assert(finRank >= origRank);
+			auto k = finRank - origRank;
+
+			m_aNumForward = k;
+			m_aNumForward = all_got_lin_dep() ? 0 : m_aNumForward;
 
 			break;
 		}
@@ -541,6 +584,7 @@ private:
 	RelayStrategy m_strategy;
 	StrategyOption m_strategyOption;
 	double m_cr;
+	uint16_t m_numFeedbackSent;
 
 	// feedbacks received
 	std::map<uint16_t, CoderHelpInfo> m_feedbacks;
@@ -550,6 +594,18 @@ private:
 };
 
 struct FALogItem {
+
+	FALogItem() {
+	}
+	FALogItem(std::stringstream &ss) {
+
+		fac = FAConfig(ss);
+		ss >> sntByVs;
+		ss >> sntByUs;
+		ss >> vRank;
+		ss >> hvRank;
+		ss >> huRank;
+	}
 
 	FAConfig fac;
 
@@ -578,7 +634,7 @@ FALogItem RunFA2Test(FAConfig fac) {
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create source node
 	//
-	auto src = std::shared_ptr<SrcNode>(new SrcNode(fac));
+	auto src = std::shared_ptr < SrcNode > (new SrcNode(fac));
 
 	////////////////////////////////////////////////////////////////////////////////////////////////
 	// create relays
@@ -654,9 +710,9 @@ FALogItem RunFA2Test(FAConfig fac) {
 	//
 	uint32_t snt_by_vs = 0, snt_by_us = 0;
 
-	auto do_broadcast_us = [&](relay_ptr u)
+	auto do_broadcast_us = [&](relay_ptr u, bool force=false)
 	{
-		if(!u->HasFeedback()) return false;
+		if(!u->HasFeedback() && !force) return false;
 
 		auto feedback = u->SendFeedback();
 		snt_by_us++;
@@ -696,6 +752,13 @@ FALogItem RunFA2Test(FAConfig fac) {
 		} else {
 			do_broadcast_vs(v2);
 		}
+
+		if (!v1->HasData() && !v2->HasData() && fac.relayStrategy != EXPECTATION) {
+			SIM_LOG(TEST_LOG, "both v1 and v2 have no data to transmit");
+			for (auto u : us) {
+				if (u->GetNumFeedbackSnt() == 0) do_broadcast_us(u, true);
+			}
+		}
 	}
 
 	SIM_LOG(TEST_LOG, "Vs sent:\t" << snt_by_vs << " symbols");
@@ -720,8 +783,7 @@ FALogItem RunFA2Test(FAConfig fac) {
 
 boost::mutex io_mutex;
 
-void do_sim(FAConfig fac)
-{
+void do_sim(FAConfig fac) {
 	uint32_t num_iter = 1000, c = 0;
 
 	while (c++ != num_iter) {
@@ -738,11 +800,16 @@ void TestFeedbackAccuracy2() {
 	fac.numRelays = 2;
 	fac.genSize = 8;
 	fac.symSize = 1;
-	fac.relayStrategy = ALL_VECTORS;	//EXPECTATION, NUMBER_RCVD, PIVOTS, MIN_MAX, CCACK, ALL_VECTORS
+	fac.relayStrategy = MIN_MAX;	//EXPECTATION, NUMBER_RCVD, PIVOTS, MIN_MAX, CCACK, ALL_VECTORS
 	fac.numStd = 0;
 	fac.lossRatio = 0.2;
-	fac.feedbackF = 1;
-	fac.vDof = 4;
+	fac.feedbackF = fac.genSize;
+	fac.vDof = fac.genSize >> 1;
+//	fac.hashMatrix = hash_matrix_set_ptr(new HashMatrixSet(2, fac.genSize, 8));
+//
+//	RunFA2Test(fac);
+//
+//	return;
 
 	std::vector<uint16_t> genSizes = { 8, 16, 32 };
 	std::vector<RelayStrategy> relStrategies = { EXPECTATION, NUMBER_RCVD, PIVOTS, MIN_MAX, CCACK, ALL_VECTORS };
@@ -751,23 +818,6 @@ void TestFeedbackAccuracy2() {
 	std::vector<uint16_t> vDofS = { 0, 1 };
 
 	typedef boost::shared_ptr<boost::thread> thread_pointer;
-
-
-//	auto do_sim = [&](FAConfig fac)
-//	{
-//		uint32_t num_iter = 20, c = 0;
-//
-//		while (c++ != num_iter) {
-//			auto log = RunFA2Test(fac);
-//
-//			boost::unique_lock<boost::mutex> scoped_lock(io_mutex);
-//			std::cout << c << "\t" << log << std::endl;
-//		}
-//	};
-
-//	struct th {
-//	    void operator()();
-//	};
 
 	for (auto genSize : genSizes) {
 		fac.genSize = genSize;
@@ -801,5 +851,132 @@ void TestFeedbackAccuracy2() {
 	// sent by nodes in V|send by nodes in U|rank of v|rank of V|rank of U
 
 }
+
+struct FAMetricItem {
+	FAMetricItem(FALogItem log) {
+		fac = log.fac;
+		alpha = ((double) log.sntByVs - (double) log.vRank / (1 - fac.lossRatio)) / (double) log.huRank;
+		beta = (double) log.sntByUs / (double) log.huRank;
+		gamma = ((double) log.vRank - (double) log.huRank) / (double) log.vRank;
+	}
+
+	FAConfig fac;
+	double alpha;
+	double beta;
+	double gamma;
+};
+
+struct FAStatItem {
+
+	typedef std::pair<double, double> stat_pair_t;
+
+	FAStatItem(std::vector<FAMetricItem> fams) {
+
+		assert(!fams.empty());
+		fac = fams.begin()->fac;
+
+		std::vector<double> alphas, betas, gammas;
+		for (auto fam : fams) {
+			alphas.push_back(fam.alpha);
+			betas.push_back(fam.beta);
+			gammas.push_back(fam.gamma);
+		}
+		alpha = CalcStats(alphas);
+		beta = CalcStats(betas);
+		gamma = CalcStats(gammas);
+	}
+
+	friend std::ostream& operator<<(std::ostream& o, FAStatItem& m) {
+
+		o << m.fac << "\t" << m.alpha.first << "\t" << m.alpha.second << "\t" << m.beta.first << "\t" << m.beta.second << "\t" << m.gamma.first << "\t"
+				<< m.gamma.second;
+		return o;
+	}
+
+	FAConfig fac;
+	stat_pair_t alpha;
+	stat_pair_t beta;
+	stat_pair_t gamma;
+};
+
+void EvaluteFeedbackAccuracy(std::string path) {
+
+	//
+	// read from file
+	//
+	std::cout << "Evaluate results in " << path << std::endl;
+	std::vector<FALogItem> logs;
+	std::ifstream fi(path, std::ios_base::in);
+	std::string line;
+	while (getline(fi, line, '\n')) {
+		std::stringstream ss(line);
+		uint16_t c = 0;
+		ss >> c;
+		logs.push_back(FALogItem(ss));
+	}
+	fi.close();
+
+	//
+	// construct use cases
+	//
+	std::vector<FAConfig> facs;
+	FAConfig fac;
+	fac.numRelays = 2;
+	fac.genSize = 8;
+	fac.symSize = 1;
+	fac.relayStrategy = MIN_MAX;	//EXPECTATION, NUMBER_RCVD, PIVOTS, MIN_MAX, CCACK, ALL_VECTORS
+	fac.numStd = 0;
+	fac.lossRatio = 0.2;
+	fac.feedbackF = fac.genSize;
+	fac.vDof = fac.genSize >> 1;
+
+	std::vector<uint16_t> genSizes = { 8, 16, 32 };
+	std::vector<RelayStrategy> relStrategies = { EXPECTATION, NUMBER_RCVD, PIVOTS, MIN_MAX, CCACK, ALL_VECTORS };
+	std::vector<uint16_t> numRelays = { 2, 3, 4 };
+	std::vector<uint16_t> feedbackFs = { 1, 2, 3 };
+	std::vector<uint16_t> vDofS = { 0, 1 };
+	for (auto genSize : genSizes) {
+		fac.genSize = genSize;
+		fac.hashMatrix = hash_matrix_set_ptr(new HashMatrixSet(2, genSize, 8));
+		for (auto relStrategy : relStrategies) {
+			fac.relayStrategy = relStrategy;
+			for (auto numRelay : numRelays) {
+				fac.numRelays = numRelay;
+
+				for (auto feedbackF : feedbackFs) {
+					for (auto vDofS_ : vDofS) {
+						if (feedbackF == 1) fac.feedbackF = fac.genSize;
+						if (feedbackF == 2) fac.feedbackF = fac.genSize >> 1;
+						if (feedbackF == 3) fac.feedbackF = 1;
+						fac.vDof = fac.genSize >> vDofS_;
+
+						facs.push_back(fac);
+					}
+				}
+			}
+		}
+	}
+
+	//
+	// sort results and evaluate the target metrics
+	//
+	std::map<uint16_t, std::vector<FAMetricItem> > slogs;
+	for (auto log : logs) {
+		for (uint16_t i = 0; i < facs.size(); i++) {
+			if (facs.at(i) == log.fac) {
+				slogs[i].push_back(FAMetricItem(log));
+			}
+		}
+	}
+
+	//
+	// calculate stats
+	//
+	for (auto slog : slogs) {
+		auto fas = FAStatItem(slog.second);
+		std::cout << fas << std::endl;
+	}
+}
+
 }
 #endif /* TEST_FEEDBACK_ACCURACY_TWO_H_ */

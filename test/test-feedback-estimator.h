@@ -37,7 +37,7 @@ namespace ncr {
 // calculates mean and confidence interval using T-Student theorem and 95% confidence probability
 //
 std::pair<double, double> CalcStats(std::vector<double> vals) {
-	uint16_t num_batches = 20;
+	uint16_t num_batches = 15;
 	std::size_t batch_size = floor((double) vals.size() / (double) (num_batches + 1)), j = 0;
 	std::vector<double> v;
 

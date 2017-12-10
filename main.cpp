@@ -383,8 +383,10 @@ int main(int argc, char *argv[]) {
 		std::cout << "TEST MODE" << std::endl;
 		std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
 
-		TestRedundancy();
+//		TestRedundancy();
 //		TestFeedbackAccuracy2();
+		std::string path = "/home/tsokalo/Dokumente/4_Publications/ArqNcFeedback/projects/sim/res1000_new_last.cvs";
+		EvaluteFeedbackAccuracy(path);
 //		TestCcackSimple();
 //		for (uint16_t i = 0; i < 20; i++)
 //			TestCcackSimpleMonteCarlo();
