@@ -15,5 +15,7 @@
 #include "test-bit-set.h"
 #include "test-channel-capacity.h"
 #include "test-redundancy.h"
+#include "test-out-of-order.h"
+
 
 #endif /* TEST_TEST_H_ */
