@@ -1,0 +1,6 @@
+Source:	mate
+Destination:	frank
+Graph:	
+mate	->	mirko,lab
+mirko	->	frank,lab
+lab	->	frank

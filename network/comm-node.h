@@ -53,6 +53,8 @@ public:
 	Edge_ptr
 	CreateInputEdge(UanAddress src_id, double e);
 	Edge_ptr
+	CreateInputEdge(UanAddress src_id, std::string traceFile);
+	Edge_ptr
 	CreateOutputEdge(UanAddress dst_id, Edge_ptr input);
 	Edge_ptr
 	GetEdge(UanAddress src_id, UanAddress dst_id);
@@ -91,11 +93,12 @@ public:
 	//
 	bool DoIwannaSend();
 
-	Datarate GetDatarate()
-	{
+	Datarate GetDatarate() {
 		return m_sp.apiRate;
 	}
-	NodeType GetNodeType(){return m_nodeType;}
+	NodeType GetNodeType() {
+		return m_nodeType;
+	}
 
 	void SetMessTypeCallback(set_msg_type_func f);
 
@@ -130,6 +133,6 @@ private:
 	get_rank_func m_getRank;
 
 };
-}//ncr
+}	//ncr
 
 #endif /* COMMNODE_H_ */

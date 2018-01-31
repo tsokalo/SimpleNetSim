@@ -12,6 +12,7 @@
 #include <vector>
 #include <memory>
 #include <math.h>
+#include <iterator>
 
 #include <storage/storage.hpp>
 #include <kodo_rlnc/full_vector_codes.hpp>
@@ -23,8 +24,92 @@
 #include "routing-rules/srp-solver.h"
 #include "test/test.h"
 #include "utils/sim-parameters.h"
+#include "utils/files-dirs.h"
 
 namespace ncr {
+
+void ReadScenario(std::shared_ptr<CommNet> &net, SimParameters sp, std::string path, std::string folder_with_traces) {
+
+	//
+	// read topology file
+	//
+	std::ifstream infile(path, std::ios_base::in);
+
+	std::string line, temp, src, dst;
+	std::map<std::string, std::vector<std::string> > graph_names;
+
+	infile >> temp >> src;
+	infile >> temp >> dst;
+	infile >> temp;
+	std::cout << src << " " << dst << std::endl;
+
+	while (!infile.eof()) {
+		std::string sender, receivers_str;
+		std::vector<std::string> receivers;
+		infile >> sender >> temp >> receivers_str;
+		std::string receiver;
+		for (auto letter : receivers_str) {
+			if (letter == '\n') continue;
+			if (letter == ',' && !receiver.empty()) {
+				receivers.push_back(receiver);
+				receiver.clear();
+			} else {
+				receiver.push_back(letter);
+			}
+		}
+		if (!receiver.empty()) receivers.push_back(receiver);
+		if (!sender.empty()) graph_names[sender] = receivers;
+	}
+	infile.close();
+
+	for (auto e : graph_names) {
+		std::cout << "Sender " << e.first << " has following receivers: ";
+		for (auto r : e.second)
+			std::cout << r << ", ";
+		std::cout << std::endl;
+	}
+
+	//
+	// make enumerated node list
+	//
+	std::vector<std::string> names;
+	names.push_back(src);
+	for (auto e : graph_names) {
+		auto name = e.first;
+		if (name != src && name != dst) names.push_back(name);
+	}
+	names.push_back(dst);
+
+	auto get_id = [&](std::string name)
+	{
+		auto it = std::find(names.begin(), names.end(), name);
+		assert(it != names.end());
+		return std::distance(names.begin(), it);
+	};
+	auto get_trace_filename = [&](std::string s, std::string r)
+	{
+		auto files = FindFile(folder_with_traces, s + "-" + r);
+		assert(files.size() == 1);
+		return files.at(0);
+	};
+
+	uint16_t numNodes = graph_names.size() + 1;
+	net = std::shared_ptr<CommNet>(new CommNet(numNodes, sp));
+	for (auto e : graph_names) {
+		auto s_name = e.first;
+		auto s_id = get_id(s_name);
+		for (auto r_name : e.second) {
+			auto r_id = get_id(r_name);
+			std::cout << "connecting " << s_name << " with id " << s_id << " and " << r_name << " with id " << r_id << " using trace file " << get_trace_filename(s_name, r_name) << std::endl;
+			net->ConnectNodes(s_id, r_id, get_trace_filename(s_name, r_name));
+		}
+	}
+
+	net->SetDestination(get_id(dst));
+	net->Configure();
+	net->PrintNet();
+}
+
 void CreateTriangleScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net = std::shared_ptr<CommNet>(new CommNet(3, sp));
 	net->ConnectNodes(0, 1, 0.2);
@@ -259,11 +344,17 @@ int main(int argc, char *argv[]) {
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
 //	CreateStackScenario(net, 8, sim_par);
-	CreateTriangleScenario(net, sim_par);
+//	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);
+	std::string topology = subpath + "Topologies/Topology1.txt";
+	std::cout << "Looking for topology " << topology << std::endl;
+	std::string folder_with_traces = "/home/tsokalo/Dokumente/4_Publications/EuropeWireless2018/docs/zhenya_bitmaskdump";
+	ReadScenario(net, sim_par, topology, folder_with_traces);
+
+//	return 0;
 
 	if (m == RUN_MODE) {
 		RemoveDirectory(folder);

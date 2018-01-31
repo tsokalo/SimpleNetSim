@@ -65,6 +65,16 @@ void CommNet::ConnectNodes(UanAddress src, UanAddress dst, double e1, double e2)
 	fromSrc->reverse_edge_ = fromDst;
 	fromDst->reverse_edge_ = fromSrc;
 }
+void
+CommNet::ConnectNodes(UanAddress src, UanAddress dst, std::string traceFile)
+{
+	assert(m_nodes.size() > (uint16_t )src && m_nodes.size() > (uint16_t )dst && src != dst && m_nodes.at(src) && m_nodes.at(dst));
+
+	std::shared_ptr<Edge> fromSrc = m_nodes.at(src)->CreateOutputEdge(dst, m_nodes.at(dst)->CreateInputEdge(src, traceFile));
+	std::shared_ptr<Edge> fromDst = m_nodes.at(dst)->CreateOutputEdge(src, m_nodes.at(src)->CreateInputEdge(dst, traceFile));
+	fromSrc->reverse_edge_ = fromDst;
+	fromDst->reverse_edge_ = fromSrc;
+}
 void CommNet::ConnectNodesDirected(UanAddress src, UanAddress dst, double e) {
 	assert(m_nodes.size() > (uint16_t )src && m_nodes.size() > (uint16_t )dst && src != dst && m_nodes.at(src) && m_nodes.at(dst));
 

@@ -39,14 +39,6 @@ namespace ncr {
 void
 PrintSymbol(NcSymbol sym);
 
-typedef std::vector<std::string> FileList;
-typedef struct stat Stat;
-
-void GetDirListing(FileList& result, const std::string& dirpath);
-int16_t CreateDirectory(std::string path);
-bool RemoveDirectory(std::string folderPath);
-FileList FindFiles(std::string searchPath, std::string filePartName);
-
 std::string GetLogFileName();
 std::string GetSimParamFileName();
 LogBank ReadLogBank(std::string path);

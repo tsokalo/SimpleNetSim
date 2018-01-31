@@ -42,6 +42,11 @@ public:
 	 */
 	void
 	ConnectNodes(UanAddress src, UanAddress dst, double e1, double e2 = -1);
+	/*
+	 * using the file with the CRC check traces; only for undirected graph suitable
+	 */
+	void
+	ConnectNodes(UanAddress src, UanAddress dst, std::string traceFile);
 
 	void
 	ConnectNodesDirected(UanAddress src, UanAddress dst, double e);
@@ -100,9 +105,7 @@ public:
 	void
 	EnableLog(std::string path);
 
-	SimParameters
-	GetSimParameters()
-	{
+	SimParameters GetSimParameters() {
 		return m_sp;
 	}
 

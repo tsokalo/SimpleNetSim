@@ -18,100 +18,6 @@ void PrintSymbol(NcSymbol sym) {
 	std::cout << std::endl;
 }
 
-void GetDirListing(FileList& result, const std::string& dirpath) {
-	DIR* dir = opendir(dirpath.c_str());
-	if (dir) {
-		struct dirent* entry;
-		while ((entry = readdir(dir))) {
-			struct stat entryinfo;
-			std::string entryname = entry->d_name;
-			std::string entrypath = dirpath + "/" + entryname;
-			if (!stat(entrypath.c_str(), &entryinfo)) result.push_back(entrypath);
-		}
-		closedir(dir);
-	}
-}
-
-int16_t CreateDirectory(std::string path) {
-	//mode_t mode = 0x0666;
-	Stat st;
-	int32_t status = 0;
-
-	if (stat(path.c_str(), &st) != 0) {
-		/* Directory does not exist. EEXIST for race condition */
-		if (mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH) != 0 && errno != EEXIST) status = -1; //, mode
-	} else if (!S_ISDIR(st.st_mode)) {
-		errno = ENOTDIR;
-		status = -1;
-	}
-
-	return status;
-}
-
-bool RemoveDirectory(std::string folderPath) {
-	std::cout << "Deleting directory: " << folderPath << std::endl;
-	FileList dirtree;
-	GetDirListing(dirtree, folderPath);
-	int32_t numofpaths = dirtree.size();
-
-	for (int32_t i = 0; i < numofpaths; i++) {
-		std::string str(dirtree[i]);
-		std::string fullPath = str;
-
-		int32_t pos = 0;
-		while (pos != -1) {
-			pos = str.find("/");
-			str = str.substr(pos + 1);
-		}
-		if (str == "" || str == "." || str == "..") {
-			continue;
-		}
-		struct stat st_buf;
-		stat(fullPath.c_str(), &st_buf);
-		if (S_ISDIR(st_buf.st_mode)) {
-			RemoveDirectory(fullPath);
-		} else {
-			std::remove(fullPath.c_str());
-		}
-		rmdir(fullPath.c_str());
-	}
-	return true;
-}
-FileList FindFiles(std::string searchPath, std::string filePartName) {
-	//  std::cout << "Searching in directory: " << searchPath << " for file with " << filePartName << " in its name" << std::endl;
-	FileList matchFullPath;
-	FileList dirtree;
-	GetDirListing(dirtree, searchPath);
-	int32_t numofpaths = dirtree.size();
-
-	for (int32_t i = 0; i < numofpaths; i++) {
-		std::string str(dirtree[i]);
-		std::string fullPath = str;
-
-		int32_t pos = 0;
-		while (pos != -1) {
-			pos = str.find("/");
-			str = str.substr(pos + 1);
-		}
-		if (str == "" || str == "." || str == "..") {
-			continue;
-		}
-		struct stat st_buf;
-		stat(fullPath.c_str(), &st_buf);
-		if (S_ISDIR(st_buf.st_mode)) {
-			continue;
-		} else {
-			std::size_t found = str.find(filePartName);
-			if (found != std::string::npos) {
-				if (str.find('~') == std::string::npos) {
-					matchFullPath.push_back(fullPath);
-					//                  std::cout << "Found file: " << fullPath << std::endl;
-				}
-			}
-		}
-	}
-	return matchFullPath;
-}
 std::string GetLogFileName() {
 	return "log.txt";
 }
@@ -1206,18 +1112,13 @@ void CreateArqInfoCvs(LogBank lb, std::string path) {
 	// accomplish entries
 	//
 	std::map<UanAddress, ArqWin> last_aw;
-	for (auto t : aw)
-	{
-		if(aw[t.first].empty())continue;
+	for (auto t : aw) {
+		if (aw[t.first].empty()) continue;
 
-		for (auto k : ks)
-		{
-			if (aw[t.first].find(k.first) == aw[t.first].end())
-			{
+		for (auto k : ks) {
+			if (aw[t.first].find(k.first) == aw[t.first].end()) {
 				aw[t.first][k.first] = last_aw[k.first];
-			}
-			else
-			{
+			} else {
 				last_aw[k.first] = aw[t.first][k.first];
 			}
 		}
@@ -1361,4 +1262,6 @@ void PrintProgress(uint32_t m, uint32_t c) {
 //	if (m == ORIG_MSG_TYPE) os << "ORIGINAL";
 //	return os;
 //}
+
 }
+

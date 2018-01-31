@@ -19,9 +19,6 @@ RR candidate selection way				4
 Type of the feedback contents			2
 Give RR priority to SRC					1
 Who can forward RR						1
-Warm-up period							500
-Warm-down period						500
-Simulation duration						6000
-Warm-up period							5000
-Warm-down period						5000
-Simulation duration						120000
+Warm-up period							1000
+Warm-down period						1000
+Simulation duration						100000

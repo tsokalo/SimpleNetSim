@@ -1,0 +1,7 @@
+Source:	krish
+Destination:	frank
+Graph:	
+krish	->	mate,mirko,lab
+mate	->	mirko
+mirko	->	frank,lab
+lab	->	frank

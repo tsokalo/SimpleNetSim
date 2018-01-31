@@ -84,6 +84,16 @@ Edge_ptr CommNode::CreateInputEdge(int16_t src_id, double e) {
 	m_in_ids[edge->v_] = m_ins.size() - 1;
 	return edge;
 }
+Edge_ptr CommNode::CreateInputEdge(UanAddress src_id, std::string traceFile) {
+	assert(src_id != m_id);
+	Edge_ptr edge = Edge_ptr(new Edge(src_id, std::bind(&CommNode::Receive, this, std::placeholders::_1, std::placeholders::_2)));
+	edge->SetNotifyLoss(std::bind(&CommNode::NotifyLoss, this, std::placeholders::_1, std::placeholders::_2));
+	edge->SetLossProcess(std::shared_ptr<TraceLossProcess>(new TraceLossProcess(traceFile)));
+
+	m_ins.push_back(edge);
+	m_in_ids[edge->v_] = m_ins.size() - 1;
+	return edge;
+}
 Edge_ptr CommNode::CreateOutputEdge(int16_t dst_id, Edge_ptr input) {
 	assert(dst_id != m_id);
 
@@ -198,7 +208,6 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 
 	m_brr->RcvHeaderInfo(pkt.GetHeader());
 
-
 	if (!pkt.IsFeedbackSymbol()) {
 
 		auto txPlan = pkt.GetHeader().txPlan;
@@ -209,8 +218,7 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 		GenId genId = txPlan.begin()->first;
 		auto plan_item = txPlan.begin()->second;
 
-		if (m_nodeType == SOURCE_NODE_TYPE)
-			return;
+		if (m_nodeType == SOURCE_NODE_TYPE) return;
 
 		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receives packet from generation " << genId);
 
@@ -344,8 +352,7 @@ bool CommNode::DoIwannaSend() {
 //	return (accumulate(txPlan) > 0);
 }
 void CommNode::SetMessTypeCallback(set_msg_type_func f) {
-	if (m_trafSink)
-		m_trafSink->SetMessTypeCallback(f);
+	if (m_trafSink) m_trafSink->SetMessTypeCallback(f);
 }
 
 void CommNode::EnableCcack(hash_matrix_set_ptr hashMatrixSet) {
