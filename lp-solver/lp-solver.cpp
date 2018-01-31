@@ -40,11 +40,14 @@ void LPSolver::ConstructTask() {
 	CoinPackedMatrix *matrix = new CoinPackedMatrix(false, 0, 0);
 	matrix->setDimensions(0, m_o.size());
 
+	std::cout << "Inserting constraints" << std::endl;
 	for (uint16_t i = 0; i < m_c.size(); i++) {
 		CoinPackedVector row;
 		for (uint16_t j = 0; j < m_c.at(i).size(); j++) {
 			row.insert(j, m_c.at(i).at(j));
+			std::cout << m_c.at(i).at(j) << " ";
 		}
+		std::cout << std::endl;
 //		row_lb[i] = 0;
 //		row_ub[i] = si->getInfinity();
 		matrix->appendRow(row);

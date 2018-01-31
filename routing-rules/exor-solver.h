@@ -81,14 +81,24 @@ protected:
 		for (auto node : m_commNet->GetNodes()) {
 			if (std::find(dsts.begin(), dsts.end(), node->GetId()) != dsts.end()) {
 				auto dst = node->GetId();
+				std::cout << "Preparing constraints for destination " << dst << std::endl;
 				graph_ptr graph = ConstructGraph(src, dst);
 				graph->Evaluate();
 				auto cutsets = graph->GetAllCutSets();
 				auto c = graph->GetConstraints();
 				constraints_map[numDest] = c;
 				numDest++;
+
+
+				auto obj = graph->GetObjectives();
+				auto bs = graph->GetBounds();
+				std::cout << "obj from graph: ";
+				for(auto o : obj)
+					std::cout << o << " ";
+				std::cout << std::endl;
 			}
 		}
+		std::cout << "Number of destinations " << numDest << std::endl;
 
 		// constraints for data rate variables
 		Constraints constraints;
@@ -121,8 +131,8 @@ protected:
 		//
 		Bounds cBounds(std::vector<double>(n, 0), std::vector<double>(n, std::numeric_limits<double>::max()));
 		// for the sum of all ts
-		cBounds.first.insert(cBounds.first.end(), 1, 1);
-		cBounds.second.insert(cBounds.second.end(), 1, 1);
+		cBounds.first.insert(cBounds.first.end(), 1, 0.999999);
+		cBounds.second.insert(cBounds.second.end(), 1, 1.0000001);
 		// for difference of all rates
 		cBounds.first.insert(cBounds.first.end(), k, 0);
 		cBounds.second.insert(cBounds.second.end(), k, 0);
