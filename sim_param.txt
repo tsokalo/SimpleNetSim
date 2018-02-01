@@ -24,13 +24,7 @@ RR candidate selection way				4
 Type of the feedback contents			2
 Give RR priority to SRC					1
 Who can forward RR						1
-<<<<<<< HEAD
-Warm-up period							1000
-Warm-down period						1000
-Simulation duration						100000
-=======
-Warm-up period							500
-Warm-down period						500
-Simulation duration						60000
+Warm-up period							100
+Warm-down period						100
+Simulation duration						1000
 Soft ACK decision coefficient			1.1
->>>>>>> 7a78821a07a70eeca77e35be24727ca50277b103

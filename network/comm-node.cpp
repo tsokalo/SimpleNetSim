@@ -200,11 +200,8 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 
 	SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receives from " << input->v_);
 
-<<<<<<< HEAD
-	m_brr->RcvHeaderInfo(pkt.GetHeader());
-=======
+
 	m_brr->ProcessHeaderInfo(pkt.GetHeader());
->>>>>>> 7a78821a07a70eeca77e35be24727ca50277b103
 
 	if (!pkt.IsFeedbackSymbol()) {
 
@@ -216,14 +213,11 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 		GenId genId = txPlan.begin()->first;
 		auto plan_item = txPlan.begin()->second;
 
-<<<<<<< HEAD
-		if (m_nodeType == SOURCE_NODE_TYPE) return;
-=======
+
 		if (m_nodeType == SOURCE_NODE_TYPE) {
 			m_brr->UpdateRcvd(genId, input->v_, true);
 			return;
 		}
->>>>>>> 7a78821a07a70eeca77e35be24727ca50277b103
 
 		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receives packet from generation " << genId);
 

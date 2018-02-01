@@ -100,7 +100,8 @@ void ReadScenario(std::shared_ptr<CommNet> &net, SimParameters sp, std::string p
 		auto s_id = get_id(s_name);
 		for (auto r_name : e.second) {
 			auto r_id = get_id(r_name);
-			std::cout << "connecting " << s_name << " with id " << s_id << " and " << r_name << " with id " << r_id << " using trace file " << get_trace_filename(s_name, r_name) << std::endl;
+			std::cout << "connecting " << s_name << " with id " << s_id << " and " << r_name << " with id " << r_id << " using trace file "
+					<< get_trace_filename(s_name, r_name) << std::endl;
 			net->ConnectNodes(s_id, r_id, get_trace_filename(s_name, r_name));
 		}
 	}
@@ -348,32 +349,30 @@ int main(int argc, char *argv[]) {
 	//
 	// using default parameters
 	//
-<<<<<<< HEAD
-=======
+
 	if (m == RUN_MODE || m == EVAL_MODE) {
->>>>>>> 7a78821a07a70eeca77e35be24727ca50277b103
+
 //	CreateAutoSquareScenario(net, sim_par, 3);
 //	CreateBetaSquareScenario(net, sim_par, 3);
 
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
 //		CreateStackScenario(net, 1, sim_par);
-	CreateTriangleScenario(net, sim_par);
+//	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);
-<<<<<<< HEAD
-	std::string topology = subpath + "Topologies/Topology1.txt";
-	std::cout << "Looking for topology " << topology << std::endl;
-	std::string folder_with_traces = "/home/tsokalo/Dokumente/4_Publications/EuropeWireless2018/docs/zhenya_bitmaskdump";
-	ReadScenario(net, sim_par, topology, folder_with_traces);
+
+		std::string topology = subpath + "Topologies/Topology0.txt";
+		std::cout << "Looking for topology " << topology << std::endl;
+		std::string folder_with_traces = "/home/tsokalo/Dokumente/4_Publications/EuropeWireless2018/docs/zhenya_bitmaskdump";
+		ReadScenario(net, sim_par, topology, folder_with_traces);
 
 //	return 0;
 
-=======
 	}
->>>>>>> 7a78821a07a70eeca77e35be24727ca50277b103
+
 	if (m == RUN_MODE) {
 		RemoveDirectory(folder);
 		CreateDirectory(folder);
