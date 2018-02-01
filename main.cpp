@@ -269,8 +269,8 @@ int main(int argc, char *argv[]) {
 
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
-		CreateStackScenario(net, 1, sim_par);
-//	CreateTriangleScenario(net, sim_par);
+//		CreateStackScenario(net, 1, sim_par);
+	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);

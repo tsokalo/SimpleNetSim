@@ -53,7 +53,7 @@ struct PathDesc {
 	double loss;
 };
 
-std::vector<uint16_t> GenSendSeq(PathDesc path1, PathDesc path2, uint32_t num_v, std::vector<double> &arrivals) {
+std::vector<uint16_t> GenDetSendSeq(PathDesc path1, PathDesc path2, uint32_t num_v, std::vector<double> &arrivals) {
 	using namespace std;
 
 	auto gen_iats = [](double latency, double jitter, uint32_t num_v)
@@ -114,7 +114,7 @@ std::vector<uint16_t> GenSendSeq(PathDesc path1, PathDesc path2, uint32_t num_v,
 	auto iats_i = gen_iats(path1.latency, path1.jitter, num_v);
 	auto arrivals_i = get_arrivals(iats_i);
 	// second path
-	auto iats_j = gen_iats(path1.latency, path1.jitter, num_v);
+	auto iats_j = gen_iats(path2.latency, path2.jitter, num_v);
 	auto arrivals_j = get_arrivals(iats_j);
 
 	//
@@ -122,12 +122,80 @@ std::vector<uint16_t> GenSendSeq(PathDesc path1, PathDesc path2, uint32_t num_v,
 	//
 	return get_sending_sequence(arrivals_i, arrivals_j);
 }
+std::pair<std::vector<uint16_t>, std::vector<uint16_t> > GenRndSendSeq(PathDesc path1, PathDesc path2, uint32_t num_v, std::vector<double> &arrivals) {
+	using namespace std;
+
+	auto gen_iats = [](double latency, double jitter, uint32_t num_v)
+	{
+		std::random_device r;
+		std::default_random_engine gen (r ());
+
+		std::normal_distribution<> d
+		{	latency, jitter};
+
+		std::vector<double> iats;
+
+		auto get_iat = [&]()
+		{
+			auto v = d (gen);
+			return (v < 0 ? 0 : v);
+		};
+
+		for (uint32_t i = 0; i < num_v; i++)
+		iats.push_back (get_iat ());
+
+		return iats;
+	};
+	auto get_p_schedule_path1 = [&]()
+	{
+		auto a = (path1.latency / (1 - path1.loss)) / (path2.latency / (1 - path2.loss));
+		return 1 / (1 + a);
+	};
+	auto get_sending_sequence = [&](std::vector<double> iats_i, std::vector<double> iats_j, double p)
+	{
+
+		std::random_device r;
+
+		std::default_random_engine generator(r());
+		std::uniform_real_distribution<double> distribution(0.0, 1.0);
+
+		std::vector<uint16_t> seq;
+		auto i_it = iats_i.begin();
+		auto j_it = iats_j.begin();
+
+		uint16_t i = 0;
+		double arrival = 0;
+		while(i_it != iats_i.end() && j_it != iats_j.end())
+		{
+			if(distribution(generator) < p) {i = 1;arrival += (*i_it);i_it++;}
+			else {i = 2;arrival += (*j_it);j_it++;}
+			seq.push_back(i);
+			arrivals.push_back(arrival);
+		}
+		return seq;
+	};
+
+	auto p = get_p_schedule_path1();
+	std::cout << "P for path 1: " << p << std::endl;
+	// first path
+	auto iats_i = gen_iats(path1.latency, path1.jitter, num_v);
+	// second path
+	auto iats_j = gen_iats(path2.latency, path2.jitter, num_v);
+	//
+	// define receiving order assuming the round robin scheduling
+	//
+	std::pair<std::vector<uint16_t>, std::vector<uint16_t> > seq;
+	seq.first = get_sending_sequence(iats_i, iats_j, p);
+	seq.second = get_sending_sequence(iats_i, iats_j, 0.5);
+
+	return seq;
+}
 
 struct OoO {
 	typedef std::vector<uint8_t> pkt_t;
 
 	struct Feedback {
-		std::vector<bool> ssns;
+		std::map<uint32_t, bool> ssns;
 		uint32_t rank;
 	};
 	enum Codec {
@@ -136,14 +204,22 @@ struct OoO {
 
 };
 
+uint32_t get_ssn(OoO::pkt_t payload) {
+	symb_ssn_t ssn;
+	memcpy(ssn.data(), &payload[0], ssn.size());
+	return ssn.val();
+}
+
 class SenderNode: public NodeObject<encoder_ptr> {
 public:
 
 	SenderNode(FAConfig fac, OoO::Codec c, std::vector<OoO::pkt_t> pkts) :
 			NodeObject(fac) {
 
+		m_c = c;
+
 		m_coder = m_encFactory.build();
-		m_payload.resize(m_coder->payload_size());
+		if (m_c == OoO::FULL_RLNC) m_payload.resize(m_coder->payload_size());
 		kodo_core::set_systematic_off (*m_coder);
 
 		// Allocate some data to encode. In this case we make a buffer
@@ -158,7 +234,11 @@ public:
 
 		m_toSend = pkts.size();
 		m_pkts = pkts;
-		m_c = c;
+		if (m_c == OoO::NO_CODEC) m_payload.resize(PKT_SIZE);
+
+		for (auto pkt : m_pkts)
+			m_ssns[get_ssn(pkt)] = false;
+
 	}
 	virtual ~SenderNode() {
 	}
@@ -172,13 +252,17 @@ public:
 		SIM_LOG_FUNC(TEST_LOG);
 
 		m_toSend = 0;
-		if (OoO::NO_CODEC) {
-			for (auto v : fb.ssns)
-				if (!v) m_toSend++;
-			m_tx = fb.ssns;
+		if (m_c == OoO::NO_CODEC) {
+			for (auto v : fb.ssns) {
+				if (TEST_LOG) std::cout << "(" << v.first << "," << v.second << ")";
+				if (!v.second) m_toSend++;
+			}
+			if (TEST_LOG) std::cout << std::endl;
+			m_ssns = fb.ssns;
 		}
-		if (OoO::FULL_RLNC) {
+		if (m_c == OoO::FULL_RLNC) {
 			m_toSend = m_coder->rank() - fb.rank;
+			SIM_LOG(TEST_LOG, "Rank in feedback: " << fb.rank << ", remaining to send: " << m_toSend);
 		}
 
 		SIM_LOG(TEST_LOG, "Number to send: " << m_toSend);
@@ -190,13 +274,18 @@ public:
 
 		assert(!m_pkts.empty());
 
-		m_toSend--;
-		assert(m_toSend >= 0);
+		assert(m_toSend > 0);
 
 		if (m_c == OoO::NO_CODEC) {
 			auto p_it = m_pkts.begin();
-			for (auto tx : m_tx) {
-				if (tx) m_payload = *p_it;
+			for (auto &ssn : m_ssns) {
+				assert(p_it != m_pkts.end());
+				assert((*p_it).size() == m_payload.size());
+				if (!ssn.second) {
+					std::copy((*p_it).begin(), (*p_it).end(), m_payload.begin());
+					ssn.second = true;
+					break;
+				}
 				p_it++;
 			}
 		}
@@ -204,6 +293,9 @@ public:
 		if (m_c == OoO::FULL_RLNC) {
 			m_coder->write_payload(m_payload.data());
 		}
+
+		m_toSend--;
+
 		return m_payload;
 	}
 
@@ -222,7 +314,7 @@ private:
 	int32_t m_toSend;
 	OoO::Codec m_c;
 	std::vector<OoO::pkt_t> m_pkts;
-	std::vector<bool> m_tx;
+	std::map<uint32_t, bool> m_ssns;
 };
 
 class ReceiverNode: public NodeObject<decoder_ptr> {
@@ -278,7 +370,7 @@ public:
 		SIM_LOG_FUNC(TEST_LOG);
 
 		OoO::Feedback fb;
-		fb.ssns = m_tx;
+		fb.ssns = m_ssns;
 		fb.rank = m_coder->rank();
 		return fb;
 	}
@@ -288,21 +380,20 @@ public:
 		assert(0);
 		return m_payload;
 	}
-	void RcvData(std::vector<uint8_t> payload, uint16_t id = 0) {
+	void RcvData(std::vector<uint8_t> payload, bool crc, uint16_t id = 0) {
 
 		SIM_LOG_FUNC(TEST_LOG);
 
 		if (m_c == OoO::NO_CODEC) {
-			//
-			// extract SSN and mark the received
-			//
-
+			m_ssns[get_ssn(payload)] = crc;
 		}
 		if (m_c == OoO::FULL_RLNC) {
-			m_coder->read_payload(payload.data());
+			if (crc) m_coder->read_payload(payload.data());
 		}
 	}
-
+	void RcvData(std::vector<uint8_t> payload, uint16_t id = 0) {
+		assert(0);
+	}
 	void RcvFeedback(CoderHelpInfo chi, uint16_t id) {
 		assert(0);
 	}
@@ -331,22 +422,10 @@ private:
 
 	OoO::Codec m_c;
 	std::vector<OoO::pkt_t> m_pkts;
-	std::vector<bool> m_tx;
+	std::map<uint32_t, bool> m_ssns;
 };
 
-void TestOutOfOrder() {
-
-	FAConfig fac;
-	fac.numRelays = 2;
-	fac.genSize = 8;
-	fac.symSize = PKT_SIZE;
-	fac.relayStrategy = MIN_MAX;	//EXPECTATION, NUMBER_RCVD, PIVOTS, MIN_MAX, CCACK, ALL_VECTORS
-	fac.numStd = 0;
-	fac.lossRatio = 0.2;
-	fac.feedbackF = fac.genSize;
-	fac.vDof = fac.genSize >> 1;
-	fac.hashMatrix = hash_matrix_set_ptr(new HashMatrixSet(2, fac.genSize, 8));
-
+double DoTestOutOfOrder(FAConfig fac, PathDesc path1, PathDesc path2, std::vector<uint16_t> seq, OoO::Codec c, std::vector<double> arrivals) {
 
 	std::random_device r;
 
@@ -369,16 +448,8 @@ void TestOutOfOrder() {
 		pkts.push_back(packet);
 	}
 
-	//
-	// create sending sequence order
-	//
-	PathDesc path1(10, 5, 0.5), path2(10, 2, 0.5);
-	uint32_t numTransmissionSlots = fac.genSize * 10;
-	std::vector<double> arrivals;
-	auto seq = GenSendSeq(path1, path2, numTransmissionSlots, arrivals);
-
-	SenderNode snd(fac, OoO::NO_CODEC, pkts);
-	ReceiverNode rcv(fac, OoO::NO_CODEC, pkts);
+	SenderNode snd(fac, c, pkts);
+	ReceiverNode rcv(fac, c, pkts);
 	auto seq_it = seq.begin();
 	auto arr_it = arrivals.begin();
 
@@ -387,18 +458,77 @@ void TestOutOfOrder() {
 
 			assert(seq_it != seq.end());
 			auto pkt = snd.SendData();
-			if(*seq_it == 1)if(distribution(generator) > path1.loss)rcv.RcvData(pkt);
-			if(*seq_it == 2)if(distribution(generator) > path2.loss)rcv.RcvData(pkt);
+			if (*seq_it == 1) rcv.RcvData(pkt, distribution(generator) > path1.loss);
+			if (*seq_it == 2) rcv.RcvData(pkt, distribution(generator) > path2.loss);
 			seq_it++;
 			arr_it++;
 		}
-
+		SIM_LOG(TEST_LOG, "Sender has no more data. Send the feedback");
 		snd.RcvFeedback(rcv.GetFeedback());
 	}
 
 	double duration = *arr_it;
 
-	std::cout << "Duration: " << duration << std::endl;
+//	std::cout << fac << "\t" << (uint16_t) c << "\t" << duration << std::endl;
+	return duration;
+}
+void TestOutOfOrder() {
+
+	FAConfig fac;
+	fac.numRelays = 2;
+	fac.genSize = 8;
+	fac.symSize = PKT_SIZE;
+	fac.relayStrategy = MIN_MAX;	//EXPECTATION, NUMBER_RCVD, PIVOTS, MIN_MAX, CCACK, ALL_VECTORS
+	fac.numStd = 0;
+	fac.lossRatio = 0.2;
+	fac.feedbackF = fac.genSize;
+	fac.vDof = fac.genSize >> 1;
+	fac.hashMatrix = hash_matrix_set_ptr(new HashMatrixSet(2, fac.genSize, 8));
+	auto c = OoO::NO_CODEC;
+
+	//
+	// create sending sequence order
+	//
+	PathDesc path1(10, 1, 0.25), path2(2, 1, 0.25);
+	uint32_t numTransmissionSlots = fac.genSize * 10;
+	std::vector<double> arrivals;
+	auto seq_pair = GenRndSendSeq(path1, path2, numTransmissionSlots, arrivals);
+	std::vector<uint16_t> seq = seq_pair.first;
+
+	std::vector<double> res;
+
+	auto iter_func = [&]()
+	{
+		for (uint32_t i = 0; i < 20; i++) {
+			auto v = DoTestOutOfOrder(fac, path1, path2, seq, c, arrivals);
+			boost::unique_lock<boost::mutex> scoped_lock(io_mutex);
+			res.push_back(v);
+		}
+	};
+
+	auto run_multicore = [&]()
+	{
+		boost::thread_group group;
+		for (uint16_t j = 0; j < 8; j++) {
+			group.create_thread(boost::bind<void>(iter_func));
+		}
+		group.join_all();
+
+		auto stat_pair = CalcStats(res);
+		std::cout << "RES: " << fac << "\t" << (uint16_t)c << "\t" << stat_pair.first << "\t" << stat_pair.second << std::endl;
+	};
+
+	run_multicore();
+
+	c = OoO::FULL_RLNC;
+	run_multicore();
+
+	seq = seq_pair.second;
+	c = OoO::NO_CODEC;
+	run_multicore();
+
+	c = OoO::FULL_RLNC;
+	run_multicore();
 }
 
 }
