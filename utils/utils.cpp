@@ -972,7 +972,6 @@ void PlotOutputStability(LogBank lb, std::string path, double opt, UanAddress ds
 	uint32_t batch_size = (long double) (lb.begin()->second.end() - 1)->t / (double) (num_batches);
 	std::vector<double> dr(num_batches, 0), sent(num_batches, 0);
 	uint32_t c_in_b, c_out_b = 0;
-	uint32_t sum_send = 0, sum_rcvd = 0;
 
 	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
 
@@ -1015,7 +1014,7 @@ void PlotOutputStability(LogBank lb, std::string path, double opt, UanAddress ds
 	// make data file
 	//
 	std::ofstream fd(data_file, std::ios_base::out);
-	for (auto i = 0; i < dr.size(); i++)
+	for (uint32_t i = 0; i < dr.size(); i++)
 		fd << i << "\t" << dr.at(i) << std::endl;
 	fd.close();
 
@@ -1165,7 +1164,6 @@ void PlotSrcPriorStability(LogBank lb, std::string path, double opt, UanAddress 
 	std::vector<double> dr(num_batches, 0);
 	std::vector<double> dt(num_batches, 0);
 	uint32_t c_in_b, c_out_b = 0;
-	uint32_t sum_send = 0, sum_rcvd = 0;
 
 	auto lh = lb[src];
 
@@ -1199,7 +1197,7 @@ void PlotSrcPriorStability(LogBank lb, std::string path, double opt, UanAddress 
 	// make data file
 	//
 	std::ofstream fd(data_file, std::ios_base::out);
-	for (auto i = 0; i < dr.size(); i++)
+	for (uint32_t i = 0; i < dr.size(); i++)
 		fd << i << "\t" << dr.at(i) << std::endl;
 	fd.close();
 
@@ -1235,6 +1233,9 @@ void ExecuteCommand(const char * cmd) {
 }
 
 CodingVector ExtractCodingVector(std::vector<uint8_t> payload, uint16_t genSize) {
+//	std::cout << "Received coded packet: [";
+//	for(auto v : payload)std::cout << (uint16_t)v << " ";
+//	std::cout << "]" << std::endl;
 	CodingVector cv;
 	cv.insert(cv.begin(), payload.begin() + 1, payload.begin() + 1 + genSize);
 	return cv;

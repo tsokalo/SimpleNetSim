@@ -37,7 +37,7 @@ namespace ncr {
 // calculates mean and confidence interval using T-Student theorem and 95% confidence probability
 //
 std::pair<double, double> CalcStats(std::vector<double> vals) {
-	uint16_t num_batches = 20;
+	uint16_t num_batches = 15;
 	std::size_t batch_size = floor((double) vals.size() / (double) (num_batches + 1)), j = 0;
 	std::vector<double> v;
 
@@ -79,8 +79,6 @@ void TestFeedbackEstimator() {
 	// terminology) and the size of a symbol in bytes
 	uint32_t symbols = 64;
 	uint32_t symbol_size = 5;
-
-	bool trace_enabled = true;
 
 	// Typdefs for the encoder/decoder type we wish to use
 	using rlnc_encoder = kodo_rlnc::full_vector_encoder<fifi_field>;

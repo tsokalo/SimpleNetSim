@@ -279,7 +279,7 @@ public:
 
 		SIM_LOG(FILTER_LOG, m_vals.to_string () << " batch size: " << batch_size);
 
-		while (j++ < (1 << m_num_batches_bits) - 1) {
+		while (j++ < (uint32_t)(1 << m_num_batches_bits) - 1) {
 			auto temp_vals = ((m_vals << (batch_size * j)) >> (m_vals.size() - batch_size));
 			v.push_back((double) temp_vals.count() / (double) batch_size);
 			SIM_LOG(FILTER_LOG, temp_vals.to_string () << " -> " << (double) temp_vals.count () / (double) batch_size);

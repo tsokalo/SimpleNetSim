@@ -174,7 +174,7 @@ CodingMatrix Ccack::CollectRxVectorsForAck() {
 		max--;
 	}
 
-	assert(!s.empty());
+//	assert(!s.empty());
 
 	return s;
 }

@@ -122,6 +122,14 @@ struct node_map_t {
 		}
 		return v.end();
 	}
+	bool is_in(UanAddress a) {
+		for (node_map_it it = v.begin(); it != v.end(); it++) {
+			if (it->first == a) {
+				return true;
+			}
+		}
+		return false;
+	}
 
 private:
 

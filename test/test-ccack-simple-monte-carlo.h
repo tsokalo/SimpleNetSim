@@ -20,7 +20,7 @@ void TestCcackSimpleMonteCarlo() {
 
 	// Set the number of symbols (i.e. the generation size in RLNC
 	// terminology) and the size of a symbol in bytes
-	uint32_t symbols = 50;
+	uint32_t symbols = 128;
 	uint32_t symbol_size = 5;
 	uint16_t levels = 2;
 	uint16_t fs = 8;
@@ -114,11 +114,11 @@ void TestCcackSimpleMonteCarlo() {
 				//
 				ccackS.RcvHashVector(hashD);
 				heardS = ccackS.GetHeardSymbNum();
-			}
 
-			auto r = decoder->rank();
-			if (heardS > r) eplus += heardS - r;
-			if (heardS < r) eminus += r - heardS;
+				auto r = decoder->rank();
+				if (heardS > r) eplus += heardS - r;
+				if (heardS < r) eminus += r - heardS;
+			}
 
 		} while (encoder->rank() != heardS);
 	}

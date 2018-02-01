@@ -126,6 +126,7 @@ void CommNet::Run(int64_t cycles) {
 //		if (m_logger) m_logger->IncTime();
 	}
 }
+
 /*
  * only one source is possible
  */
@@ -162,8 +163,10 @@ CommNet::node_ptr CommNet::SelectSender() {
 	do {
 //		std::cout << "Selecting sender.." << std::endl;
 		v.clear();
+		SIM_LOG(COMM_NET_LOG, ">>>>>>>>>>>>>> MAKE NEW GLOBAL SCHEDULE <<<<<<<<<<<<<<<");
 		for (std::vector<node_ptr>::iterator it = m_nodes.begin(); it != m_nodes.end(); it++) {
 //			if ((*it)->GetId() == m_dst) continue;
+			SIM_LOG(COMM_NET_LOG, ">>>>>>>>>>>>>> Check if want to send for node " << (*it)->GetId());
 			if ((*it)->DoIwannaSend()) v.push_back(std::distance(m_nodes.begin(), it));
 		}
 		assert(i++ < 1000);

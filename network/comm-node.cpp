@@ -55,7 +55,7 @@ void CommNode::Configure(NodeType type, std::vector<UanAddress> dst) {
 		//
 		// fill the encoder buffer
 		//
-		m_trafGen->Start(m_sp.genSize * (m_sp.numGenBuffering + 1));
+		m_trafGen->Start(m_sp.genSize * m_brr->GetFreeBufferSize());
 
 		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " type " << m_nodeType);
 	} else {
@@ -130,57 +130,59 @@ UanAddress CommNode::GetId() {
 NcPacket CommNode::DoBroadcast() {
 
 	SIM_LOG_FUNC_N(COMM_NODE_LOG, m_id);
-
-	assert(m_nodeType != DESTINATION_NODE_TYPE);
-
-	TxPlan plan = m_brr->GetTxPlan();
-	assert(!plan.empty());
-
-//	auto it = plan.begin();
-//	std::cout << "Node " << m_id << ": Tx plan: ";
-//	for (; it != plan.end(); it++) {
-//		std::cout << "<" << it->first << " - " << it->second.num_all << " - " << m_getRank(it->first) << "> ";
-//	}
-//	std::cout << std::endl;
-
-	auto item_it = plan.begin_orig_order();
-
-	assert(item_it != plan.end());
-
-	GenId genId = item_it->first;
-	TxPlanItem planItem = item_it->second;
-
-	assert(planItem.num_all != 0);
-
-	SIM_LOG(COMM_NODE_LOG, "Node " << m_id << ": for generation " << genId << " number of packets in plan: " << planItem.num_all);
-
-	m_brr->UpdateSent(genId, 1);
-
-	planItem.num_all = 1;
-	TxPlan planI;
-	planI[genId] = planItem;
-
-	auto header = m_brr->GetHeaderInfo(planI);
+	auto plan_broadcast =
+			[this](NcPacket f, MessType m)
+			{
+				auto notify_sending = std::bind(&MulticastBrr::NotifySending, m_brr);
+				for (auto i : m_outs) m_simulator->Schedule(std::bind(&Edge::Transmit, i, std::placeholders::_1), f, (i->v_ == m_outs.at(0)->v_), m, notify_sending);;
+			};
 
 	NcPacket pkt;
-	if (m_nodeType == SOURCE_NODE_TYPE) {
-		pkt.SetData(m_encQueue->get_coded(genId));
-	} else {
-		pkt.SetData(m_decQueue->get_coded(genId));
-	}
-#ifdef HASH_VECTOR_FEEDBACK_ART
-	m_brr->AddSentCcack(genId, ExtractCodingVector(pkt.GetData(), m_sp.genSize));
-#endif
-	pkt.SetHeader(header);
-	auto notify_sending = std::bind(&MulticastBrr::NotifySending, m_brr);
-	for (auto &i : m_outs)
-		m_simulator->Schedule(std::bind(&Edge::Transmit, i, std::placeholders::_1), pkt, (i->v_ == m_outs.at(0)->v_), DATA_MSG_TYPE, notify_sending);
-	;
 
-	if (m_nodeType == SOURCE_NODE_TYPE) {
-		if (m_brr->NeedGen()) {
-			m_trafGen->Start(m_sp.genSize);
+	if (m_brr->MaySendServiceMessage()) {
+		//
+		// Sending the packet with the service message
+		//
+		pkt.SetFeedback(m_brr->GetServiceMessage());
+		pkt.SetHeader(m_brr->GetHeaderInfo());
+		auto type = pkt.GetFeedback().type;
+
+		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << type.GetAsInt() << ", TTL: " << pkt.GetFeedback().ttl);
+		plan_broadcast(pkt, ServiceMessType::ConvertToMessType(type));
+
+	} else {
+		//
+		// Sending the packet with data
+		//
+		TxPlan plan = m_brr->GetTxPlan();
+		assert(!plan.empty());
+		//
+		// in this implementation we send one data symbol per the broadcast event; so we take only one
+		//
+		auto item_it = plan.begin_orig_order();
+		GenId genId = item_it->first;
+		TxPlanItem planItem = item_it->second;
+		assert(planItem.num_all != 0);
+		planItem.num_all = 1;
+		TxPlan planI;
+		planI[genId] = planItem;
+
+		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << ": for generation " << genId << " number of packets in plan: " << planItem.num_all);
+
+		m_brr->UpdateSent(genId, 1);
+		auto header = m_brr->GetHeaderInfo(planI);
+		pkt.SetHeader(header);
+
+		if (m_nodeType == SOURCE_NODE_TYPE) {
+			pkt.SetData(m_encQueue->get_coded(genId));
+		} else {
+			pkt.SetData(m_decQueue->get_coded(genId));
 		}
+#ifdef HASH_VECTOR_FEEDBACK_ART
+		m_brr->AddSentCcack(genId, ExtractCodingVector(pkt.GetData(), m_sp.genSize));
+#endif
+
+		plan_broadcast(pkt, DATA_MSG_TYPE);
 	}
 
 	return pkt;
@@ -196,17 +198,13 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 
 	assert(!m_outs.empty());
 
-	auto plan_broadcast =
-			[this](NcPacket f, MessType m)
-			{
-				auto notify_sending = std::bind(&MulticastBrr::NotifySending, m_brr);
-				for (auto i : m_outs) m_simulator->Schedule(std::bind(&Edge::Transmit, i, std::placeholders::_1), f, (i->v_ == m_outs.at(0)->v_), m, notify_sending);;
-			};
-	;
-
 	SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receives from " << input->v_);
 
+<<<<<<< HEAD
 	m_brr->RcvHeaderInfo(pkt.GetHeader());
+=======
+	m_brr->ProcessHeaderInfo(pkt.GetHeader());
+>>>>>>> 7a78821a07a70eeca77e35be24727ca50277b103
 
 	if (!pkt.IsFeedbackSymbol()) {
 
@@ -218,7 +216,14 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 		GenId genId = txPlan.begin()->first;
 		auto plan_item = txPlan.begin()->second;
 
+<<<<<<< HEAD
 		if (m_nodeType == SOURCE_NODE_TYPE) return;
+=======
+		if (m_nodeType == SOURCE_NODE_TYPE) {
+			m_brr->UpdateRcvd(genId, input->v_, true);
+			return;
+		}
+>>>>>>> 7a78821a07a70eeca77e35be24727ca50277b103
 
 		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receives packet from generation " << genId);
 
@@ -234,122 +239,28 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 #ifdef HASH_VECTOR_FEEDBACK_ART
 		m_brr->AddRcvdCcack(genId, ExtractCodingVector(pkt.GetData(), m_sp.genSize));
 #endif
-		NcPacket feedback;
+		m_brr->CheckReqRetrans(input->v_, genId, plan_item.all_prev_acked);
 
-		//
-		// --->
-		//
-		if (m_brr->MaySendNetDiscovery()) {
-			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends the network discovery message with maximum TTL");
-			feedback.SetHeader(m_brr->GetHeaderInfo());
-			feedback.SetFeedback(m_brr->GetNetDiscoveryInfo());
-			plan_broadcast(feedback, NETDISC_MSG_TYPE);
-		} else {
-			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " refuses to send the network discovery message");
-
-			//
-			// --->
-			//
-			if (m_brr->MaySendRetransRequest(m_decQueue->get_ranks(), input->v_, genId, plan_item.all_prev_acked)) {
-				SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends the retransmission request");
-				feedback.SetHeader(m_brr->GetHeaderInfo());
-				feedback.SetFeedback(m_brr->GetRetransRequestInfo());
-				plan_broadcast(feedback, RETRANS_REQUEST_MSG_TYPE);
-			} else {
-				SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " refuses to send the retransmission request");
-
-				//
-				// --->
-				//
-				if (m_brr->MaySendFeedback()) {
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends the feedback");
-					feedback.SetHeader(m_brr->GetHeaderInfo());
-					feedback.SetFeedback(m_brr->GetFeedbackInfo());
-					plan_broadcast(feedback, FEEDBACK_MSG_TYPE);
-				} else {
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " refuses to send the feedback");
-				}
-			}
-		}
 	} else {
 
-		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receive feedback symbol");
-		m_brr->RcvFeedbackInfo(pkt.GetFeedback());
+		auto f = pkt.GetFeedback();
+		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receive service message " << f.type.GetAsInt() << ", TTL " << f.ttl);
 
-		if (pkt.GetFeedback().ttl != 0) {
+		m_brr->ProcessServiceMessage(f);
 
-			//
-			// --->
-			//
-			if (pkt.GetFeedback().netDiscovery) {
-
-				SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receive the network discovery message with TTL " << pkt.GetFeedback().ttl);
-
-				if (m_brr->MaySendNetDiscovery(pkt.GetFeedback().ttl)) {
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends the network discovery message with TTL " << pkt.GetFeedback().ttl - 1);
-					NcPacket feedback;
-					feedback.SetHeader(m_brr->GetHeaderInfo());
-					feedback.SetFeedback(m_brr->GetNetDiscoveryInfo(pkt.GetFeedback().ttl - 1));
-					plan_broadcast(feedback, NETDISC_MSG_TYPE);
-				} else {
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " refuses to send the network discovery message");
-				}
-			} else {
-				SIM_LOG(COMM_NODE_LOG, "Node " << m_id << ". Network discovery flag is not set");
-
-				if (m_brr->HasRetransRequest(pkt.GetFeedback())) {
-
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " processing retransission request");
-
-					//
-					// --->
-					//
-					if (m_brr->ProcessRetransRequest(pkt.GetFeedback())) {
-						if (m_nodeType != SOURCE_NODE_TYPE) {
-
-							SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " forward retransmission request. TTL " << pkt.GetFeedback().ttl);
-
-							NcPacket feedback;
-							feedback.SetHeader(m_brr->GetHeaderInfo());
-							feedback.SetFeedback(m_brr->GetRetransRequestInfo(pkt.GetFeedback().ttl - 1));
-							//							m_brr->ResetRetransInfo();
-							plan_broadcast(feedback, RETRANS_REQUEST_MSG_TYPE);
-						} else {
-							SIM_LOG(COMM_NODE_LOG, "Node " << m_id << ". The source does not forward retransmission requests");
-						}
-					} else {
-						SIM_LOG(COMM_NODE_LOG, "Node " << m_id << ". Retransmission request is either not set or I should not forward it");
-					}
-				} else {
-					SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " there is no retransmission request");
-				}
+		if (m_nodeType == SOURCE_NODE_TYPE) {
+			if (m_brr->NeedGen()) {
+				m_trafGen->Start(m_sp.genSize * m_brr->GetFreeBufferSize());
 			}
-
-		} else {
-			SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " TTL has expired");
 		}
 	}
+
 }
 bool CommNode::DoIwannaSend() {
 
 	SIM_LOG_FUNC(COMM_NODE_LOG);
 
-	return m_brr->MaySendData();
-//
-//	if (!m_brr->MaySendData()) return false;
-//
-//	TxPlan txPlan = m_brr->GetTxPlan();
-//	auto accumulate = [](TxPlan plan)->uint32_t
-//	{
-//		uint32_t sum = 0;
-//		for(auto item : plan)
-//		{
-//			sum += item.second.num_all;
-//		}
-//		return sum;
-//	};
-//
-//	return (accumulate(txPlan) > 0);
+	return m_brr->MaySend();
 }
 void CommNode::SetMessTypeCallback(set_msg_type_func f) {
 	if (m_trafSink) m_trafSink->SetMessTypeCallback(f);
@@ -378,7 +289,8 @@ void CommNode::NotifyLoss(Edge * input, NcPacket pkt) {
 		// special for this simulator
 		//
 		auto txPlan = pkt.GetHeader().txPlan;
-		assert(txPlan.size() == 1);
+//		assert(txPlan.size() == 1);
+		assert(txPlan.size() > 0);
 		auto genId = txPlan.begin()->first;
 
 		m_brr->UpdateLoss(genId, input->v_);

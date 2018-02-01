@@ -10,17 +10,20 @@
 
 #include <sstream>
 #include <string.h>
+#include <iostream>
 
 #include "header.h"
 #include "utils/brr-retrans-request.h"
 #include "utils/ack-info.h"
+#include "utils/service-messtype.h"
 
 namespace ncr {
+
 
 struct FeedbackInfo {
 
 	FeedbackInfo() {
-		netDiscovery = false;
+		addr = 0;
 		ttl = 0;
 		updated = false;
 	}
@@ -29,9 +32,10 @@ struct FeedbackInfo {
 		this->p = other.p;
 		this->rcvMap = other.rcvMap;
 		this->rrInfo = other.rrInfo;
-		this->netDiscovery = other.netDiscovery;
 		this->ttl = other.ttl;
 		this->ackInfo = other.ackInfo;
+		this->rcvNum = other.rcvNum;
+		this->type.copy(other.type);
 
 		this->updated = true;
 	}
@@ -43,35 +47,48 @@ struct FeedbackInfo {
 			this->p = other.p;
 			this->rcvMap = other.rcvMap;
 			this->rrInfo = other.rrInfo;
-			this->netDiscovery = other.netDiscovery;
 			this->ttl = other.ttl;
 			this->ackInfo = other.ackInfo;
+			this->rcvNum = other.rcvNum;
+			this->type.copy(other.type);
 
 			this->updated = true;
 		}
 		return *this;
 	}
 
-	void Reset()
-	{
+	void Reset() {
 		this->rcvMap.clear();
 		this->rrInfo.clear();
-		this->netDiscovery = false;
 		this->ackInfo.clear();
 		this->updated = false;
+		this->rcvNum.clear();
+		this->type = ServiceMessType::NONE;
 	}
 
 	void Serialize(std::stringstream &ss) {
 
 		ss << addr << DELIMITER;
 		ss << p.val() << DELIMITER;
-		ss << (uint16_t)netDiscovery << DELIMITER;
+		ss << type.GetAsInt() << DELIMITER;
 		ss << ttl << DELIMITER;
-		ss << (uint16_t)rcvMap.size() << DELIMITER;
+		ss << (uint16_t) rcvMap.size() << DELIMITER;
 		for (auto r : rcvMap)
 			ss << r.first << DELIMITER << r.second.Serialize();
 		rrInfo.Serialize(ss);
 		ackInfo.Serialize(ss);
+		auto serialize_rcv_num = [this](std::stringstream &ss)
+		{
+			ss << (uint16_t) rcvNum.size() << DELIMITER;
+			auto it = rcvNum.begin_orig_order();
+			while (it != rcvNum.last_orig_order()) {
+				ss << it->first << DELIMITER;
+				ss << (uint16_t) it->second.size() << DELIMITER;
+				for(auto i : it->second) ss << i.first << DELIMITER << i.second << DELIMITER;
+				it = rcvNum.next_orig_order(it);
+			}
+		};
+		serialize_rcv_num(ss);
 
 		updated = false;
 	}
@@ -84,7 +101,7 @@ struct FeedbackInfo {
 		p = v;
 		uint16_t w;
 		ss >> w;
-		netDiscovery = w;
+		type = w;
 		ss >> ttl;
 		uint16_t n;
 		ss >> n;
@@ -99,6 +116,27 @@ struct FeedbackInfo {
 		rrInfo.clear();
 		rrInfo.Deserialize(ss);
 		ackInfo.Deserialize(ss);
+		auto deserialize_rcv_num = [this](std::stringstream &ss)
+		{
+			uint16_t n = 0, m = 0;
+			ss >> n;
+			for(auto i = 0; i < n; i++)
+			{
+				GenId gid = 0;
+				ss >> gid;
+				ss >> m;
+				for(auto j = 0; j < m; j++)
+				{
+					UanAddress id;
+					uint16_t v;
+					ss >> id;
+					ss >> v;
+					rcvNum[gid][id] = v;
+				}
+			}
+		};
+		rcvNum.clear();
+		deserialize_rcv_num(ss);
 
 		updated = true;
 	}
@@ -117,10 +155,6 @@ struct FeedbackInfo {
 	AckInfo ackInfo;
 
 	/*
-	 * network discovery flag
-	 */
-	bool netDiscovery;
-	/*
 	 * time to live
 	 */
 	ttl_t ttl;
@@ -128,7 +162,17 @@ struct FeedbackInfo {
 	 * this flag is for local usage only
 	 */
 	bool updated;
+	/*
+	 * how many symbols from whom for each generation I've received
+	 */
+	RcvNum rcvNum;
+	/*
+	 * kind of the message
+	 */
+	ServiceMessType type;
+
 };
 
 }
+
 #endif /* BRRFEEDBACK_H_ */

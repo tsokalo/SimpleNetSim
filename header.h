@@ -63,7 +63,7 @@ enum WhoCanSendRr {
 	ALL_WHO_HEAR_LEGAL, ONE_SELECTED_LEGAL
 };
 
-//#define FULL_VECTOR
+#define FULL_VECTOR
 
 /*
  * unit [bps]
@@ -108,7 +108,7 @@ enum ProgMode {
 	RUN_MODE, EVAL_MODE, TEST_MODE
 };
 enum MessType {
-	DATA_MSG_TYPE, FEEDBACK_MSG_TYPE, NETDISC_MSG_TYPE, RETRANS_REQUEST_MSG_TYPE, ORIG_MSG_TYPE
+	DATA_MSG_TYPE, FEEDBACK_MSG_TYPE, NETDISC_MSG_TYPE, RETRANS_REQUEST_MSG_TYPE, ORIG_MSG_TYPE, NONE_MSG_TYPE
 };
 
 /*************************************************************************************************/
@@ -208,8 +208,7 @@ struct ArqWin {
 			{
 		return (l.s_rx == r.s_rx && l.s_tx == r.s_tx && l.e_tx == r.e_tx && l.e_rx == r.e_rx);
 	}
-	bool is_def()
-	{
+	bool is_def() {
 		return (s_rx != MAX_GEN_SSN && s_tx != MAX_GEN_SSN && e_tx != MAX_GEN_SSN && e_rx != MAX_GEN_SSN);
 	}
 	GenId s_rx; //start of RX window
@@ -300,7 +299,7 @@ struct LogItem {
 	friend std::ostream&
 	operator<<(std::ostream& os, const LogItem& l) {
 		os << l.dst << "\t" << l.d << "\t" << l.p << "\t" << l.cr << "\t" << l.cs << "\t" << l.ns << "\t" << l.nr << "\t" << l.ssn << "\t" << l.gsn << "\t"
-				<< l.rank << "\t" << l.aw.s_tx << "\t" << l.aw.s_rx << "\t" << l.aw.e_tx << "\t" << l.aw.e_rx << "\t" << l.fp.size() << "\t" << l.eps.size();
+				<< l.rank << "\t" << l.aw.s_rx << "\t" << l.aw.s_tx << "\t" << l.aw.e_tx << "\t" << l.aw.e_rx << "\t" << l.fp.size() << "\t" << l.eps.size();
 
 		for (std::map<int16_t, double>::const_iterator it = l.fp.begin(); it != l.fp.end(); it++)
 			os << "\t" << it->first << "\t" << it->second;

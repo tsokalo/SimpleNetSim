@@ -103,6 +103,10 @@ public:
 		l = N - l;
 		return rotate(lhs, l);
 	}
+	static T get_max()
+	{
+		return N;
+	}
 protected:
 
 	/*

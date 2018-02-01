@@ -14,69 +14,58 @@
 #include "ssn.h"
 
 namespace ncr {
-struct AckBacklog {
+struct AckBacklog : public std::deque<GenId> {
 
-	typedef std::deque<GenId> buf_t;
-	typedef buf_t::iterator ack_it;
+	typedef AckBacklog::iterator ack_it;
 public:
-	AckBacklog(uint16_t deepness) {
-		this->deepness = deepness;
-		SIM_ASSERT_MSG(deepness < (MAX_GEN_SSN >> 1), "Deepness on SRC equals 4*ACK_WIN_SIZE (4 * m_sp.numGen), MAX_GEN_SSN: " << MAX_GEN_SSN);
+	AckBacklog(uint16_t d) {
+		this->d = d;
+		SIM_ASSERT_MSG(d < (MAX_GEN_SSN >> 1), "Deepness on SRC equals 4*ACK_WIN_SIZE (4 * m_sp.numGen), MAX_GEN_SSN: " << MAX_GEN_SSN);
 	}
 	void add(GenId genId) {
 
 		if(is_in(genId))return;
 
-		auto it = bl.begin();
-		while (it != bl.end()) {
+		auto it = this->begin();
+		while (it != this->end()) {
 			if (gen_ssn_t(*it) > gen_ssn_t(genId)) {
-				bl.insert(it, genId);
+				this->insert(it, genId);
 				break;
 			}
 			it++;
 		}
-		if (it == bl.end()) bl.push_back(genId);
-		if (bl.size() > deepness) bl.pop_front();
+		if (it == this->end()) this->push_back(genId);
+		if (this->size() > d) this->pop_front();
 	}
 	void remove(GenId genId)
 	{
-		auto it = std::find(bl.begin(), bl.end(), genId);
-		if(it != bl.end())
+		auto it = std::find(this->begin(), this->end(), genId);
+		if(it != this->end())
 		{
-			bl.erase(it, it + 1);
+			this->erase(it, it + 1);
 		}
 	}
 
 	bool is_in(GenId genId) {
-		return (std::find(bl.begin(), bl.end(), genId) != bl.end());
+		return (std::find(this->begin(), this->end(), genId) != this->end());
 	}
 
-	ack_it begin() {
-		return bl.begin();
+	std::deque<GenId>::iterator last() {
+		return this->empty() ? this->end() : (--(this->end()));
 	}
 
-	ack_it end() {
-		return bl.end();
-	}
-	ack_it last() {
-		return bl.empty() ? bl.end() : (--(bl.end()));
+	uint16_t tiefe() {
+		return d;
 	}
 
-	bool empty() {
-		return bl.empty();
-	}
-	uint16_t size() {
-		return deepness;
-	}
-
-	buf_t get_last(uint16_t n) {
-		return (n >= bl.size()) ? bl : buf_t(bl.begin() + (bl.size() - n), bl.end());
+	std::deque<GenId> get_last(uint16_t n) {
+		auto s = (n >= this->size()) ? 0 : (this->size() - n);
+		return std::deque<GenId>(this->begin() + s, this->end());
 	}
 
 private:
 
-	uint16_t deepness;
-	buf_t bl;
+	uint16_t d;
 };
 
 }

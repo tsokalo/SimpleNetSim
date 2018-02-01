@@ -16,6 +16,24 @@ RM := rm -rf
 -include network/subdir.mk
 -include lp-solver/subdir.mk
 -include galois-field/subdir.mk
+-include comp/tst/subdir.mk
+-include comp/src/subdir.mk
+-include comp/dep/googletest/googletest/xcode/Samples/FrameworkSample/subdir.mk
+-include comp/dep/googletest/googletest/test/subdir.mk
+-include comp/dep/googletest/googletest/src/subdir.mk
+-include comp/dep/googletest/googletest/samples/subdir.mk
+-include comp/dep/googletest/googletest/codegear/subdir.mk
+-include comp/dep/googletest/googlemock/test/subdir.mk
+-include comp/dep/googletest/googlemock/src/subdir.mk
+-include comp/dep/googletest/build/googlemock/gtest/CMakeFiles/gtest_main.dir/src/subdir.mk
+-include comp/dep/googletest/build/googlemock/gtest/CMakeFiles/gtest.dir/src/subdir.mk
+-include comp/dep/googletest/build/googlemock/CMakeFiles/gmock_main.dir/src/subdir.mk
+-include comp/dep/googletest/build/googlemock/CMakeFiles/gmock_main.dir/__/googletest/src/subdir.mk
+-include comp/dep/googletest/build/googlemock/CMakeFiles/gmock.dir/src/subdir.mk
+-include comp/dep/googletest/build/googlemock/CMakeFiles/gmock.dir/__/googletest/src/subdir.mk
+-include comp/dep/googletest/build/CMakeFiles/3.5.1/CompilerIdCXX/subdir.mk
+-include comp/dep/googletest/build/CMakeFiles/3.5.1/CompilerIdC/subdir.mk
+-include comp/dep/googletest/build/CMakeFiles/subdir.mk
 -include ccack/subdir.mk
 -include build/utils/subdir.mk
 -include build/traffic/subdir.mk
@@ -55,19 +73,19 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: SnsMulticast
+all: libSnsMulticast
 
 # Tool invocations
-SnsMulticast: $(OBJS) $(USER_OBJS)
+libSnsMulticast: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	g++  -o "SnsMulticast" $(OBJS) $(USER_OBJS) $(LIBS)
+	g++ -L/usr/lib/ -L/usr/local/lib/ -shared -o "libSnsMulticast" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(CC_DEPS)$(C++_DEPS)$(EXECUTABLES)$(C_UPPER_DEPS)$(CXX_DEPS)$(OBJS)$(CPP_DEPS)$(C_DEPS) SnsMulticast
+	-$(RM) $(LIBRARIES)$(CC_DEPS)$(C++_DEPS)$(C_UPPER_DEPS)$(CXX_DEPS)$(OBJS)$(CPP_DEPS)$(C_DEPS) libSnsMulticast
 	-@echo ' '
 
 .PHONY: all clean dependents

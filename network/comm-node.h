@@ -96,9 +96,14 @@ public:
 	Datarate GetDatarate() {
 		return m_sp.apiRate;
 	}
+<<<<<<< HEAD
 	NodeType GetNodeType() {
 		return m_nodeType;
 	}
+=======
+	NodeType GetNodeType(){return m_nodeType;}
+	void SetNodeType(NodeType t){m_nodeType = t;}
+>>>>>>> 7a78821a07a70eeca77e35be24727ca50277b103
 
 	void SetMessTypeCallback(set_msg_type_func f);
 

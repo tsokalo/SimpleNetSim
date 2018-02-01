@@ -14,8 +14,8 @@
 #include <math.h>
 #include <iterator>
 
-#include <storage/storage.hpp>
-#include <kodo_rlnc/full_vector_codes.hpp>
+//#include <storage/storage.hpp>
+//#include <kodo_rlnc/full_vector_codes.hpp>
 
 #include "header.h"
 #include "network/comm-net.h"
@@ -217,8 +217,21 @@ void CreateDiamondScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
 	net->ConnectNodes(1, 2, 0.2, 0.3);
 	net->ConnectNodes(1, 3, 0.5);
 	net->ConnectNodes(2, 3, 0.1);
-	net->SetDestination(1);
-	net->SetDestination(2);
+	net->SetSource(0);
+//	net->SetDestination(1);
+//	net->SetDestination(2);
+	net->SetDestination(3);
+	net->Configure();
+	net->PrintNet();
+}
+
+void CreateReducedDiamondScenario(std::shared_ptr<CommNet> &net, SimParameters sp) {
+	net = std::shared_ptr<CommNet>(new CommNet(4, sp));
+	net->ConnectNodes(0, 1, 0.2);
+	net->ConnectNodes(0, 2, 0.4);
+	net->ConnectNodes(1, 3, 0);
+	net->ConnectNodes(2, 3, 0);
+	net->SetSource(0);
 	net->SetDestination(3);
 	net->Configure();
 	net->PrintNet();
@@ -306,7 +319,6 @@ int main(int argc, char *argv[]) {
 
 	std::string path = argv[0];
 	size_t position = path.rfind("/build");
-	std::cout << "see position " << position << std::endl;
 	std::string subpath = path.substr(0, position + 1);
 
 	if (subpath.empty()) {
@@ -331,24 +343,27 @@ int main(int argc, char *argv[]) {
 
 	std::shared_ptr<CommNet> net;
 
-	std::cout << "see position " << position << std::endl;
-
 	SimParameters sim_par(subpath + GetSimParamFileName());
 
 	//
 	// using default parameters
 	//
+<<<<<<< HEAD
+=======
+	if (m == RUN_MODE || m == EVAL_MODE) {
+>>>>>>> 7a78821a07a70eeca77e35be24727ca50277b103
 //	CreateAutoSquareScenario(net, sim_par, 3);
 //	CreateBetaSquareScenario(net, sim_par, 3);
 
 //	CreateBigSquareScenario(net, sim_par);
 //	CreateSquareScenario(net, sim_par);
-//	CreateStackScenario(net, 8, sim_par);
-//	CreateTriangleScenario(net, sim_par);
+//		CreateStackScenario(net, 1, sim_par);
+	CreateTriangleScenario(net, sim_par);
 //	CreateNoCScenario(net, 2, sim_par);
 //	CreateDiamondScenario(net, sim_par);
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);
+<<<<<<< HEAD
 	std::string topology = subpath + "Topologies/Topology1.txt";
 	std::cout << "Looking for topology " << topology << std::endl;
 	std::string folder_with_traces = "/home/tsokalo/Dokumente/4_Publications/EuropeWireless2018/docs/zhenya_bitmaskdump";
@@ -356,6 +371,9 @@ int main(int argc, char *argv[]) {
 
 //	return 0;
 
+=======
+	}
+>>>>>>> 7a78821a07a70eeca77e35be24727ca50277b103
 	if (m == RUN_MODE) {
 		RemoveDirectory(folder);
 		CreateDirectory(folder);
@@ -459,27 +477,19 @@ int main(int argc, char *argv[]) {
 
 	} else if (m == TEST_MODE) {
 
-		std::string f = folder + GetLogFileName();
-		std::cout << "Using file " << f << std::endl;
-		LogBank lb = ReadLogBank(f);
+		std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
+		std::cout << "TEST MODE" << std::endl;
+		std::cout << ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>" << std::endl;
 
-		//
-		// setup your filter
-		//
-		UanAddress s = 0;
-
-		if (lb.find(s) == lb.end()) {
-			std::cout << "Found no data for the sender " << s << std::endl;
-		}
-
-		for (auto v : lb[s]) {
-			//
-			// select only those entries that correspond to the sending event
-			//
-			if (v.log.ns == 1) {
-				std::cout << v.t << "\t" << v.m << "\t" << v.log << std::endl;
-			}
-		}
+//		TestRedundancy();
+//		TestFeedbackAccuracy2();
+//		std::string path = "/home/tsokalo/Dokumente/4_Publications/ArqNcFeedback/projects/sim/res1000_new_last.cvs";
+//		EvaluteFeedbackAccuracy(path);
+//		TestCcackSimple();
+//		for (uint16_t i = 0; i < 20; i++)
+//			TestCcackSimpleMonteCarlo();
+//		TestCcack2Relay();
+		TestOutOfOrder();
 	}
 
 	std::cout << std::endl << "Finished successfully" << std::endl;

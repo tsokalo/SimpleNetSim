@@ -19,6 +19,13 @@ struct CoderHelpInfo {
 		finRank = 0;
 		origRank = 0;
 	}
+	CoderHelpInfo(CodingMatrix m, CoderInfo c, CodingVector hashVec) {
+		this->m = m;
+		this->c = c;
+		this->hashVec = hashVec;
+		finRank = 0;
+		origRank = 0;
+	}
 	CoderHelpInfo& operator=(const CoderHelpInfo& other) // copy assignment
 			{
 		if (this != &other) { // self-assignment check expected
@@ -27,6 +34,8 @@ struct CoderHelpInfo {
 			this->hashVec = other.hashVec;
 			this->finRank = other.finRank;
 			this->origRank = other.origRank;
+			this->rcvd = other.rcvd;
+			this->gotLinDep = other.gotLinDep;
 		}
 		return *this;
 	}
@@ -39,6 +48,9 @@ struct CoderHelpInfo {
 
 	uint32_t finRank;
 	uint32_t origRank;
+
+	std::map<uint16_t, uint16_t> rcvd;// <from node> <number>
+	std::map<uint16_t, bool> gotLinDep;// <from node> <received a linear dependent packet>
 };
 }
 

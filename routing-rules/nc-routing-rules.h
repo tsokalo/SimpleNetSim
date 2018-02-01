@@ -29,10 +29,13 @@
 #include "utils/feedback-estimator.h"
 #include "utils/sim-parameters.h"
 #include "utils/brr-header.h"
+#include "utils/soft-ack-info.h"
 #include "utils/ack-backlog.h"
+#include "utils/ack-countdown.h"
 #include "utils/retrans-gen-id.h"
 #include "utils/coding-vector.h"
 #include "utils/retrans-request-counter.h"
+#include "utils/brr-service.h"
 #include "ccack/ccack.h"
 
 namespace ncr {
@@ -65,8 +68,7 @@ public:
 	/*
 	 * INPUTS
 	 */
-	void RcvHeaderInfo(HeaderInfo l);
-	void RcvFeedbackInfo(FeedbackInfo l);
+	void ProcessHeaderInfo(HeaderInfo l);
 	void UpdateSent(GenId genId, uint32_t num, bool notify_sending = false);
 	void UpdateRcvd(GenId genId, UanAddress id, bool linDep = false);
 	void UpdateRcvd(GenId genId, UanAddress id, std::vector<OrigSymbol> v);
@@ -77,30 +79,29 @@ public:
 	//
 	void AddToCoalition(UanAddress addr);
 	void SetSendingRate(Datarate d);
+	//
+	void ProcessServiceMessage(FeedbackInfo f);
+	void CheckReqRetrans(UanAddress id, GenId genId, bool all_prev_acked);
+	//
+	void ResetRetransInfo();
 
 	/*
 	 * OUTPUTS
 	 */
 	TxPlan GetTxPlan();
 	BrrHeader GetHeader(TxPlan txPlan, FeedbackInfo f);
-	FeedbackInfo GetFeedbackInfo();
-	FeedbackInfo GetRetransRequestInfo(ttl_t ttl = -2);
 	HeaderInfo GetHeaderInfo();
 	HeaderInfo GetHeaderInfo(TxPlan txPlan);
-	NetDiscoveryInfo GetNetDiscoveryInfo(ttl_t ttl = -2);
 	UanAddress GetSinkVertex();
+	FeedbackInfo GetServiceMessage();
 	//
 	bool NeedGen();
-	uint32_t GetNumGreedyGen();
+	uint32_t GetFreeBufferSize();
+	bool MaySend(double dr = 0);
 	bool MaySendData(double dr = 0);
-	bool MaySendFeedback();
-	bool MaySendNetDiscovery(ttl_t ttl = -1);
-	// retransmission requests
-	bool MaySendRetransRequest(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked);
-	bool ProcessRetransRequest(FeedbackInfo fb);
-	bool HasRetransRequest(FeedbackInfo fb);
-	void ResetRetransInfo();
-	void UpdateRetransRequest();
+	bool MaySendServiceMessage();
+	//
+	void CreateRetransRequest();
 	//
 	uint32_t GetGenBufSize(uint32_t maxPkts);
 	uint32_t GetAmountTxData();
@@ -121,26 +122,58 @@ private:
 	void DoFilter();
 	void DoUpdateFilter();
 	void DoCalcRedundancy();
+	double DoCalcRedundancy(node_map_t coalition);
 	void DoUpdateTxPlan();
 	void DoUpdatePriority(node_map_t outputs);
 	void DoUpdateCoalition();
 	void DoUpdateForwardPlan();
 	void DoForgetGeneration();
 	void DoForgetGeneration(GenId id);
+	void PlanForgetGeneration(GenId gid);
+	/*
+	 * ARQ and congestion control
+	 */
+	void CheckGeneralFeedback();
+	void CheckReqPtpAck();
+	void CheckReqEteAckI();
+	void CheckReqEteAckII();
+	void CheckNetDisc();
+	void CheckServiceMessage();
+	//
+	void ProcessRegularFeedback(FeedbackInfo f);
+	void ProcessReqPtpAck(FeedbackInfo f);
+	void ProcessReqEteAck(FeedbackInfo f);
+	void ProcessRespPtpAck(FeedbackInfo f);
+	void ProcessRespEteAck(FeedbackInfo f);
+	void ProcessNetDisc(FeedbackInfo f);
+	void ProcessReqRetrans(FeedbackInfo f);
+	//
+	void WorkInPtpAckRange(std::function<bool(GenId)> func);
+	void WorkInEteAckRange(std::function<bool(GenId)> func);
+	void WorkInRetransRange(std::function<bool(GenId)> func);
+	void WorkInBufferingRange(std::function<bool(GenId)> func);
+	bool IsInBufferingRange(GenId gid);
+	//
+	void OriginateReqPtpAck();
+	void OriginateReqEteAck();
+	//
+	bool IsConnected();
+	void SetConnected(bool v);
 
 	/*
 	 * Retransmission requests
 	 */
 	UanAddress SelectRetransRequestForwarder();
-	bool MayOriginateRetransRequest(std::map<GenId, uint32_t> ranks, GenId genId);
-	bool MayReplicateRetransRequest(UanAddress id, GenId genId);
+	bool MayOrigReqRetrans(GenId genId);
+//	bool MayRepeatReqRetrans(UanAddress id, GenId genId);
 	void GetAchievableRank(FeedbackInfo fb, std::map<GenId, CoderHelpInfo> &helpInfo);
 	void DoUpdateRetransPlan(std::map<GenId, CoderHelpInfo> helpInfo);
 	bool HaveDataForRetransmissions();
 	bool IsRetransRequestOld(FeedbackInfo fb);
 	void FormRrInfo(FeedbackInfo fb, std::map<GenId, CoderHelpInfo> helpInfo);
 	void RefineCoderHelpInfo(std::map<GenId, CoderHelpInfo> &helpInfo);
-	bool CreateRetransRequest(std::map<GenId, uint32_t> ranks, GenId genId);
+	bool DoCreateRetransRequest(GenId genId);
+	bool IsRequestedForRetrans(GenId gid);
 	/*
 	 * Acknowledgements
 	 */
@@ -148,33 +181,57 @@ private:
 	void ProcessAcks(FeedbackInfo l);
 	void SetAcks();
 	void ClearAcks();
-	bool AreNewAcksPresent();
+	bool HaveAcksToSend();
 	void SetFastAck();
+	void EvaluateSoftAck();
+	uint32_t GetRegularFeedbackFreq();
+	bool IsSoftAck(GenId gid);
+	bool IsHardAck(GenId gid);
 
 	void Reset();
 
 	void CheckBuffering();
+	/*
+	 * the buffer overflow causes data drops; on relays and destination it happens due to reception of too much data
+	 * without ACKs; on source the overflow does not happen, instead the protocol does not accept any new generated packets,
+	 * thus on source the overflow problem is similar to the problem of blocking the protocol layer above
+	 */
+	bool IsOverflowDanger();
 
 	node_map_it LookUpInputs(UanAddress id);
 	node_map_it LookUpOutputs(UanAddress id);
 
 	void UpdateLogItem();
-	GenId GetAckWinSize();
-	GenId GetTxAckWinStart();
-	GenId GetRxAckWinStart();
-	GenId GetRxAckWinEnd();
-	GenId GetTxAckWinEnd();
+	GenId GetTxWinStart();
+	GenId GetRxWinStart();
+	GenId GetRxWinEnd();
+	GenId GetTxWinEnd();
+	GenId GetActualRxWinSize();
+	GenId GetActualTxWinSize();
+
+	bool DoesItCooperate(UanAddress addr);
+	bool DoICooperate(UanAddress addr);
 
 	void Overshoot(GenId gid);
+
+	void ValidateReaction(GenId genId, UanAddress id);
+	void ValidateReaction(FeedbackInfo l);
+	void PlanExpectedReaction(GenId genId, UanAddress id);
+	void PlanExpectedReaction(FeedbackInfo l);
+	void PlanExpectedReaction();
 
 	HeaderInfo m_h;
 	FeedbackInfo m_f;
 
 	/********************************************************************************************************
 	 * all received packets from the nodes with lower priority and increasing the coding matrix rank;
-	 * they are the subject to be filtered
+	 * they are the subject to be passed through the filter
 	 */
-	RcvNum m_rcvNum;
+	RcvNum m_inRcvNum;
+	/*
+	 * received packet by my neighbors from me; obtained from the feedback
+	 */
+	RcvNum m_outRcvNum;
 	/*
 	 * forwarding plan specifies the number of degrees of freedom to be forwarded to the sinks of output edges;
 	 * it does not include redundancy; includes both retransmission and filtered symbols
@@ -199,17 +256,21 @@ private:
 	 */
 	SentNum m_sentNum;
 	/*
-	 * storing actual indeces of the acknowledged generations: either own or received ACKs
+	 * the indeces of the generations that are already removed from the buffer
 	 */
-	AckBacklog m_ackBacklog;
+	AckBacklog m_outdatedGens;
 	/*
-	 * storing indeces of the acknowledged generations that are already sent
+	 * the indeces of the generations that are already removed from the buffer; and still no feedback message was sent with this info
 	 */
-	AckBacklog m_ackBacklogTx;
+	AckCountDown m_outdatedGensInform;
 	/*
-	 * indeces of generations that are last in the Tx buffers of corresponding vertices
+	 * counter of PtpAck
 	 */
-	std::map<UanAddress, GenId> m_lastInTx;
+	std::map<GenId, uint16_t> m_ptpAckCount;
+	/*
+	 * the end of the RX window of the corresponding vertices
+	 */
+	std::map<UanAddress, GenId> m_remoteRxWinEnd;
 	/********************************************************************************************************/
 
 	/*
@@ -290,29 +351,37 @@ private:
 	/*
 	 * time to live for network discovery messages
 	 */
-	ttl_t m_ttl;
-	/*
-	 * number of generations to be buffered before the transmission
-	 * can start
-	 */
-	uint16_t m_numGenBuffering;
+	ttl_t m_maxTtl;
 	/*
 	 * oldest generation ID to retransmit
 	 */
 	RetransGenId m_oldestRetransGenId;
 	/*
-	 * send feedback at next possible opportunity; fast feedback is targeted to ACK the generaitions,
+	 * send feedback at next possible opportunity; fast feedback is targeted to ACK the generations,
 	 * for which the vertices with lower priorities replicate RRs
 	 */
 	bool m_fastFeedback;
 	/*
-	 * the newest generation ID
-	 */
-	GenId m_newestRcvGenId;
-	/*
 	 * counter of retransmission requests per generation
 	 */
 	rr_counter_ptr m_numRr;
+	/*
+	 * counter of broadcasted packets
+	 */
+	uint32_t m_sent;
+	/*
+	 * soft ACK information
+	 */
+	SoftAckInfo softAckInfo;
+	/*
+	 * counter of Transmission opportunities (TXOPs) for NetDisc
+	 */
+	uint16_t countTxopNetDisc;
+	/*
+	 * sending certain service message applies the requirements on the network reaction
+	 * the service describes the valid sequence of network actions
+	 */
+	BrrService m_service;
 
 	NodeType m_nodeType;
 
@@ -332,5 +401,5 @@ private:
 
 };
 
-}//ncr
+} //ncr
 #endif /* NCROUTINGRULES_H_ */

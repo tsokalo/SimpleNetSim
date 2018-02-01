@@ -13,6 +13,7 @@
 #include "test/test-ccack-redundancy-monte-carlo.h"
 #include "test/test-ccack-manual-relay.h"
 #include "test/test-ccack-relay.h"
+#include "test/test-ccack-2relay.h"
 #include "test/test-ccack-relay-monte-carlo.h"
 #include "test/test-ccack-relay-redundancy-monte-carlo.h"
 

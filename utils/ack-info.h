@@ -17,16 +17,16 @@ namespace ncr {
 struct AckInfo: public std::map<GenId, bool> {
 
 	AckInfo() {
-		ackWinEnd = MAX_GEN_SSN;
+		rxWinEnd = MAX_GEN_SSN;
 	}
 
 	void Serialize(std::stringstream &ss) {
 
 		ss << (uint16_t) this->size() << DELIMITER;
 		for (auto a : *this)
-		ss << a.first << DELIMITER << (uint8_t) a.second << DELIMITER;
+			ss << a.first << DELIMITER << (uint8_t) a.second << DELIMITER;
 
-		ss << ackWinEnd << DELIMITER;
+		ss << rxWinEnd << DELIMITER;
 	}
 
 	void Deserialize(std::stringstream &ss) {
@@ -41,13 +41,13 @@ struct AckInfo: public std::map<GenId, bool> {
 			ss >> v;
 			this->operator[](g) = v;
 		}
-		ss >> ackWinEnd;
+		ss >> rxWinEnd;
 	}
 
 	friend std::ostream& operator<<(std::ostream& o, AckInfo& m) {
-		o << "Size: " << m.size() << ", last GID " << m.ackWinEnd << " [";
-		for(auto v : m)
-		o << v.first << ":" << (uint16_t)v.second << " ";
+		o << "Size: " << m.size() << ", last GID " << m.rxWinEnd << " [";
+		for (auto v : m)
+			o << v.first << ":" << (uint16_t) v.second << " ";
 		o << "]";
 		return o;
 	}
@@ -55,7 +55,7 @@ struct AckInfo: public std::map<GenId, bool> {
 	/*
 	 * indicates the latest generation in the TX buffer; the vertex may already ACK this generation
 	 */
-	GenId ackWinEnd;
+	GenId rxWinEnd;
 
 };
 }

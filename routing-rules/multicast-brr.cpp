@@ -16,6 +16,8 @@ MulticastBrr::MulticastBrr(UanAddress ownAddress, NodeType type, std::vector<Uan
 
 	for (auto dst : destAddresses) {
 
+		SIM_LOG(BRR_LOG, "Create BRR instance for DST " << dst << ", I am " << m_id);
+
 		NodeType t = (ownAddress == dst) ? DESTINATION_NODE_TYPE : type;
 		assert(!(t == DESTINATION_NODE_TYPE && type == SOURCE_NODE_TYPE));
 
@@ -61,7 +63,7 @@ void MulticastBrr::EnableCcack(hash_matrix_set_ptr hashMatrixSet) {
 /*
  * INPUTS
  */
-void MulticastBrr::RcvHeaderInfo(HeaderMInfo l) {
+void MulticastBrr::ProcessHeaderInfo(HeaderMInfo l) {
 
 	HeaderInfo h;
 	h.addr = l.addr;
@@ -72,28 +74,8 @@ void MulticastBrr::RcvHeaderInfo(HeaderMInfo l) {
 		auto addr = p.first;
 		assert(m_brr.find(addr) != m_brr.end());
 		h.p = p.second;
-		m_brr.at(addr)->RcvHeaderInfo(h);
+		m_brr.at(addr)->ProcessHeaderInfo(h);
 	}
-}
-void MulticastBrr::RcvFeedbackInfo(FeedbackMInfo l) {
-
-	FeedbackInfo f;
-	f.addr = l.addr;
-	f.rcvMap = l.rcvMap;
-	f.rrInfo = l.rrInfo;
-	f.netDiscovery = l.netDiscovery;
-	f.ttl = l.ttl;
-	f.ackInfo = l.ackInfo;
-	f.updated = l.updated;
-
-	for (auto p : l.p) {
-		auto dst = p.first;
-		assert(m_brr.find(dst) != m_brr.end());
-		f.p = p.second;
-		SIM_LOG_N(BRRM_LOG, m_id, "Feedback source " << f.addr << " with priority " << f.p << " for DST " << dst);
-		m_brr.at(dst)->RcvFeedbackInfo(f);
-	}
-
 }
 void MulticastBrr::UpdateSent(GenId genId, uint32_t num, bool notify_sending) {
 	for (auto brr : m_brr)
@@ -131,7 +113,23 @@ void MulticastBrr::SetSendingRate(Datarate d) {
 	for (auto brr : m_brr)
 		brr.second->SetSendingRate(d);
 }
-
+void MulticastBrr::ProcessServiceMessage(FeedbackMInfo f) {
+	for (auto p : f.ps) {
+		auto dst = p.first;
+		assert(m_brr.find(dst) != m_brr.end());
+		f.p = p.second;
+		SIM_LOG_N(BRRM_LOG, m_id, "Feedback source " << f.addr << " with priority " << f.p << " for DST " << dst);
+		m_brr.at(dst)->ProcessServiceMessage(f);
+	}
+}
+void MulticastBrr::CheckReqRetrans(UanAddress id, GenId genId, bool all_prev_acked)
+{
+	//
+	// if at least for all destination we may send the retransmission request
+	//
+	for (auto brr_it : m_brr)
+		brr_it.second->CheckReqRetrans(id, genId, all_prev_acked);
+}
 /*
  * OUTPUTS
  */
@@ -225,46 +223,8 @@ BrrMHeader MulticastBrr::GetHeader(TxPlan txPlan, FeedbackMInfo f) {
 
 	auto h = GetHeaderInfo(txPlan);
 	f.addr = h.addr;
-	f.p = h.p;
+	f.ps = h.p;
 	return BrrMHeader(h, f);
-}
-FeedbackMInfo MulticastBrr::GetFeedbackInfo() {
-	FeedbackMInfo feedback(m_brr.begin()->second->GetFeedbackInfo());
-
-	for (auto brr_it : m_brr) {
-		auto brr = brr_it.second;
-		auto dst = brr_it.first;
-		feedback.p[dst] = brr->GetFeedbackInfo().p;
-	}
-
-	auto f = m_brr.begin()->second->GetFeedbackInfo();
-	feedback.rcvMap = f.rcvMap;
-	feedback.rrInfo = f.rrInfo;
-	feedback.netDiscovery = f.netDiscovery;
-	feedback.ttl = f.ttl;
-	feedback.ackInfo = f.ackInfo;
-	feedback.updated = true;
-
-	return feedback;
-}
-FeedbackMInfo MulticastBrr::GetRetransRequestInfo(ttl_t ttl) {
-	FeedbackMInfo feedback(m_brr.begin()->second->GetFeedbackInfo());
-
-	for (auto brr_it : m_brr) {
-		auto brr = brr_it.second;
-		auto dst = brr_it.first;
-		feedback.p[dst] = brr->GetFeedbackInfo().p;
-	}
-
-	auto f = m_brr.begin()->second->GetRetransRequestInfo(ttl);
-	feedback.rcvMap = f.rcvMap;
-	feedback.rrInfo = f.rrInfo;
-	feedback.netDiscovery = f.netDiscovery;
-	feedback.ttl = f.ttl;
-	feedback.ackInfo = f.ackInfo;
-	feedback.updated = true;
-
-	return feedback;
 }
 
 HeaderMInfo MulticastBrr::GetHeaderInfo() {
@@ -403,25 +363,15 @@ HeaderMInfo MulticastBrr::GetHeaderInfo(TxPlan txPlan) {
 	header.txPlan = txPlan;
 	return header;
 }
-NetDiscoveryMInfo MulticastBrr::GetNetDiscoveryInfo(ttl_t ttl) {
+FeedbackMInfo MulticastBrr::GetServiceMessage() {
 
-	NetDiscoveryMInfo ndi(m_brr.begin()->second->GetNetDiscoveryInfo(ttl));
-
+	FeedbackMInfo f(m_brr.begin()->second->GetServiceMessage());
 	for (auto brr_it : m_brr) {
 		auto brr = brr_it.second;
 		auto dst = brr_it.first;
-		ndi.p[dst] = brr->GetNetDiscoveryInfo(ttl).p;
+		f.ps[dst] = brr->GetPriority();
 	}
-
-	auto f = m_brr.begin()->second->GetNetDiscoveryInfo(ttl);
-	ndi.rcvMap = f.rcvMap;
-	ndi.rrInfo = f.rrInfo;
-	ndi.netDiscovery = f.netDiscovery;
-	ndi.ttl = f.ttl;
-	ndi.ackInfo = f.ackInfo;
-	ndi.updated = true;
-
-	return ndi;
+	return f;
 }
 bool MulticastBrr::NeedGen() {
 	//
@@ -432,19 +382,29 @@ bool MulticastBrr::NeedGen() {
 
 	return true;
 }
-uint32_t MulticastBrr::GetNumGreedyGen() {
+uint32_t MulticastBrr::GetFreeBufferSize() {
 
 	//
 	// select the minimum of that is required for each destination
 	//
-	uint32_t num = std::numeric_limits<uint32_t>::max();
+	uint32_t num = std::numeric_limits < uint32_t > ::max();
 	for (auto brr_it : m_brr) {
-		auto v = brr_it.second->GetNumGreedyGen();
+		auto v = brr_it.second->GetFreeBufferSize();
 		num = (num > v) ? v : num;
 	}
 	return num;
 }
-bool MulticastBrr::MaySendData(double dr) {
+bool MulticastBrr::MaySend(double dr) {
+	//
+	// if at least for all destination we may send data
+	//
+	for (auto brr_it : m_brr)
+	{
+		if (brr_it.second->MaySend(dr)) return true;
+	}
+	return false;
+}
+bool MulticastBrr::MaySendData(double dr){
 	//
 	// if at least for all destination we may send data
 	//
@@ -453,133 +413,41 @@ bool MulticastBrr::MaySendData(double dr) {
 
 	return false;
 }
-bool MulticastBrr::MaySendFeedback() {
+bool MulticastBrr::MaySendServiceMessage(){
 	//
-	// only if for all destination we may send the feedback
-	//
-	for (auto brr_it : m_brr)
-		if (!brr_it.second->MaySendFeedback()) return false;
-
-	return true;
-}
-bool MulticastBrr::MaySendNetDiscovery(ttl_t ttl) {
-	//
-	// only if for all destination we may send the network discovery
+	// if at least for all destination we may send data
 	//
 	for (auto brr_it : m_brr)
-		if (!brr_it.second->MaySendNetDiscovery(ttl)) return false;
-
-	return true;
-}
-// retransmission requests
-bool MulticastBrr::MaySendRetransRequest(std::map<GenId, uint32_t> ranks, UanAddress id, GenId genId, bool all_prev_acked) {
-	//
-	// if at least for all destination we may send the retransmission request
-	//
-	for (auto brr_it : m_brr)
-		if (brr_it.second->MaySendRetransRequest(ranks, id, genId, all_prev_acked)) return true;
+		if (brr_it.second->MaySendServiceMessage()) return true;
 
 	return false;
 }
-bool MulticastBrr::ProcessRetransRequest(FeedbackMInfo l) {
-
-	//
-	// 1. process the retransmission request for each destination
-	// 2. return true if at least by one destination the processing returns true
-	//
-	FeedbackInfo f;
-	f.addr = l.addr;
-	f.rcvMap = l.rcvMap;
-	f.rrInfo = l.rrInfo;
-	f.netDiscovery = l.netDiscovery;
-	f.ttl = l.ttl;
-	f.ackInfo = l.ackInfo;
-	f.updated = l.updated;
-
-	bool b = false;
-	for (auto p : l.p) {
-		auto addr = p.first;
-		assert(m_brr.find(addr) != m_brr.end());
-		f.p = p.second;
-//		m_brr.at(addr)->RcvFeedbackInfo(f);
-		b = (m_brr.at(addr)->ProcessRetransRequest(f)) ? true : b;
-	}
-
-	return b;
+void MulticastBrr::CreateRetransRequest() {
+	for (auto brr_it : m_brr)
+		brr_it.second->CreateRetransRequest();
 }
-bool MulticastBrr::HasRetransRequest(FeedbackMInfo l) {
-	//
-	// 1. ask for the retransmission request for each destination
-	// 2. return true if at least by one destination the processing returns true
-	//
-	FeedbackInfo f;
-	f.addr = l.addr;
-	f.rcvMap = l.rcvMap;
-	f.rrInfo = l.rrInfo;
-	f.netDiscovery = l.netDiscovery;
-	f.ttl = l.ttl;
-	f.ackInfo = l.ackInfo;
-	f.updated = l.updated;
 
-	bool b = false;
-	for (auto p : l.p) {
-		auto addr = p.first;
-		assert(m_brr.find(addr) != m_brr.end());
-		f.p = p.second;
-//		m_brr.at(addr)->RcvFeedbackInfo(f);
-		b = (m_brr.at(addr)->HasRetransRequest(f)) ? true : b;
-	}
-
-	return b;
-}
 void MulticastBrr::ResetRetransInfo() {
 	for (auto brr_it : m_brr)
 		brr_it.second->ResetRetransInfo();
 }
-void MulticastBrr::UpdateRetransRequest() {
-	for (auto brr_it : m_brr)
-		brr_it.second->UpdateRetransRequest();
-}
+
 uint32_t MulticastBrr::GetGenBufSize(uint32_t maxPkts) {
 	//
 	// select the minimum of that is required for each destination
 	//
-	uint32_t num = std::numeric_limits<uint32_t>::max();
+	uint32_t num = std::numeric_limits < uint32_t > ::max();
 	for (auto brr_it : m_brr) {
 		auto v = brr_it.second->GetGenBufSize(maxPkts);
 		num = (num > v) ? v : num;
 	}
 	return num;
 }
-uint32_t MulticastBrr::GetAmountTxData() {
-	//
-	// get the number of symbols that are already present in TX plan
-	//
-	auto txPlan = GetTxPlan();
-	uint32_t sum_tx = 0;
-	for (auto item : txPlan) {
-		sum_tx += item.second.num_all;
-	}
-	//
-	// get minimum of {maximum eligible to be sent from the view of BRR} for each generation
-	//
-	uint32_t max_el_brr = std::numeric_limits<uint32_t>::max();
-	for (auto brr_it : m_brr) {
-		auto v = floor(brr_it.second->GetMaxAmountTxData() * brr_it.second->GetCodingRate());
-	}
-
-	uint32_t act_tx = sum_tx;
-
-	SIM_LOG_N(BRRM_LOG, m_id,
-			"[sum_tx " << sum_tx << "],[max_el_brr " << max_el_brr << "],[act_tx " << act_tx << "],[res " << ((act_tx > max_el_brr) ? max_el_brr : act_tx) << "]");
-
-	return (act_tx > max_el_brr) ? max_el_brr : act_tx;
-}
 uint16_t MulticastBrr::GetAckBacklogSize() {
 	//
 	// select the minimum ACK backlog size
 	//
-	uint32_t num = std::numeric_limits<uint32_t>::max();
+	uint32_t num = std::numeric_limits < uint32_t > ::max();
 	for (auto brr_it : m_brr) {
 		auto v = brr_it.second->GetAckBacklogSize();
 		num = (num > v) ? v : num;
@@ -587,7 +455,7 @@ uint16_t MulticastBrr::GetAckBacklogSize() {
 	return num;
 }
 std::map<UanAddress, uint16_t> MulticastBrr::GetCoalitionSize() {
-	std::map<UanAddress, uint16_t> cs;
+	std::map < UanAddress, uint16_t > cs;
 	for (auto brr_it : m_brr) {
 		cs[brr_it.first] = brr_it.second->GetCoalitionSize();
 	}
