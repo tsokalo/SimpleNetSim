@@ -1,3 +1,0 @@
-#!/bin/bash
-
-LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/tsokalo/workspace/tmaTool/coin-Clp/lib/ ./build/simple_simulator "$1"
