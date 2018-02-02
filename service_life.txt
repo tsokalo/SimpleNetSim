@@ -1,7 +1,40 @@
-
 >>>>>>> Start service <<<<<<<<
 
-[STARTED] When getting access and having the service message: GetServiceMessage -> PlanExpactedReaction
+admit -> check -> init
+
+Short summary:
+
+[admit]:        check if the new service can be started instead of the currently running service
+[check]:        check if there is necessity to start the service for the routing protocol
+[init]:         marking the new process as active if two previous conditions fulfill
+
+Description:
+
+[admit]:
+        the new process can be started if it has the higher priority than the running service (if any)
+
+[check]:
+        NET_DISC: if the cooperation group is empty and if the number of checking the NET_DISC does not exceed the maximum one
+
+        REP_NET_DISC: if received the NET_DISC message
+
+        REQ_PTP_ACK: if for certain older generations there is neither soft no hard ACK and at least one cooperating node did not send the ACK/NACK for certain number of ?_time slots_?
+
+	RESP_PTP_ACK: if REQ_PTP_ACK is received
+
+	REQ_ETE_ACK: 
+		1) if for certain older generations there is neither soft no hard ACK
+		2) if got the feedback from all neighbors but no soft ACK is possible
+		3) if maximum number of REQ_PTP_ACK is ?_sent_?
+
+	RESP_ETE_ACK:
+		1) by destination if destination gets REQ_ETE_ACK
+		2) by a node if it gets RESP_ETE_ACK from the node with higher priority	
+
+	__REQ_RETRANS__:
+		1) if not source
+		2) if there is an overflow danger
+
 
 >>>>>>>	Repeat service message <<<<<<<<
 

@@ -27,16 +27,18 @@ public:
 	void add(GenId genId) {
 
 		if (std::find(c_in_mem.begin(), c_in_mem.end(), genId) == c_in_mem.end()) {
-			counters[genId] += maxCount;
+			counters[genId] = maxCount;
 			c_in_mem.push_back(genId);
-			if(c_in_mem.size() > max_in_mem)c_in_mem.pop_front();
+			if (c_in_mem.size() > max_in_mem) c_in_mem.pop_front();
 			AckBacklog::add(genId);
 		}
 	}
 	void remove(GenId genId) {
 
-		counters.erase(genId);
-		AckBacklog::remove(genId);
+		if (std::find(c_in_mem.begin(), c_in_mem.end(), genId) != c_in_mem.end()) {
+			counters.erase(genId);
+			AckBacklog::remove(genId);
+		}
 	}
 
 	void tic() {
@@ -49,12 +51,47 @@ public:
 			this->remove(g);
 	}
 
+	void reset(GenId genId) {
+		counters[genId] = maxCount;
+	}
+
 private:
 	uint16_t maxCount;
 	std::map<GenId, uint16_t> counters;
 
 	std::deque<GenId> c_in_mem;
 	static const uint16_t max_in_mem = 300;
+};
+
+struct AckHistory {
+
+	typedef std::shared_ptr<AckCountDown> ack_count_ptr;
+
+public:
+	AckHistory(uint16_t maxCount) {
+		this->maxCount = maxCount;
+	}
+
+	void add(UanAddress addr, GenId genId) {
+		if (h.find(addr) != h.end()) {
+			h[addr]->reset(genId);
+		} else {
+			h.emplace(addr, ack_count_ptr(new AckCountDown(1000, maxCount)));
+			h[addr]->add(genId);
+		}
+	}
+	void tic() {
+		for (auto v : h)
+			v.second->tic();
+	}
+	bool is_in(UanAddress addr, GenId genId) {
+		if (h.find(addr) == h.end()) return false;
+		return h[addr]->is_in(genId);
+	}
+private:
+
+	uint16_t maxCount;
+	std::map<UanAddress, ack_count_ptr> h;
 };
 
 }

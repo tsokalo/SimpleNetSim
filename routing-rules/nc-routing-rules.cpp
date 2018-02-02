@@ -14,7 +14,7 @@
 namespace ncr {
 
 NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress destAddress, SimParameters sp) :
-		m_outdatedGens(2 * sp.numGen), m_outdatedGensInform(2 * sp.numGen, sp.ackMaxRetransNum), m_thresholdP(sp.sendRate / 10), m_gen(m_rd()), m_dis(0, 1) {
+		m_outdatedGens(2 * sp.numGen), m_outdatedGensInform(2 * sp.numGen, sp.ackMaxRetransNum), m_acksHist(10), m_thresholdP(sp.sendRate / 10), m_gen(m_rd()), m_dis(0, 1) {
 
 	m_sp = sp;
 	//	assert((sp.sendRate / 5) >= SMALLEST_SENDER_PHY_DATA_RATE && (sp.sendRate / 50) <= SMALLEST_SENDER_PHY_DATA_RATE);
@@ -417,7 +417,7 @@ void NcRoutingRules::CheckReqPtpAck() {
 	auto func = [this](GenId gid)->bool
 	{
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Checking ACK");
-		if (!IsSoftAck(gid) && !IsHardAck(gid)) {
+		if (!IsSoftAck(gid) && !IsHardAck(gid) && !IsUptodateFeedback(gid)) {
 			m_service.set_want_start_service(true);
 			return true;
 		}
@@ -454,50 +454,57 @@ void NcRoutingRules::CheckReqEteAckI() {
 void NcRoutingRules::CheckReqEteAckII() {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	auto dec_count = [this](GenId gid)->bool
-	{
-		//
-		// if got the feedback from all neighbors but no soft ACK is possible
-		//
-			if(!softAckInfo.is_acked(gid) && softAckInfo.is_up_to_date(gid))
-			{
-				SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Got the feedback from all neighbors but no soft ACK is possible");
-				m_service.set_want_start_service(true);
-				return false;
-			}
-			//
-			// if maximum number of ReqPtpAck is sent
-			//
-			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "updating the ReqPtpAck count");
-			assert(m_f.ackInfo.find(gid) != m_f.ackInfo.end());//because of called after SetAcks
-			if (!m_f.ackInfo[gid]) {
-				if (m_ptpAckCount.find(gid) == m_ptpAckCount.end()) {
-					m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
-				} else {
-					if (m_ptpAckCount[gid]-- == 0) {
-						m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
-						SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Maximum number of ReqPtpAck is sent");
-						m_service.set_want_start_service(true);
-					}
-				}
-			}
-			return false;		// work for all generation in the PtpAck range
-		};
-	auto make_default = [this](GenId gid)->bool
-	{
-		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "defaulting the ReqPtpAck count");
-		m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
-		return false;			// work for all generation in the PtpAck range
-		};
-
 	if (m_service.get_type() == ServiceMessType::REQ_PTP_ACK) {
 		if (m_service.admit(ServiceMessType::REQ_ETE_ACK)) {
-			WorkInPtpAckRange(dec_count);
+			m_service.set_want_start_service(false);	// REQ_ETE_ACK II is not supported at the moment
 			if (m_service.init()) m_f.ttl = m_maxTtl;
 		}
-	} else {
-		WorkInPtpAckRange(make_default);
 	}
+
+//	auto dec_count = [this](GenId gid)->bool
+//	{
+//		//
+//		// if got the feedback from all neighbors but no soft ACK is possible
+//		//
+//			if(!softAckInfo.is_acked(gid) && softAckInfo.is_up_to_date(gid))
+//			{
+//				SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Got the feedback from all neighbors but no soft ACK is possible");
+//				m_service.set_want_start_service(true);
+//				return false;
+//			}
+//			//
+//			// if maximum number of ReqPtpAck is sent
+//			//
+//			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "updating the ReqPtpAck count");
+//			assert(m_f.ackInfo.find(gid) != m_f.ackInfo.end());//because of called after SetAcks
+//			if (!m_f.ackInfo[gid]) {
+//				if (m_ptpAckCount.find(gid) == m_ptpAckCount.end()) {
+//					m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
+//				} else {
+//					if (m_ptpAckCount[gid]-- == 0) {
+//						m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
+//						SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Maximum number of ReqPtpAck is sent");
+//						m_service.set_want_start_service(true);
+//					}
+//				}
+//			}
+//			return false;		// work for all generation in the PtpAck range
+//		};
+//	auto make_default = [this](GenId gid)->bool
+//	{
+//		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "defaulting the ReqPtpAck count");
+//		m_ptpAckCount[gid] = m_sp.numPtpAckBeforeEteAck;
+//		return false;			// work for all generation in the PtpAck range
+//		};
+//
+//	if (m_service.get_type() == ServiceMessType::REQ_PTP_ACK) {
+//		if (m_service.admit(ServiceMessType::REQ_ETE_ACK)) {
+//			WorkInPtpAckRange(dec_count);
+//			if (m_service.init()) m_f.ttl = m_maxTtl;
+//		}
+//	} else {
+//		WorkInPtpAckRange(make_default);
+//	}
 }
 
 void NcRoutingRules::CheckNetDisc() {
@@ -2055,6 +2062,9 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 			oldestMentionedGenId = (oldestMentionedGenId == MAX_GEN_SSN) ? genId : oldestMentionedGenId;
 			oldestMentionedGenId = (gen_ssn_t(genId) > gen_ssn_t(oldestMentionedGenId)) ? genId : oldestMentionedGenId;
 
+			m_f.ackInfo[genId] = m_f.ackInfo[genId] ? m_f.ackInfo[genId] : a.second;
+			m_acksHist.add(l.addr, genId);
+
 			if (a.second) {
 				PlanForgetGeneration(genId);
 				DoForgetGeneration(genId);
@@ -2287,6 +2297,13 @@ bool NcRoutingRules::IsSoftAck(GenId gid) {
 bool NcRoutingRules::IsHardAck(GenId gid) {
 	return (m_f.ackInfo[gid] || m_outdatedGens.is_in(gid));
 }
+bool NcRoutingRules::IsUptodateFeedback(GenId gid) {
+	for (auto node : m_coalition) {
+		auto addr = node.first;
+		if (!m_acksHist.is_in(addr, gid)) return false;
+	}
+	return true;
+}
 bool NcRoutingRules::HaveAcksToSend() {
 
 	SIM_LOG_FUNC(BRR_LOG);
@@ -2486,36 +2503,37 @@ bool NcRoutingRules::DoCreateRetransRequest(GenId newGid) {
 
 		assert(m_getRank);
 		auto r = m_getRank(gid);
-		if(r == 0)return false;
+		// TODO: check it
+			if(r == 0)return false;
 
-		if (r < m_sp.genSize) {
+			if (r < m_sp.genSize) {
 
-			m_f.rrInfo[gid].codingCoefs.clear();
-			m_f.rrInfo[gid].hashVector.clear();
-			switch (m_sp.fbCont) {
-				case ALL_VECTORS_FEEDBACK_ART: {
-					assert(m_getCodingMatrix);
-					SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Adding coding matrix with rank: " << r);
-					m_f.rrInfo[gid].codingCoefs = m_getCodingMatrix(gid);
-					break;
-				}
-				case HASH_VECTOR_FEEDBACK_ART: {
-					assert(m_ccack.find(gid) != m_ccack.end());
-					m_f.rrInfo[gid].hashVector = m_ccack[gid]->GetHashVector();
-					SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Hash vector " << m_f.rrInfo[gid].hashVector);
-					break;
-				}
-				case SEEN_DEC_RANK_FEEDBACK_ART: {
-					assert(m_getCoderInfo);
-					m_f.rrInfo[gid].coderInfo = m_getCoderInfo(gid);
-					break;
-				}
-				default: {
-					assert(0);
+				m_f.rrInfo[gid].codingCoefs.clear();
+				m_f.rrInfo[gid].hashVector.clear();
+				switch (m_sp.fbCont) {
+					case ALL_VECTORS_FEEDBACK_ART: {
+						assert(m_getCodingMatrix);
+						SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Adding coding matrix with rank: " << r);
+						m_f.rrInfo[gid].codingCoefs = m_getCodingMatrix(gid);
+						break;
+					}
+					case HASH_VECTOR_FEEDBACK_ART: {
+						assert(m_ccack.find(gid) != m_ccack.end());
+						m_f.rrInfo[gid].hashVector = m_ccack[gid]->GetHashVector();
+						SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Hash vector " << m_f.rrInfo[gid].hashVector);
+						break;
+					}
+					case SEEN_DEC_RANK_FEEDBACK_ART: {
+						assert(m_getCoderInfo);
+						m_f.rrInfo[gid].coderInfo = m_getCoderInfo(gid);
+						break;
+					}
+					default: {
+						assert(0);
+					}
 				}
 			}
-		}
-		return false;	// apply for generations in the retransmission range
+			return false;	// apply for generations in the retransmission range
 		};
 
 	if (m_nodeType == SOURCE_NODE_TYPE) return false;
@@ -2745,8 +2763,8 @@ void NcRoutingRules::PlanExpectedReaction() {
 		return;
 	}
 }
-void NcRoutingRules::Tic()
-{
+void NcRoutingRules::Tic() {
 	m_service.tic();
+	m_acksHist.tic();
 }
 } //ncr

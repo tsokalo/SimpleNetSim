@@ -189,6 +189,7 @@ private:
 	uint32_t GetRegularFeedbackFreq();
 	bool IsSoftAck(GenId gid);
 	bool IsHardAck(GenId gid);
+	bool IsUptodateFeedback(GenId gid);
 
 	void Reset();
 
@@ -265,6 +266,10 @@ private:
 	 * the indeces of the generations that are already removed from the buffer; and still no feedback message was sent with this info
 	 */
 	AckCountDown m_outdatedGensInform;
+	/*
+	 * track all received ACKs/NACKs from the cooperating nodes;
+	 */
+	AckHistory m_acksHist;
 	/*
 	 * counter of PtpAck
 	 */
