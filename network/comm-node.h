@@ -105,6 +105,8 @@ public:
 
 	void EnableCcack(hash_matrix_set_ptr hashMatrixSet);
 
+	void Tic();
+
 private:
 
 	void NotifyGen(GenId genId);

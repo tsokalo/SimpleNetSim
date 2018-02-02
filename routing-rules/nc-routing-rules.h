@@ -113,6 +113,8 @@ public:
 	//
 	double GetInfoOnDsts();
 
+	void Tic();
+
 private:
 
 	/*
@@ -157,7 +159,7 @@ private:
 	void OriginateReqPtpAck();
 	void OriginateReqEteAck();
 	//
-	bool IsConnected();
+	bool IsConnected();// we are connected if we heard at least one neighbor
 	void SetConnected(bool v);
 
 	/*

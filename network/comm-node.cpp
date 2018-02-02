@@ -203,7 +203,7 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 
 	m_brr->ProcessHeaderInfo(pkt.GetHeader());
 
-	if (!pkt.IsFeedbackSymbol()) {
+	if (!pkt.IsServiceMessage()) {
 
 		auto txPlan = pkt.GetHeader().txPlan;
 		//
@@ -263,6 +263,10 @@ void CommNode::SetMessTypeCallback(set_msg_type_func f) {
 void CommNode::EnableCcack(hash_matrix_set_ptr hashMatrixSet) {
 	m_brr->EnableCcack(hashMatrixSet);
 }
+void CommNode::Tic()
+{
+	m_brr->Tic();
+}
 
 void CommNode::NotifyGen(GenId genId) {
 
@@ -276,7 +280,7 @@ void CommNode::NotifyLoss(Edge * input, NcPacket pkt) {
 
 	SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " symbol loss is notified");
 
-	if (!pkt.IsFeedbackSymbol()) {
+	if (!pkt.IsServiceMessage()) {
 
 		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " loosing information symbol");
 		//

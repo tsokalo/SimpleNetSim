@@ -144,6 +144,7 @@ void CommNet::SetDestination(UanAddress i) {
 }
 void CommNet::DoBroadcast(node_ptr sender) {
 
+	for (auto node : m_nodes)node->Tic();
 	NcPacket symb = sender->DoBroadcast();
 }
 

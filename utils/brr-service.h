@@ -24,6 +24,7 @@ struct BrrService {
 	enum BrrServiceStatus {
 		INITIALIZED, STARTED, PLANNED_FOR_REPETITION, REPEATED, FINISHED_NORMAL, FINISHED_ASSIGNED_HIGHER, NONE
 	};
+
 	typedef std::map<uint16_t, int16_t> Timer;
 
 	BrrService() {
@@ -32,7 +33,7 @@ struct BrrService {
 		timerPeriod[ServiceMessType::REP_NET_DISC] = INVALID_TIMER_VALUE;
 		timerPeriod[ServiceMessType::NET_DISC] = INVALID_TIMER_VALUE;
 		timerPeriod[ServiceMessType::RESP_ETE_ACK] = INVALID_TIMER_VALUE;
-		timerPeriod[ServiceMessType::REQ_ETE_ACK] = 3;
+		timerPeriod[ServiceMessType::REQ_ETE_ACK] = 30;
 		timerPeriod[ServiceMessType::REP_REQ_RETRANS] = INVALID_TIMER_VALUE;
 		timerPeriod[ServiceMessType::REQ_RETRANS] = 3;
 		timerPeriod[ServiceMessType::RESP_PTP_ACK] = INVALID_TIMER_VALUE;
@@ -44,7 +45,8 @@ struct BrrService {
 
 	bool admit(ServiceMessType::ServiceMessType_ t) {
 
-		SIM_LOG_FUNC(BRR_LOG);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
 
 		messTypeAdmitted.assign(ServiceMessType::NONE);
 		want_start_service = false;
@@ -53,19 +55,21 @@ struct BrrService {
 		//
 		bool b = (!messType.is_higher_prior(t));
 		if (b) messTypeAdmitted.assign(t);
-		SIM_LOG(BRR_LOG, "Current service " << messType.GetAsInt() << " , new service " << (uint16_t) t << ": admit " << b);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG && b);
+		SIM_LOG(BRR_SERVICE_LOG, "Active " << messType << " , Requested " << t << ": admit " << b);
 
 		return b;
 	}
 	bool init() {
 
-		SIM_LOG_FUNC(BRR_LOG);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
 
 		SIM_ASSERT_MSG(messTypeAdmitted != ServiceMessType::NONE, "Call admit before init / init cannot be called if admit was successful");
 
 		bool ret = false;
 
-		if(messType == messTypeAdmitted && this->is_running())return false;
+		if (messType == messTypeAdmitted && this->is_running()) return false;
 		//
 		// if no more need to run the currently running service
 		//
@@ -94,8 +98,8 @@ struct BrrService {
 
 		if (ret) timer = timerPeriod[messType.GetAsInt()]; // reset the timer
 
-		SIM_LOG(BRR_LOG,
-				"Current service " << messType.GetAsInt() << ", admitted service " << messTypeAdmitted.GetAsInt() << ": case " << want_start_service << "," << (messType == messTypeAdmitted) << ", ret " << ret << ", timer " << timer);
+		SIM_LOG(BRR_SERVICE_LOG,
+				"Active: " << messType << ", Admitted: " << messTypeAdmitted << ": case " << want_start_service << "," << (messType == messTypeAdmitted) << ", ret " << ret << ", timer " << timer);
 
 		messTypeAdmitted.assign(ServiceMessType::NONE);
 		want_start_service = false;
@@ -103,39 +107,45 @@ struct BrrService {
 	}
 	void tic() {
 
-		SIM_LOG_FUNC(BRR_LOG);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
 
 		timer = (is_timeout() || timer == INVALID_TIMER_VALUE) ? timer : timer - 1;
 		if (is_timeout()) set_repeat(true);
 	}
 
 	bool is_timeout() {
+		SIM_LOG_FUNC(BRR_SERVICE_LOG && timer == 0);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
 		return (timer == 0);
 	}
-	bool is_running()
-	{
-		SIM_LOG_FUNC(BRR_LOG);
+	bool is_running() {
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
 
 		return (status == INITIALIZED || status == STARTED || status == PLANNED_FOR_REPETITION || status == REPEATED) && !is_timeout();
 	}
 
 	void set_want_start_service(bool v) {
 
-		SIM_LOG_FUNC(BRR_LOG);
-		SIM_LOG(BRR_LOG, "Current service " << messType.GetAsInt() << " want start " << v);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
+		SIM_LOG(BRR_SERVICE_LOG, "Current service " << messType.GetAsInt() << " want start " << v);
 		want_start_service = v;
 	}
 
 	bool ready_to_start() {
 
-		SIM_LOG_FUNC(BRR_LOG);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
 
 		return (status == INITIALIZED || status == PLANNED_FOR_REPETITION);
 	}
 
 	void start() {
 
-		SIM_LOG_FUNC(BRR_LOG);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
 
 		if (this->status == PLANNED_FOR_REPETITION) {
 			set_status(REPEATED);
@@ -149,7 +159,8 @@ struct BrrService {
 	}
 	void stop() {
 
-		SIM_LOG_FUNC(BRR_LOG);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
 
 		timer = INVALID_TIMER_VALUE;
 		set_status(FINISHED_NORMAL);
@@ -159,7 +170,8 @@ struct BrrService {
 	}
 	void stop_if(ServiceMessType::ServiceMessType_ t) {
 
-		SIM_LOG_FUNC(BRR_LOG);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
 
 		if (messType == t) {
 			stop();
@@ -167,9 +179,9 @@ struct BrrService {
 	}
 	void set_status(BrrServiceStatus status) {
 
-		SIM_LOG_FUNC(BRR_LOG);
-
-		SIM_LOG(BRR_LOG, "Current service " << messType.GetAsInt() << " , current status " << (uint16_t) this->status << ", new status " << (uint16_t) status);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG(BRR_SERVICE_LOG,
+				"Active: " << messType << ", Admitted: " << messTypeAdmitted << " , current status " << this->status << ", new status " << status);
 
 		switch (status) {
 		case INITIALIZED: {
@@ -204,22 +216,57 @@ struct BrrService {
 	}
 	void set_repeat(bool b) {
 
-		SIM_LOG_FUNC(BRR_LOG);
-
-		SIM_LOG(BRR_LOG, "Current service " << messType.GetAsInt() << " , current status " << (uint16_t) this->status << ", set repeat " << b);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG && b);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted << " , current status " << this->status << ", set repeat " << b);
 
 		if (b) set_status(PLANNED_FOR_REPETITION);
 	}
 	bool need_repeat() {
 
-		SIM_LOG_FUNC(BRR_LOG);
+		SIM_LOG_FUNC(BRR_SERVICE_LOG);
+		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
 
 		return (status == PLANNED_FOR_REPETITION);
 	}
 
 	friend std::ostream& operator<<(std::ostream& o, BrrService& m) {
 
-		o << "Service: " << m.messType.GetAsInt() << " / " << (uint16_t) m.status << " / " << m.messTypeAdmitted.GetAsInt() << " / " << m.want_start_service;
+		o << "Service: " << m.messType << " / " << m.status << " / " << m.messTypeAdmitted << " / " << m.want_start_service;
+		return o;
+	}
+	friend std::ostream& operator<<(std::ostream& o, BrrServiceStatus& m) {
+
+		switch (m) {
+		case INITIALIZED: {
+			o << "INITIALIZED";
+			break;
+		}
+		case STARTED: {
+			o << "STARTED";
+			break;
+		}
+		case PLANNED_FOR_REPETITION: {
+			o << "PLANNED_FOR_REPETITION";
+			break;
+		}
+		case REPEATED: {
+			o << "REPEATED";
+			break;
+		}
+		case FINISHED_NORMAL: {
+			o << "FINISHED_NORMAL";
+			break;
+		}
+		case FINISHED_ASSIGNED_HIGHER: {
+			o << "FINISHED_ASSIGNED_HIGHER";
+			break;
+		}
+		case NONE: {
+			o << "NONE";
+			break;
+		}
+		}
 		return o;
 	}
 

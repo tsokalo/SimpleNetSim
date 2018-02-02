@@ -122,8 +122,7 @@ void MulticastBrr::ProcessServiceMessage(FeedbackMInfo f) {
 		m_brr.at(dst)->ProcessServiceMessage(f);
 	}
 }
-void MulticastBrr::CheckReqRetrans(UanAddress id, GenId genId, bool all_prev_acked)
-{
+void MulticastBrr::CheckReqRetrans(UanAddress id, GenId genId, bool all_prev_acked) {
 	//
 	// if at least for all destination we may send the retransmission request
 	//
@@ -387,7 +386,7 @@ uint32_t MulticastBrr::GetFreeBufferSize() {
 	//
 	// select the minimum of that is required for each destination
 	//
-	uint32_t num = std::numeric_limits < uint32_t > ::max();
+	uint32_t num = std::numeric_limits<uint32_t>::max();
 	for (auto brr_it : m_brr) {
 		auto v = brr_it.second->GetFreeBufferSize();
 		num = (num > v) ? v : num;
@@ -398,13 +397,12 @@ bool MulticastBrr::MaySend(double dr) {
 	//
 	// if at least for all destination we may send data
 	//
-	for (auto brr_it : m_brr)
-	{
+	for (auto brr_it : m_brr) {
 		if (brr_it.second->MaySend(dr)) return true;
 	}
 	return false;
 }
-bool MulticastBrr::MaySendData(double dr){
+bool MulticastBrr::MaySendData(double dr) {
 	//
 	// if at least for all destination we may send data
 	//
@@ -413,7 +411,7 @@ bool MulticastBrr::MaySendData(double dr){
 
 	return false;
 }
-bool MulticastBrr::MaySendServiceMessage(){
+bool MulticastBrr::MaySendServiceMessage() {
 	//
 	// if at least for all destination we may send data
 	//
@@ -436,7 +434,7 @@ uint32_t MulticastBrr::GetGenBufSize(uint32_t maxPkts) {
 	//
 	// select the minimum of that is required for each destination
 	//
-	uint32_t num = std::numeric_limits < uint32_t > ::max();
+	uint32_t num = std::numeric_limits<uint32_t>::max();
 	for (auto brr_it : m_brr) {
 		auto v = brr_it.second->GetGenBufSize(maxPkts);
 		num = (num > v) ? v : num;
@@ -447,7 +445,7 @@ uint16_t MulticastBrr::GetAckBacklogSize() {
 	//
 	// select the minimum ACK backlog size
 	//
-	uint32_t num = std::numeric_limits < uint32_t > ::max();
+	uint32_t num = std::numeric_limits<uint32_t>::max();
 	for (auto brr_it : m_brr) {
 		auto v = brr_it.second->GetAckBacklogSize();
 		num = (num > v) ? v : num;
@@ -455,11 +453,17 @@ uint16_t MulticastBrr::GetAckBacklogSize() {
 	return num;
 }
 std::map<UanAddress, uint16_t> MulticastBrr::GetCoalitionSize() {
-	std::map < UanAddress, uint16_t > cs;
+	std::map<UanAddress, uint16_t> cs;
 	for (auto brr_it : m_brr) {
 		cs[brr_it.first] = brr_it.second->GetCoalitionSize();
 	}
 	return cs;
+}
+
+void MulticastBrr::Tic() {
+	for (auto brr_it : m_brr) {
+		brr_it.second->Tic();
+	}
 }
 
 }

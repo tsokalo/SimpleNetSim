@@ -83,8 +83,7 @@ public:
 		return false;
 	}
 
-	void copy(const ServiceMessType& other)
-	{
+	void copy(const ServiceMessType& other) {
 		this->t = other.t;
 	}
 
@@ -94,19 +93,16 @@ public:
 		return this->assign(other);
 	}
 
-	ServiceMessType& operator=(const uint16_t& other)
-			{
+	ServiceMessType& operator=(const uint16_t& other) {
 		this->t = ServiceMessType_(other);
 		return *this;
 	}
 
-	bool is_higher_prior(const ServiceMessType& other)
-	{
+	bool is_higher_prior(const ServiceMessType& other) {
 		return is_higher_prior(other.t);
 	}
 
-	bool is_higher_prior(const ServiceMessType_& t)
-	{
+	bool is_higher_prior(const ServiceMessType_& t) {
 		return (this->t < t);
 	}
 
@@ -122,6 +118,56 @@ public:
 	}
 	inline friend bool operator!=(const ServiceMessType &a, const ServiceMessType_ &b) {
 		return a.t != b;
+	}
+	friend std::ostream& operator<<(std::ostream& o, ServiceMessType_& m) {
+		switch (m) {
+		case REP_NET_DISC: {
+			o << "REP_NET_DISC";
+			break;
+		}
+		case NET_DISC: {
+			o << "NET_DISC";
+			break;
+		}
+		case RESP_ETE_ACK: {
+			o << "RESP_ETE_ACK";
+			break;
+		}
+		case REQ_ETE_ACK: {
+			o << "REQ_ETE_ACK";
+			break;
+		}
+		case REP_REQ_RETRANS: {
+			o << "REP_REQ_RETRANS";
+			break;
+		}
+		case REQ_RETRANS: {
+			o << "REQ_RETRANS";
+			break;
+		}
+		case RESP_PTP_ACK: {
+			o << "RESP_PTP_ACK";
+			break;
+		}
+		case REQ_PTP_ACK: {
+			o << "REQ_PTP_ACK";
+			break;
+		}
+		case REGULAR: {
+			o << "REGULAR";
+			break;
+		}
+		case NONE: {
+			o << "NONE";
+			break;
+		}
+		}
+		return o;
+	}
+	friend std::ostream& operator<<(std::ostream& o, ServiceMessType& m) {
+
+		o << m.t;
+		return o;
 	}
 
 	uint16_t GetAsInt() {
@@ -155,6 +201,5 @@ private:
 	ServiceMessType_ t;
 };
 }
-
 
 #endif /* UTILS_SERVICE_MESSTYPE_H_ */

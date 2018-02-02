@@ -42,7 +42,7 @@ public:
 	HeaderMInfo GetHeader() {
 		return m_header;
 	}
-	bool IsFeedbackSymbol()
+	bool IsServiceMessage()
 	{
 		return m_isFeedbackSymbol;
 	}

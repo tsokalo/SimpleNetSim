@@ -121,8 +121,6 @@ void NcRoutingRules::UpdateSent(GenId genId, uint32_t num, bool notify_sending) 
 		m_logItem.ns = 0;
 	}
 
-	m_service.tic();
-
 	DoUpdateForwardPlan();
 }
 void NcRoutingRules::NotifySending() {
@@ -170,8 +168,6 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, std::vector<OrigSymb
 void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, bool linDep) {
 
 	SIM_LOG_FUNC(BRR_LOG);
-
-	m_service.tic();
 
 	if (id != m_id) {
 		SetConnected(true);
@@ -223,8 +219,6 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, bool linDep) {
 void NcRoutingRules::UpdateLoss(GenId genId, UanAddress id) {
 
 	SIM_LOG_FUNC(BRR_LOG);
-
-	m_service.tic();
 
 	uint32_t num = 1;
 	m_inRcvMap[id].add(num, 1);
@@ -310,16 +304,15 @@ FeedbackInfo NcRoutingRules::GetServiceMessage() {
 	//
 	PlanExpectedReaction();
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "After planning the expected reaction" << m_service);
-	//
-	m_service.tic();
-	//
-	if (m_f.type == ServiceMessType::NET_DISC || m_f.type == ServiceMessType::REP_NET_DISC) {
-		//
-		// assume to be connected after sending the network discovery message
-		// with assuming that, we issue the timer before sending the next network discovery message
-		//
-		SetConnected(true);
-	}
+
+//	//
+//	if (m_f.type == ServiceMessType::NET_DISC || m_f.type == ServiceMessType::REP_NET_DISC) {
+//		//
+//		// assume to be connected after sending the network discovery message
+//		// with assuming that, we issue the timer before sending the next network discovery message
+//		//
+//		SetConnected(true);
+//	}
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Service message type: " << m_f.type.GetAsInt());
 
@@ -659,8 +652,6 @@ void NcRoutingRules::ProcessServiceMessage(FeedbackInfo f) {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	m_service.tic();
-
 	SetConnected(true);
 	ValidateReaction(f);
 	PlanExpectedReaction(f);
@@ -668,6 +659,7 @@ void NcRoutingRules::ProcessServiceMessage(FeedbackInfo f) {
 	ProcessRegularFeedback(f);
 
 	if (f.type == ServiceMessType::REGULAR) {
+		// do nothing
 		return;
 	}
 	if (f.type == ServiceMessType::REQ_PTP_ACK) {
@@ -686,8 +678,12 @@ void NcRoutingRules::ProcessServiceMessage(FeedbackInfo f) {
 		ProcessRespEteAck(f);
 		return;
 	}
-	if (f.type == ServiceMessType::NET_DISC || f.type == ServiceMessType::REP_NET_DISC) {
+	if (f.type == ServiceMessType::NET_DISC) {
 		ProcessNetDisc(f);
+		return;
+	}
+	if (f.type == ServiceMessType::REP_NET_DISC) {
+		// do nothing
 		return;
 	}
 	if (f.type == ServiceMessType::REQ_RETRANS || f.type == ServiceMessType::REP_REQ_RETRANS) {
@@ -804,12 +800,12 @@ void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
 void NcRoutingRules::ProcessNetDisc(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
 
-	//
-	// source and destination does not forward the network discovery message
-	//
-	if (m_nodeType == SOURCE_NODE_TYPE || m_nodeType == DESTINATION_NODE_TYPE) {
-		return;
-	}
+//	//
+//	// source and destination does not forward the network discovery message
+//	//
+//	if (m_nodeType == SOURCE_NODE_TYPE || m_nodeType == DESTINATION_NODE_TYPE) {
+//		return;
+//	}
 
 //	if (!m_coalition.empty()) {
 //		if (m_service.prepare(ServiceMessType::NET_DISC, ServiceMessType::NONE)) m_f.ttl = -1;
@@ -900,12 +896,13 @@ void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
 }
 
 bool NcRoutingRules::IsConnected() {
-	return !(countTxopNetDisc++ >= m_sp.numTxopNetDisc);
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "NetDisc sent " << countTxopNetDisc << ", max NetDisc " << m_sp.numTxopNetDisc);
+	return (countTxopNetDisc++ >= m_sp.numTxopNetDisc);
 }
 void NcRoutingRules::SetConnected(bool v) {
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Set connected " << v);
-	countTxopNetDisc = v ? 0 : m_sp.numTxopNetDisc;
+	countTxopNetDisc = v ? m_sp.numTxopNetDisc : 0;
 	m_service.stop_if(ServiceMessType::NET_DISC);
 	m_service.stop_if(ServiceMessType::REP_NET_DISC);
 }
@@ -1288,12 +1285,10 @@ void NcRoutingRules::DoFilter() {
 #ifdef FULL_VECTOR
 		if (m_nodeType == SOURCE_NODE_TYPE) {
 			if (m_getRank(genId) != m_sp.genSize) {
-				SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "Rank " << m_getRank(genId)
-						<< ", size " << m_sp.genSize << " - not full. Skip..");
+				SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "Rank " << m_getRank(genId) << ", size " << m_sp.genSize << " - not full. Skip..");
 				continue;
 			}
-		}
-		else {
+		} else {
 			//			if (!m_inRcvNum.is_in_tail(m_sp.numGenBuffering, genId)) {
 			//				SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst,  "Generation " << genId << ", rank " << m_getRank(genId)
 			//						<< ", size " << m_sp.genSize << ", number buffering "
@@ -2659,6 +2654,7 @@ void NcRoutingRules::Overshoot(GenId gid) {
 void NcRoutingRules::ValidateReaction(GenId genId, UanAddress id) {
 
 	SIM_LOG_FUNC(BRR_LOG);
+	SIM_LOG_FUNC(BRR_SERVICE_LOG);
 
 	m_service.set_repeat(false);	// be optimistic by default
 
@@ -2679,6 +2675,7 @@ void NcRoutingRules::ValidateReaction(GenId genId, UanAddress id) {
 void NcRoutingRules::ValidateReaction(FeedbackInfo l) {
 
 	SIM_LOG_FUNC(BRR_LOG);
+	SIM_LOG_FUNC(BRR_SERVICE_LOG);
 
 	auto react_bad_if_higher_prior = [this](FeedbackInfo l)
 	{
@@ -2702,6 +2699,7 @@ void NcRoutingRules::ValidateReaction(FeedbackInfo l) {
 void NcRoutingRules::PlanExpectedReaction(GenId genId, UanAddress id) {
 
 	SIM_LOG_FUNC(BRR_LOG);
+	SIM_LOG_FUNC(BRR_SERVICE_LOG);
 
 	if (m_service.get_type() == ServiceMessType::REQ_RETRANS || m_service.get_type() == ServiceMessType::REP_REQ_RETRANS) {
 		if (DoICooperate(id)) if (IsRequestedForRetrans(genId)) m_service.stop();
@@ -2711,6 +2709,7 @@ void NcRoutingRules::PlanExpectedReaction(GenId genId, UanAddress id) {
 void NcRoutingRules::PlanExpectedReaction(FeedbackInfo l) {
 
 	SIM_LOG_FUNC(BRR_LOG);
+	SIM_LOG_FUNC(BRR_SERVICE_LOG);
 
 	if (m_service.get_type() == ServiceMessType::REQ_PTP_ACK) {
 		if (DoesItCooperate(l.addr)) {
@@ -2732,6 +2731,7 @@ void NcRoutingRules::PlanExpectedReaction(FeedbackInfo l) {
 void NcRoutingRules::PlanExpectedReaction() {
 
 	SIM_LOG_FUNC(BRR_LOG);
+	SIM_LOG_FUNC(BRR_SERVICE_LOG);
 
 	m_service.start();
 
@@ -2744,5 +2744,9 @@ void NcRoutingRules::PlanExpectedReaction() {
 		m_service.stop();
 		return;
 	}
+}
+void NcRoutingRules::Tic()
+{
+	m_service.tic();
 }
 } //ncr

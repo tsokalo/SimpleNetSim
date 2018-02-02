@@ -91,6 +91,8 @@ public:
 	uint16_t GetAckBacklogSize();
 	std::map<UanAddress, uint16_t> GetCoalitionSize();
 
+	void Tic();
+
 private:
 
 	std::map<UanAddress, routing_rules_ptr> m_brr;
