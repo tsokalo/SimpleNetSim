@@ -366,7 +366,7 @@ int main(int argc, char *argv[]) {
 
 		std::string topology = subpath + "Topologies/Topology0.txt";
 		std::cout << "Looking for topology " << topology << std::endl;
-		std::string folder_with_traces = "/home/tsokalo/Dokumente/4_Publications/EuropeWireless2018/docs/zhenya_bitmaskdump";
+		std::string folder_with_traces = subpath + "Topologies/traces";
 		ReadScenario(net, sim_par, topology, folder_with_traces);
 
 //	return 0;

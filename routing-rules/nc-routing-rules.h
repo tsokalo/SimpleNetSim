@@ -175,6 +175,7 @@ private:
 	void FormRrInfo(FeedbackInfo fb, std::map<GenId, CoderHelpInfo> helpInfo);
 	void RefineCoderHelpInfo(std::map<GenId, CoderHelpInfo> &helpInfo);
 	bool DoCreateRetransRequest(GenId genId);
+	void SetRetransInfo(GenId genId);
 	bool IsRequestedForRetrans(GenId gid);
 	/*
 	 * Acknowledgements

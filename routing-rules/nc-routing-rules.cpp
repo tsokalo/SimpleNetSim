@@ -14,7 +14,8 @@
 namespace ncr {
 
 NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress destAddress, SimParameters sp) :
-		m_outdatedGens(2 * sp.numGen), m_outdatedGensInform(2 * sp.numGen, sp.ackMaxRetransNum), m_acksHist(10), m_thresholdP(sp.sendRate / 10), m_gen(m_rd()), m_dis(0, 1) {
+		m_outdatedGens(2 * sp.numGen), m_outdatedGensInform(2 * sp.numGen, sp.ackMaxRetransNum), m_acksHist(10), m_thresholdP(sp.sendRate / 10), m_gen(m_rd()), m_dis(
+				0, 1) {
 
 	m_sp = sp;
 	//	assert((sp.sendRate / 5) >= SMALLEST_SENDER_PHY_DATA_RATE && (sp.sendRate / 50) <= SMALLEST_SENDER_PHY_DATA_RATE);
@@ -2501,39 +2502,8 @@ bool NcRoutingRules::DoCreateRetransRequest(GenId newGid) {
 			m_numRr->increment(gid);
 		}
 
-		assert(m_getRank);
-		auto r = m_getRank(gid);
-		// TODO: check it
-			if(r == 0)return false;
-
-			if (r < m_sp.genSize) {
-
-				m_f.rrInfo[gid].codingCoefs.clear();
-				m_f.rrInfo[gid].hashVector.clear();
-				switch (m_sp.fbCont) {
-					case ALL_VECTORS_FEEDBACK_ART: {
-						assert(m_getCodingMatrix);
-						SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Adding coding matrix with rank: " << r);
-						m_f.rrInfo[gid].codingCoefs = m_getCodingMatrix(gid);
-						break;
-					}
-					case HASH_VECTOR_FEEDBACK_ART: {
-						assert(m_ccack.find(gid) != m_ccack.end());
-						m_f.rrInfo[gid].hashVector = m_ccack[gid]->GetHashVector();
-						SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Hash vector " << m_f.rrInfo[gid].hashVector);
-						break;
-					}
-					case SEEN_DEC_RANK_FEEDBACK_ART: {
-						assert(m_getCoderInfo);
-						m_f.rrInfo[gid].coderInfo = m_getCoderInfo(gid);
-						break;
-					}
-					default: {
-						assert(0);
-					}
-				}
-			}
-			return false;	// apply for generations in the retransmission range
+		SetRetransInfo(gid);
+		return false;	// apply for generations in the retransmission range
 		};
 
 	if (m_nodeType == SOURCE_NODE_TYPE) return false;
@@ -2557,6 +2527,40 @@ bool NcRoutingRules::DoCreateRetransRequest(GenId newGid) {
 	} else {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say NO to sending of RR. I have not sufficient generations in memory");
 		return false;
+	}
+}
+void NcRoutingRules::SetRetransInfo(GenId gid) {
+	assert(m_getRank);
+	auto r = m_getRank(gid);
+	// TODO: check it
+	if (r == 0) return false;
+
+	if (r < m_sp.genSize) {
+
+		m_f.rrInfo[gid].codingCoefs.clear();
+		m_f.rrInfo[gid].hashVector.clear();
+		switch (m_sp.fbCont) {
+		case ALL_VECTORS_FEEDBACK_ART: {
+			assert(m_getCodingMatrix);
+			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Adding coding matrix with rank: " << r);
+			m_f.rrInfo[gid].codingCoefs = m_getCodingMatrix(gid);
+			break;
+		}
+		case HASH_VECTOR_FEEDBACK_ART: {
+			assert(m_ccack.find(gid) != m_ccack.end());
+			m_f.rrInfo[gid].hashVector = m_ccack[gid]->GetHashVector();
+			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Hash vector " << m_f.rrInfo[gid].hashVector);
+			break;
+		}
+		case SEEN_DEC_RANK_FEEDBACK_ART: {
+			assert(m_getCoderInfo);
+			m_f.rrInfo[gid].coderInfo = m_getCoderInfo(gid);
+			break;
+		}
+		default: {
+			assert(0);
+		}
+		}
 	}
 }
 bool NcRoutingRules::IsRequestedForRetrans(GenId newGid) {
