@@ -296,6 +296,13 @@ FeedbackInfo NcRoutingRules::GetServiceMessage() {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Prepare feedback with receive map for " << it->first);
 	}
 	//
+	// set coder info
+	//
+	for (auto r : m_inRcvNum) {
+		auto gid = r.first;
+		SetRetransInfo(gid);
+	}
+	//
 	SetAcks();
 	m_outdatedGensInform.tic();
 	//
@@ -315,7 +322,7 @@ FeedbackInfo NcRoutingRules::GetServiceMessage() {
 //		SetConnected(true);
 //	}
 
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Service message type: " << m_f.type.GetAsInt());
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Service message type: " << m_f.type);
 
 	return m_f;
 }
@@ -723,9 +730,10 @@ void NcRoutingRules::ProcessRegularFeedback(FeedbackInfo l) {
 		if (it != r.second.end()) m_outRcvNum[gid][l.addr] = it->second;
 	}
 	EvaluateSoftAck();
-
+	ProcessCoderInfo(l);
 	UpdateCoalition();
 	DoCalcRedundancy();
+
 }
 void NcRoutingRules::ProcessReqPtpAck(FeedbackInfo f) {
 	SIM_LOG_FUNC(BRR_LOG);
@@ -1724,7 +1732,7 @@ void NcRoutingRules::DoUpdateForwardPlan() {
 		auto s_t = (double) s.second / m_cr;
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, s.first, "Already sent " << s.second << " coding rate " << m_cr);
 		m_forwardPlan[genId] = (s_t >= m_forwardPlan[genId]) ? 0 : (m_forwardPlan[genId] - s_t);
-		SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "To forward " << m_forwardPlan[genId]);
+		SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "To forward " << m_forwardPlan[genId] << ", Rank " << m_getRank(genId));
 		if (eq(m_forwardPlan[genId], 0)) m_forwardPlan.erase(genId);
 	}
 
@@ -2027,6 +2035,7 @@ void NcRoutingRules::DoUpdateRetransPlan(std::map<GenId, CoderHelpInfo> helpInfo
 			r.second = 0;
 		m_sentNum[genId] = 0;
 		m_filteredPlan[genId] = 0;
+		m_outRcvNum[genId].reset_all();
 		if (m_forwardPlan.find(genId) != m_forwardPlan.end()) m_forwardPlan.erase(genId);
 		assert(!m_outdatedGens.is_in(genId));
 
@@ -2048,6 +2057,7 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 	//
 
 	GenId oldestGenId = gen_ssn_t::rotate_back(l.ackInfo.rxWinEnd, m_sp.numGen + 1);
+	GenId nextGenId = oldestGenId;
 	GenId oldestMentionedGenId = MAX_GEN_SSN;
 
 	if (!l.ackInfo.empty()) {
@@ -2064,12 +2074,13 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 			oldestMentionedGenId = (gen_ssn_t(genId) > gen_ssn_t(oldestMentionedGenId)) ? genId : oldestMentionedGenId;
 
 			m_f.ackInfo[genId] = m_f.ackInfo[genId] ? m_f.ackInfo[genId] : a.second;
-			m_acksHist.add(l.addr, genId);
+			m_acksHist.add(l.addr, genId);	// add both positive and negative ACKs
 
-			if (a.second) {
-				PlanForgetGeneration(genId);
-				DoForgetGeneration(genId);
-				oldestGenId = (gen_ssn_t(genId) > gen_ssn_t(oldestGenId) && continues_ack) ? genId : oldestGenId;
+			if (a.second && gen_ssn_t(genId) > gen_ssn_t(oldestGenId) && continues_ack) {
+				if (nextGenId == gen_ssn_t::rotate_back(l.ackInfo.rxWinEnd, m_sp.numGen + 1) || genId == nextGenId) {
+					oldestGenId = genId;
+					nextGenId = (++gen_ssn_t(genId)).val();
+				}
 			} else {
 				continues_ack = false;
 			}
@@ -2082,7 +2093,7 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 	std::vector<GenId> ids;
 	for (auto r : m_inRcvNum) {
 		auto genId = r.first;
-		if (gen_ssn_t(oldestGenId) > gen_ssn_t(genId)) {
+		if (gen_ssn_t(oldestGenId) >= gen_ssn_t(genId)) {
 			ids.push_back(genId);
 			PlanForgetGeneration(genId);
 			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Oldest generation " << oldestGenId << ", forget " << genId);
@@ -2095,16 +2106,16 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 
 	if (l.ackInfo.rxWinEnd != MAX_GEN_SSN) m_remoteRxWinEnd[l.addr] = l.ackInfo.rxWinEnd;
 
-	//
-	// 2. RECOVER BIG GROUP LOSSES
-	//
-
-	for (auto r : m_inRcvNum) {
-		auto genId = r.first;
-		if (gen_ssn_t(genId) > gen_ssn_t(oldestMentionedGenId)) {
-			m_sentNum[genId] = 0;
-		}
-	}
+//	//
+//	// 2. RECOVER BIG GROUP LOSSES
+//	//
+//
+//	for (auto r : m_inRcvNum) {
+//		auto genId = r.first;
+//		if (gen_ssn_t(genId) > gen_ssn_t(oldestMentionedGenId)) {
+//			m_sentNum[genId] = 0;
+//		}
+//	}
 
 //	//
 //	// 3. OVERSHOOT
@@ -2273,7 +2284,7 @@ void NcRoutingRules::EvaluateSoftAck() {
 
 	for (auto v : r) {
 		auto gid = v.first;
-		softAckInfo.set_acked(gid, r[gid] > s[gid] * m_sp.softAckDecision);
+		softAckInfo.set_acked(gid, gr(r[gid], s[gid] * m_sp.softAckDecision) && eq(r[gid],0) && eq(s[gid],0));
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid,
 				"RCVD " << r[gid] << ", E-RCVD " << s[gid] << ", E-RCVD* " << s[gid] * m_sp.softAckDecision << ", ACK " << softAckInfo.is_acked(gid));
 	}
@@ -2304,6 +2315,13 @@ bool NcRoutingRules::IsUptodateFeedback(GenId gid) {
 		if (!m_acksHist.is_in(addr, gid)) return false;
 	}
 	return true;
+}
+void NcRoutingRules::ProcessCoderInfo(FeedbackInfo fb) {
+	if (m_coalition.size() == 1 && !fb.rrInfo.empty()) {
+		fb.ttl = 1;
+		fb.rrInfo.forwarder = -1;
+		ProcessReqRetrans(fb);
+	}
 }
 bool NcRoutingRules::HaveAcksToSend() {
 
@@ -2503,6 +2521,8 @@ bool NcRoutingRules::DoCreateRetransRequest(GenId newGid) {
 		}
 
 		SetRetransInfo(gid);
+
+		if (m_getRank(gid) == 0) return false;
 		return false;	// apply for generations in the retransmission range
 		};
 
@@ -2533,7 +2553,6 @@ void NcRoutingRules::SetRetransInfo(GenId gid) {
 	assert(m_getRank);
 	auto r = m_getRank(gid);
 	// TODO: check it
-	if (r == 0) return false;
 
 	if (r < m_sp.genSize) {
 

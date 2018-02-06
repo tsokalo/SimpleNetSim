@@ -147,7 +147,7 @@ NcPacket CommNode::DoBroadcast() {
 		pkt.SetHeader(m_brr->GetHeaderInfo());
 		auto type = pkt.GetFeedback().type;
 
-		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << type.GetAsInt() << ", TTL: " << pkt.GetFeedback().ttl);
+		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " sends service message " << type << ", TTL: " << pkt.GetFeedback().ttl);
 		plan_broadcast(pkt, ServiceMessType::ConvertToMessType(type));
 
 	} else {
@@ -238,7 +238,7 @@ void CommNode::Receive(Edge* input, NcPacket pkt) {
 	} else {
 
 		auto f = pkt.GetFeedback();
-		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receive service message " << f.type.GetAsInt() << ", TTL " << f.ttl);
+		SIM_LOG(COMM_NODE_LOG, "Node " << m_id << " receive service message " << f.type << ", TTL " << f.ttl);
 
 		m_brr->ProcessServiceMessage(f);
 

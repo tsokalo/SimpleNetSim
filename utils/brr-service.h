@@ -130,7 +130,7 @@ struct BrrService {
 
 		SIM_LOG_FUNC(BRR_SERVICE_LOG);
 		SIM_LOG(BRR_SERVICE_LOG, "Active: " << messType << ", Admitted: " << messTypeAdmitted);
-		SIM_LOG(BRR_SERVICE_LOG, "Current service " << messType.GetAsInt() << " want start " << v);
+		SIM_LOG(BRR_SERVICE_LOG, "Current service " << messType << " want start: " << (v ? "yes" : "no"));
 		want_start_service = v;
 	}
 

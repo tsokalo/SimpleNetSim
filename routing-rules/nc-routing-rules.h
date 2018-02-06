@@ -191,6 +191,7 @@ private:
 	bool IsSoftAck(GenId gid);
 	bool IsHardAck(GenId gid);
 	bool IsUptodateFeedback(GenId gid);
+	void ProcessCoderInfo(FeedbackInfo fb);
 
 	void Reset();
 

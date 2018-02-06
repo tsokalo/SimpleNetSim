@@ -172,6 +172,14 @@ struct NodeVarList: public std::unordered_map<UanAddress, uint16_t> {
 			o << "(" << v.first << "," << v.second << ")";
 		return o;
 	}
+
+	void reset_all()
+	{
+		for(auto &v : *this)
+		{
+			v.second = 0;
+		}
+	}
 };
 
 typedef special_map<GenId, NodeVarList, gen_ssn_t> RcvNum;
