@@ -265,13 +265,13 @@ private:
 	 */
 	AckBacklog m_outdatedGens;
 	/*
-	 * the indeces of the generations that are already removed from the buffer; and still no feedback message was sent with this info
+	 * track sent ACKs (only positive!)
 	 */
-	AckCountDown m_outdatedGensInform;
+	AckCountDown m_acksSent;
 	/*
 	 * track all received ACKs/NACKs from the cooperating nodes;
 	 */
-	AckHistory m_acksHist;
+	AckHistory m_acksRcvd;
 	/*
 	 * counter of PtpAck
 	 */

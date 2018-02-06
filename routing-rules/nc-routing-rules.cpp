@@ -14,7 +14,7 @@
 namespace ncr {
 
 NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress destAddress, SimParameters sp) :
-		m_outdatedGens(2 * sp.numGen), m_outdatedGensInform(2 * sp.numGen, sp.ackMaxRetransNum), m_acksHist(10), m_thresholdP(sp.sendRate / 10), m_gen(m_rd()), m_dis(
+		m_outdatedGens(2 * sp.numGen), m_acksSent(2 * sp.numGen, sp.ackMaxRetransNum), m_acksRcvd(10), m_thresholdP(sp.sendRate / 10), m_gen(m_rd()), m_dis(
 				0, 1) {
 
 	m_sp = sp;
@@ -187,12 +187,7 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, bool linDep) {
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "from " << id << ", number " << num << ", LIN DEP!");
 		SetAcks();
 		m_inLinDepMap[id].add(num, 0);
-//		if (m_coalition.find(id) == m_coalition.end()) {
-//			//
-//			// stimulate ACK retransmission
-//			//
-//			m_outdatedGensInform.remove(genId);
-//		}
+
 	} else {
 
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "from " << id << ", number " << num);
@@ -304,7 +299,7 @@ FeedbackInfo NcRoutingRules::GetServiceMessage() {
 	}
 	//
 	SetAcks();
-	m_outdatedGensInform.tic();
+	m_acksSent.tic();
 	//
 	CheckReqEteAckII();
 	//
@@ -1818,7 +1813,7 @@ void NcRoutingRules::DoForgetGeneration(GenId genId) {
 
 void NcRoutingRules::PlanForgetGeneration(GenId gid) {
 	if (!m_outdatedGens.is_in(gid)) {
-		m_outdatedGensInform.add(gid);
+		m_acksSent.add(gid);
 		m_outdatedGens.add(gid);
 	}
 }
@@ -2074,7 +2069,7 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 			oldestMentionedGenId = (gen_ssn_t(genId) > gen_ssn_t(oldestMentionedGenId)) ? genId : oldestMentionedGenId;
 
 			m_f.ackInfo[genId] = m_f.ackInfo[genId] ? m_f.ackInfo[genId] : a.second;
-			m_acksHist.add(l.addr, genId);	// add both positive and negative ACKs
+			m_acksRcvd.add(l.addr, genId);	// add both positive and negative ACKs
 
 			if (a.second && gen_ssn_t(genId) > gen_ssn_t(oldestGenId) && continues_ack) {
 				if (nextGenId == gen_ssn_t::rotate_back(l.ackInfo.rxWinEnd, m_sp.numGen + 1) || genId == nextGenId) {
@@ -2164,6 +2159,7 @@ void NcRoutingRules::SetAcks() {
 		// source does not acknowledge itself
 		//
 			m_f.ackInfo[genId] = (m_nodeType == SOURCE_NODE_TYPE) ? false : (m_getRank(genId) == m_sp.genSize);
+			if(m_f.ackInfo[genId])m_acksSent.add(genId);
 			if(m_nodeType == DESTINATION_NODE_TYPE && m_f.ackInfo[genId])PlanForgetGeneration(genId);
 			SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, (m_f.ackInfo[genId] ? "Set ACK" : "Set NACK"));
 		};
@@ -2181,6 +2177,7 @@ void NcRoutingRules::SetAcks() {
 	auto acked = m_outdatedGens.get_last(m_sp.numGen);
 	for (auto genId : acked) {
 		m_f.ackInfo[genId] = true;
+		m_acksSent.add(genId);
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "Set ACK");
 	}
 
@@ -2312,7 +2309,7 @@ bool NcRoutingRules::IsHardAck(GenId gid) {
 bool NcRoutingRules::IsUptodateFeedback(GenId gid) {
 	for (auto node : m_coalition) {
 		auto addr = node.first;
-		if (!m_acksHist.is_in(addr, gid)) return false;
+		if (!m_acksRcvd.is_in(addr, gid)) return false;
 	}
 	return true;
 }
@@ -2329,7 +2326,7 @@ bool NcRoutingRules::HaveAcksToSend() {
 
 	SetAcks();
 
-	return !m_outdatedGensInform.empty();
+	return !m_acksSent.empty();
 }
 
 bool NcRoutingRules::HaveDataForRetransmissions() {
@@ -2788,6 +2785,6 @@ void NcRoutingRules::PlanExpectedReaction() {
 }
 void NcRoutingRules::Tic() {
 	m_service.tic();
-	m_acksHist.tic();
+	m_acksRcvd.tic();
 }
 } //ncr
