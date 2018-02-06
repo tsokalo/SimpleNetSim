@@ -34,6 +34,10 @@ public:
 		 */
 		NET_DISC,
 		/*
+		 * request to pause the transmission for avoiding the buffer overflow
+		 */
+		HOLD_ON,
+		/*
 		 * response to the end-to-end ACK request; will be forwarded in direction to the source
 		 */
 		RESP_ETE_ACK,
@@ -129,6 +133,10 @@ public:
 			o << "NET_DISC";
 			break;
 		}
+		case HOLD_ON: {
+			o << "HOLD_ON";
+			break;
+		}
 		case RESP_ETE_ACK: {
 			o << "RESP_ETE_ACK";
 			break;
@@ -175,7 +183,7 @@ public:
 	}
 
 	static MessType ConvertToMessType(ServiceMessType type) {
-		if (type == REGULAR || type == REQ_PTP_ACK || type == REQ_ETE_ACK || type == RESP_PTP_ACK || type == RESP_ETE_ACK) return FEEDBACK_MSG_TYPE;
+		if (type == REGULAR || type == REQ_PTP_ACK || type == REQ_ETE_ACK || type == RESP_PTP_ACK || type == RESP_ETE_ACK || type == HOLD_ON) return FEEDBACK_MSG_TYPE;
 		if (type == NET_DISC || type == REP_NET_DISC) return NETDISC_MSG_TYPE;
 		if (type == REQ_RETRANS || type == REP_REQ_RETRANS) return RETRANS_REQUEST_MSG_TYPE;
 

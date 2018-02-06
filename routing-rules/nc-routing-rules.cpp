@@ -358,6 +358,8 @@ bool NcRoutingRules::MaySendData(double dr) {
 
 	if (m_coalition.empty()) return false;
 
+	if(m_holdOnTimer.is_running())return false;
+
 #ifdef SECONDRY_CODE
 	//
 	// if retransmission was requested
@@ -904,6 +906,11 @@ void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
 		m_service.set_want_start_service(check(f) && m_nodeType != SOURCE_NODE_TYPE);
 		if (m_service.init()) m_f.ttl = f.ttl - 1;
 	}
+}
+
+void NcRoutingRules::ProcessHoldOn(FeedbackInfo f)
+{
+	m_holdOnTimer.start((m_sp.numGen >> 1) * m_sp.genSize);
 }
 
 bool NcRoutingRules::IsConnected() {
@@ -2739,6 +2746,11 @@ void NcRoutingRules::PlanExpectedReaction(GenId genId, UanAddress id) {
 	SIM_LOG_FUNC(BRR_LOG);
 	SIM_LOG_FUNC(BRR_SERVICE_LOG);
 
+	if (m_service.admit(ServiceMessType::HOLD_ON)) {
+		m_service.set_want_start_service(IsOverflowDanger() && DoICooperate(id) && m_inRcvNum.is_in_tail(1, genId) && m_id != m_dst);
+		if (m_service.init()) m_f.ttl = -1;
+	}
+
 	if (m_service.get_type() == ServiceMessType::REQ_RETRANS || m_service.get_type() == ServiceMessType::REP_REQ_RETRANS) {
 		if (DoICooperate(id)) if (IsRequestedForRetrans(genId)) m_service.stop();
 		return;
@@ -2775,7 +2787,7 @@ void NcRoutingRules::PlanExpectedReaction() {
 
 	if (m_service.get_type() == ServiceMessType::REGULAR || m_service.get_type() == ServiceMessType::RESP_PTP_ACK
 			|| m_service.get_type() == ServiceMessType::RESP_ETE_ACK || m_service.get_type() == ServiceMessType::NET_DISC
-			|| m_service.get_type() == ServiceMessType::REP_NET_DISC) {
+			|| m_service.get_type() == ServiceMessType::REP_NET_DISC || m_service.get_type() == ServiceMessType::HOLD_ON) {
 		//
 		// expect no reaction
 		//
@@ -2786,5 +2798,6 @@ void NcRoutingRules::PlanExpectedReaction() {
 void NcRoutingRules::Tic() {
 	m_service.tic();
 	m_acksRcvd.tic();
+	m_holdOnTimer.tic();
 }
 } //ncr

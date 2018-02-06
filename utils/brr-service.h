@@ -32,6 +32,7 @@ struct BrrService {
 		want_start_service = false;
 		timerPeriod[ServiceMessType::REP_NET_DISC] = INVALID_TIMER_VALUE;
 		timerPeriod[ServiceMessType::NET_DISC] = INVALID_TIMER_VALUE;
+		timerPeriod[ServiceMessType::HOLD_ON] = INVALID_TIMER_VALUE;
 		timerPeriod[ServiceMessType::RESP_ETE_ACK] = INVALID_TIMER_VALUE;
 		timerPeriod[ServiceMessType::REQ_ETE_ACK] = 30;
 		timerPeriod[ServiceMessType::REP_REQ_RETRANS] = INVALID_TIMER_VALUE;
@@ -84,7 +85,8 @@ struct BrrService {
 				set_status(INITIALIZED);
 				ret = true;
 			} else {
-				assert(0); // because of calling admit beforehand
+				assert(0);
+				// because of calling admit beforehand
 			}
 		} else {
 			//

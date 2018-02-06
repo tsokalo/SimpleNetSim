@@ -36,6 +36,7 @@
 #include "utils/coding-vector.h"
 #include "utils/retrans-request-counter.h"
 #include "utils/brr-service.h"
+#include "utils/brr-timer.h"
 #include "ccack/ccack.h"
 
 namespace ncr {
@@ -149,6 +150,7 @@ private:
 	void ProcessRespEteAck(FeedbackInfo f);
 	void ProcessNetDisc(FeedbackInfo f);
 	void ProcessReqRetrans(FeedbackInfo f);
+	void ProcessHoldOn(FeedbackInfo f);
 	//
 	void WorkInPtpAckRange(std::function<bool(GenId)> func);
 	void WorkInEteAckRange(std::function<bool(GenId)> func);
@@ -391,6 +393,8 @@ private:
 	 * the service describes the valid sequence of network actions
 	 */
 	BrrService m_service;
+
+	BrrTimer m_holdOnTimer;
 
 	NodeType m_nodeType;
 
