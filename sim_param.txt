@@ -1,5 +1,5 @@
 Number of generations					4
-Generation size							8
+Generation size							128
 Symbol size / bytes						10
 Application data rate / bps				1e+06
 Sending data rate / bps					1e+06
@@ -26,5 +26,5 @@ Give RR priority to SRC					1
 Who can forward RR						1
 Warm-up period							100
 Warm-down period						100
-Simulation duration						1000
+Simulation duration						20000
 Soft ACK decision coefficient			1.1
