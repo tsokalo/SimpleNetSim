@@ -14,8 +14,8 @@
 namespace ncr {
 
 NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress destAddress, SimParameters sp) :
-		m_outdatedGens(2 * sp.numGen), m_acksSent(2 * sp.numGen, sp.ackMaxRetransNum), m_acksRcvd(10), m_thresholdP(sp.sendRate / 10), m_gen(m_rd()), m_dis(
-				0, 1) {
+		m_outdatedGens(2 * sp.numGen), m_acksSent(2 * sp.numGen, sp.ackMaxRetransNum), m_acksTimer(2 * sp.numGen, 10), m_acksRcvd(2 * sp.numGen), m_thresholdP(
+				sp.sendRate / 10), m_gen(m_rd()), m_dis(0, 1) {
 
 	m_sp = sp;
 	//	assert((sp.sendRate / 5) >= SMALLEST_SENDER_PHY_DATA_RATE && (sp.sendRate / 50) <= SMALLEST_SENDER_PHY_DATA_RATE);
@@ -179,6 +179,11 @@ void NcRoutingRules::UpdateRcvd(GenId genId, UanAddress id, bool linDep) {
 	uint32_t num = 1;
 
 	m_inRcvMap[id].add(num, 0);
+	if (DoICooperate(id)) {
+		m_dProgress.update(id, genId);
+	} else {
+		m_dProgress.remove(id);
+	}
 
 	if (linDep) {
 		//
@@ -358,7 +363,10 @@ bool NcRoutingRules::MaySendData(double dr) {
 
 	if (m_coalition.empty()) return false;
 
-	if(m_holdOnTimer.is_running())return false;
+	if (m_holdOnTimer.is_running()) {
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Holding on.." << m_holdOnTimer.value());
+		return false;
+	}
 
 #ifdef SECONDRY_CODE
 	//
@@ -421,7 +429,8 @@ void NcRoutingRules::CheckReqPtpAck() {
 	SIM_LOG_FUNC(BRR_LOG);
 	auto func = [this](GenId gid)->bool
 	{
-		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Checking ACK");
+		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Checking ACK: " << IsSoftAck(gid) << " / "
+				<< IsHardAck(gid) << " / " << IsUptodateFeedback(gid));
 		if (!IsSoftAck(gid) && !IsHardAck(gid) && !IsUptodateFeedback(gid)) {
 			m_service.set_want_start_service(true);
 			return true;
@@ -530,7 +539,7 @@ void NcRoutingRules::CheckNetDisc() {
 			// and can receive the feedback for them, which gives to the current node the same information as the
 			// response on the network discovery message
 			//
-			if (!m_coalition.empty()) return false;
+			if (m_coalition.empty() && m_id != m_dst) return true;
 //			//
 //			// the destination does not need to explore the network itself; it should only respond on the
 //			// network discovery messages
@@ -672,6 +681,10 @@ void NcRoutingRules::ProcessServiceMessage(FeedbackInfo f) {
 
 	if (f.type == ServiceMessType::REGULAR) {
 		// do nothing
+		return;
+	}
+	if (f.type == ServiceMessType::HOLD_ON) {
+		ProcessHoldOn(f);
 		return;
 	}
 	if (f.type == ServiceMessType::REQ_PTP_ACK) {
@@ -908,9 +921,8 @@ void NcRoutingRules::ProcessReqRetrans(FeedbackInfo f) {
 	}
 }
 
-void NcRoutingRules::ProcessHoldOn(FeedbackInfo f)
-{
-	m_holdOnTimer.start((m_sp.numGen >> 1) * m_sp.genSize);
+void NcRoutingRules::ProcessHoldOn(FeedbackInfo f) {
+	if (DoesItCooperate(f.addr)) m_holdOnTimer.start((m_sp.numGen >> 1) * m_sp.genSize);
 }
 
 bool NcRoutingRules::IsConnected() {
@@ -966,9 +978,23 @@ bool NcRoutingRules::MayOrigReqRetrans(GenId genId) {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
-	if (IsOverflowDanger()) {
-		return DoCreateRetransRequest(genId);
+	//
+	// destination: if all nodes that I cooperate with send the data from the newer generation(s)
+	// than I have in my buffer without the positive ACK
+	//
+	if (m_id == m_dst) {
+		auto lgid = m_dProgress.get_latest();
+		for (auto ack : m_f.ackInfo) {
+			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Latest GID " << lgid << ", GID in ACK buffer " << ack.first << ", ACK status " << ack.second);
+			if (gen_ssn_t(lgid) > gen_ssn_t(ack.first) && !ack.second) {
+				return DoCreateRetransRequest(ack.first);
+			}
+		}
 	}
+
+//	if (IsOverflowDanger()) {
+//		return DoCreateRetransRequest(genId);
+//	}
 
 	return false;
 }
@@ -2018,23 +2044,20 @@ void NcRoutingRules::DoUpdateRetransPlan(std::map<GenId, CoderHelpInfo> helpInfo
 	if (helpInfo.empty()) return;
 
 	for (auto inf : helpInfo) {
+
 		auto genId = inf.first;
 
-		switch (m_sp.rrCanSend) {
-		case ALL_WHO_HEAR_LEGAL: {
-			m_retransPlan[genId] = (inf.second.finRank - inf.second.origRank);
-			break;
+		if(m_txPlan.is_in(genId)) if (m_txPlan[genId].num_all != 0) {
+			SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "We still have in TX plan " << m_txPlan[genId].num_all << " packets. Apply no retransmission");
+			continue;
 		}
-		case ONE_SELECTED_LEGAL: {
-			m_retransPlan[genId] = (inf.second.finRank - inf.second.origRank);
-			break;
+
+		m_retransPlan[genId] = (inf.second.finRank - inf.second.origRank);
+
+		if (m_inRcvNum.find(genId) != m_inRcvNum.end()) {
+			for (auto &r : m_inRcvNum[genId])
+				r.second = 0;
 		}
-		default: {
-			assert(0);
-		}
-		}
-		if (m_inRcvNum.find(genId) != m_inRcvNum.end()) for (auto &r : m_inRcvNum[genId])
-			r.second = 0;
 		m_sentNum[genId] = 0;
 		m_filteredPlan[genId] = 0;
 		m_outRcvNum[genId].reset_all();
@@ -2058,9 +2081,11 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 	// 1. FORGET GENERATIONS
 	//
 
-	GenId oldestGenId = gen_ssn_t::rotate_back(l.ackInfo.rxWinEnd, m_sp.numGen + 1);
-	GenId nextGenId = oldestGenId;
-	GenId oldestMentionedGenId = MAX_GEN_SSN;
+	GenId oldestGenId = MAX_GEN_SSN + 1;
+	GenId nextGenId = MAX_GEN_SSN + 1;
+//	GenId oldestMentionedGenId = MAX_GEN_SSN;
+
+	SIM_LOG_NP(BRR_LOG, m_id, m_p, "Oldest acknowledged generation before " << oldestGenId);
 
 	if (!l.ackInfo.empty()) {
 
@@ -2072,29 +2097,31 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 			auto genId = a.first;
 			SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, (a.second ? "Receive ACK" : "Received NACK") << " from " << l.addr);
 
-			oldestMentionedGenId = (oldestMentionedGenId == MAX_GEN_SSN) ? genId : oldestMentionedGenId;
-			oldestMentionedGenId = (gen_ssn_t(genId) > gen_ssn_t(oldestMentionedGenId)) ? genId : oldestMentionedGenId;
+//			oldestMentionedGenId = (oldestMentionedGenId == MAX_GEN_SSN) ? genId : oldestMentionedGenId;
+//			oldestMentionedGenId = (gen_ssn_t(genId) > gen_ssn_t(oldestMentionedGenId)) ? genId : oldestMentionedGenId;
 
 			m_f.ackInfo[genId] = m_f.ackInfo[genId] ? m_f.ackInfo[genId] : a.second;
-			m_acksRcvd.add(l.addr, genId);	// add both positive and negative ACKs
+			m_acksTimer.add(l.addr, genId);	// add both positive and negative ACKs
+			if (a.second) m_acksRcvd.add(genId);
 
-			if (a.second && gen_ssn_t(genId) > gen_ssn_t(oldestGenId) && continues_ack) {
-				if (nextGenId == gen_ssn_t::rotate_back(l.ackInfo.rxWinEnd, m_sp.numGen + 1) || genId == nextGenId) {
-					oldestGenId = genId;
-					nextGenId = (++gen_ssn_t(genId)).val();
-				}
+			if (a.second && (genId == nextGenId || nextGenId == MAX_GEN_SSN + 1) && continues_ack) {
+				oldestGenId = genId;
+				nextGenId = (++gen_ssn_t(genId)).val();
 			} else {
 				continues_ack = false;
 			}
+			SIM_LOG_NP(BRR_LOG, m_id, m_p, "Oldest acknowledged generation running " << oldestGenId << ", next " << nextGenId);
 		};;
 	}
 
+	SIM_LOG_NP(BRR_LOG, m_id, m_p, "Oldest acknowledged generation after " << oldestGenId);
 	//
 	// forget all generations before the oldest one
 	//
 	std::vector<GenId> ids;
 	for (auto r : m_inRcvNum) {
 		auto genId = r.first;
+		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Compare with " << genId << ": " << (gen_ssn_t(oldestGenId) >= gen_ssn_t(genId)));
 		if (gen_ssn_t(oldestGenId) >= gen_ssn_t(genId)) {
 			ids.push_back(genId);
 			PlanForgetGeneration(genId);
@@ -2288,7 +2315,7 @@ void NcRoutingRules::EvaluateSoftAck() {
 
 	for (auto v : r) {
 		auto gid = v.first;
-		softAckInfo.set_acked(gid, gr(r[gid], s[gid] * m_sp.softAckDecision) && eq(r[gid],0) && eq(s[gid],0));
+		softAckInfo.set_acked(gid, gr(r[gid], s[gid] * m_sp.softAckDecision) && eq(r[gid], 0) && eq(s[gid], 0));
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid,
 				"RCVD " << r[gid] << ", E-RCVD " << s[gid] << ", E-RCVD* " << s[gid] * m_sp.softAckDecision << ", ACK " << softAckInfo.is_acked(gid));
 	}
@@ -2311,12 +2338,16 @@ bool NcRoutingRules::IsSoftAck(GenId gid) {
 	return softAckInfo.is_acked(gid);
 }
 bool NcRoutingRules::IsHardAck(GenId gid) {
-	return (m_f.ackInfo[gid] || m_outdatedGens.is_in(gid));
+	return m_acksRcvd.is_in(gid);
 }
 bool NcRoutingRules::IsUptodateFeedback(GenId gid) {
+
+	SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "ACKs timer: " << m_acksTimer);
+
 	for (auto node : m_coalition) {
 		auto addr = node.first;
-		if (!m_acksRcvd.is_in(addr, gid)) return false;
+		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "For addr " << addr << ": " << m_txPlan.is_in(gid) << "," << m_acksTimer.is_in(addr, gid));
+		if (!m_txPlan.is_in(gid) && !m_acksTimer.is_in(addr, gid)) return false;
 	}
 	return true;
 }
@@ -2512,37 +2543,42 @@ void NcRoutingRules::CreateRetransRequest() {
 }
 
 bool NcRoutingRules::DoCreateRetransRequest(GenId newGid) {
+
 	SIM_LOG_FUNC(BRR_LOG);
-
-	auto func = [this](GenId gid)->bool
-	{
-		if (m_numRr->is_expired(gid)) {
-			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "RR counter is expired");
-			return false;
-		} else {
-			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "RR counter is NOT expired yet");
-			m_numRr->increment(gid);
-		}
-
-		SetRetransInfo(gid);
-
-		if (m_getRank(gid) == 0) return false;
-		return false;	// apply for generations in the retransmission range
-		};
-
-	if (m_nodeType == SOURCE_NODE_TYPE) return false;
-
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Creating RR");
 
 	ResetRetransInfo();
 
-	WorkInRetransRange(func);
+	SetRetransInfo(newGid);
 
-	//
-	// do not send RR for the generation if just received the symbol from the actually requesting
-	// or old generation
-	//
-	if (IsRequestedForRetrans(newGid)) return false;
+//	auto func = [this](GenId gid)->bool
+//	{
+//		if (m_numRr->is_expired(gid)) {
+//			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "RR counter is expired");
+//			return false;
+//		} else {
+//			SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "RR counter is NOT expired yet");
+//			m_numRr->increment(gid);
+//		}
+//
+//		SetRetransInfo(gid);
+//
+//		if (m_getRank(gid) == 0) return false;
+//		return false;	// apply for generations in the retransmission range
+//		};
+//
+//	if (m_nodeType == SOURCE_NODE_TYPE) return false;
+//
+//	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Creating RR");
+//
+//	ResetRetransInfo();
+//
+//	WorkInRetransRange(func);
+//
+//	//
+//	// do not send RR for the generation if just received the symbol from the actually requesting
+//	// or old generation
+//	//
+//	if (IsRequestedForRetrans(newGid)) return false;
 
 	if (!m_f.rrInfo.empty()) {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Say YES to sending of RR");
@@ -2796,8 +2832,11 @@ void NcRoutingRules::PlanExpectedReaction() {
 	}
 }
 void NcRoutingRules::Tic() {
+
+	SIM_LOG_FUNC(BRR_LOG);
+
 	m_service.tic();
-	m_acksRcvd.tic();
+	m_acksTimer.tic();
 	m_holdOnTimer.tic();
 }
 } //ncr

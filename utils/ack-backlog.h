@@ -14,7 +14,7 @@
 #include "ssn.h"
 
 namespace ncr {
-struct AckBacklog : public std::deque<GenId> {
+struct AckBacklog: public std::deque<GenId> {
 
 	typedef AckBacklog::iterator ack_it;
 public:
@@ -22,9 +22,9 @@ public:
 		this->d = d;
 		SIM_ASSERT_MSG(d < (MAX_GEN_SSN >> 1), "Deepness on SRC equals 4*ACK_WIN_SIZE (4 * m_sp.numGen), MAX_GEN_SSN: " << MAX_GEN_SSN);
 	}
-	void add(GenId genId) {
+	GenId add(GenId genId) {
 
-		if(is_in(genId))return;
+		if (is_in(genId)) return MAX_GEN_SSN + 1;
 
 		auto it = this->begin();
 		while (it != this->end()) {
@@ -35,13 +35,14 @@ public:
 			it++;
 		}
 		if (it == this->end()) this->push_back(genId);
+		auto r_gid = (this->size() > d) ? *(this->begin()) : MAX_GEN_SSN + 1;
 		if (this->size() > d) this->pop_front();
+
+		return r_gid;
 	}
-	void remove(GenId genId)
-	{
+	void remove(GenId genId) {
 		auto it = std::find(this->begin(), this->end(), genId);
-		if(it != this->end())
-		{
+		if (it != this->end()) {
 			this->erase(it, it + 1);
 		}
 	}

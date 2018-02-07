@@ -8,33 +8,29 @@
 #ifndef BRR_TIMER_H_
 #define BRR_TIMER_H_
 
-namespace ncr{
+namespace ncr {
 
-struct BrrTimer
-{
-	BrrTimer()
-	{
+struct BrrTimer {
+	BrrTimer() {
 		t = 0;
 	}
-	void tic()
-	{
+	void tic() {
 		t = (t != 0) ? t - 1 : 0;
 	}
-	void start(uint32_t t)
-	{
-		this->t = t;
+	void start(uint32_t t) {
+		if (this->t == 0) this->t = t;
 	}
-	void stop()
-	{
+	void stop() {
 		t = 0;
 	}
-	bool is_running()
-	{
+	bool is_running() {
 		return t != 0;
+	}
+	uint32_t value() {
+		return t;
 	}
 	uint32_t t;
 };
 }
-
 
 #endif /* BRR_TIMER_H_ */

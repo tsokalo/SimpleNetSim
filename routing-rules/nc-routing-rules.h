@@ -37,6 +37,7 @@
 #include "utils/retrans-request-counter.h"
 #include "utils/brr-service.h"
 #include "utils/brr-timer.h"
+#include "utils/down-group-progress.h"
 #include "ccack/ccack.h"
 
 namespace ncr {
@@ -273,7 +274,11 @@ private:
 	/*
 	 * track all received ACKs/NACKs from the cooperating nodes;
 	 */
-	AckHistory m_acksRcvd;
+	BrrAckTimer m_acksTimer;
+	/*
+	 * ACKs received from the nodes with higher priority (only positive!)
+	 */
+	AckBacklog m_acksRcvd;
 	/*
 	 * counter of PtpAck
 	 */
@@ -395,6 +400,8 @@ private:
 	BrrService m_service;
 
 	BrrTimer m_holdOnTimer;
+
+	DownstreamGroupProgress m_dProgress;
 
 	NodeType m_nodeType;
 

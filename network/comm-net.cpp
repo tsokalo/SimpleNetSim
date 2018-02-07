@@ -65,9 +65,7 @@ void CommNet::ConnectNodes(UanAddress src, UanAddress dst, double e1, double e2)
 	fromSrc->reverse_edge_ = fromDst;
 	fromDst->reverse_edge_ = fromSrc;
 }
-void
-CommNet::ConnectNodes(UanAddress src, UanAddress dst, std::string traceFile)
-{
+void CommNet::ConnectNodes(UanAddress src, UanAddress dst, std::string traceFile) {
 	assert(m_nodes.size() > (uint16_t )src && m_nodes.size() > (uint16_t )dst && src != dst && m_nodes.at(src) && m_nodes.at(dst));
 
 	std::shared_ptr<Edge> fromSrc = m_nodes.at(src)->CreateOutputEdge(dst, m_nodes.at(dst)->CreateInputEdge(src, traceFile));
@@ -121,7 +119,7 @@ void CommNet::Run(int64_t cycles) {
 	int64_t i = 0;
 	while (((m_logger) ? m_logger->GetLogCounter() : i++) < cycles) {
 //		PrintProgress(cycles, i);
-		DoBroadcast(SelectSender());
+		DoBroadcast(ScheduleTransmission());
 		m_simulator->Execute();
 //		if (m_logger) m_logger->IncTime();
 	}
@@ -144,7 +142,6 @@ void CommNet::SetDestination(UanAddress i) {
 }
 void CommNet::DoBroadcast(node_ptr sender) {
 
-	for (auto node : m_nodes)node->Tic();
 	NcPacket symb = sender->DoBroadcast();
 }
 
@@ -158,19 +155,20 @@ void CommNet::EnableLog(std::string path) {
 	;
 
 }
-CommNet::node_ptr CommNet::SelectSender() {
+CommNet::node_ptr CommNet::ScheduleTransmission() {
 	std::vector<uint16_t> v;
-	uint16_t i = 0;
+	uint16_t timeslot = 0;
 	do {
+		for (auto node : m_nodes)
+			node->Tic();
 //		std::cout << "Selecting sender.." << std::endl;
 		v.clear();
 		SIM_LOG(COMM_NET_LOG, ">>>>>>>>>>>>>> MAKE NEW GLOBAL SCHEDULE <<<<<<<<<<<<<<<");
 		for (std::vector<node_ptr>::iterator it = m_nodes.begin(); it != m_nodes.end(); it++) {
-//			if ((*it)->GetId() == m_dst) continue;
 			SIM_LOG(COMM_NET_LOG, ">>>>>>>>>>>>>> Check if want to send for node " << (*it)->GetId());
 			if ((*it)->DoIwannaSend()) v.push_back(std::distance(m_nodes.begin(), it));
 		}
-		assert(i++ < 1000);
+		assert(timeslot++ < 1000);
 	} while (v.empty());
 
 	std::uniform_int_distribution<> dis(0, v.size() - 1);

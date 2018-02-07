@@ -111,7 +111,7 @@ public:
 
 private:
 	node_ptr
-	SelectSender();
+	ScheduleTransmission();
 
 	logger_ptr m_logger;
 
