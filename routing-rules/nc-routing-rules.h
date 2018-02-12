@@ -110,6 +110,7 @@ public:
 	uint16_t GetAckBacklogSize();
 	uint16_t GetCoalitionSize();
 	double GetCodingRate();
+	GenId GetMaxAmountTx();
 	uint32_t GetMaxAmountTxData();
 	priority_t GetPriority();
 	//
@@ -195,6 +196,7 @@ private:
 	bool IsHardAck(GenId gid);
 	bool IsUptodateFeedback(GenId gid);
 	void ProcessCoderInfo(FeedbackInfo fb);
+	void CopyAcksToFeedback();
 
 	void Reset();
 
@@ -205,6 +207,7 @@ private:
 	 * thus on source the overflow problem is similar to the problem of blocking the protocol layer above
 	 */
 	bool IsOverflowDanger();
+	bool IsThrottling();
 
 	node_map_it LookUpInputs(UanAddress id);
 	node_map_it LookUpOutputs(UanAddress id);
@@ -264,29 +267,42 @@ private:
 	 */
 	SentNum m_sentNum;
 	/*
-	 * the indeces of the generations that are already removed from the buffer
-	 */
-	AckBacklog m_outdatedGens;
-	/*
-	 * track sent ACKs (only positive!)
-	 */
-	AckCountDown m_acksSent;
-	/*
-	 * track all received ACKs/NACKs from the cooperating nodes;
-	 */
-	BrrAckTimer m_acksTimer;
-	/*
-	 * ACKs received from the nodes with higher priority (only positive!)
-	 */
-	AckBacklog m_acksRcvd;
-	/*
-	 * counter of PtpAck
-	 */
-	std::map<GenId, uint16_t> m_ptpAckCount;
-	/*
 	 * the end of the RX window of the corresponding vertices
 	 */
 	std::map<UanAddress, GenId> m_remoteRxWinEnd;
+	/*
+	 * counter of PtpAck
+	 * after sending a few PtpAcks for the same generation we give up and send the EteAck
+	 */
+	std::map<GenId, uint16_t> m_ptpAckCount;
+
+	/********************************************************************************************************/
+
+	/*
+	 * the indeces of the generations that are already removed from the buffer;
+	 * all removed generations are not the subject for transmission even if new data arrives
+	 */
+	AckBacklog m_acksBacklog;
+	/*
+	 * counter for sent ACKs (only positive!);
+	 * use it when ACK retransmission is configured
+	 */
+	AckCountDown m_acksSent;
+	/*
+	 * own ACKs (both positive and negative)
+	 */
+	AckInfo m_acksOwn;
+	/*
+	 * track all received ACKs/NACKs from the cooperating nodes;
+	 * use it as a timer to acquire the ACKs/NACKs information update
+	 */
+	BrrAckTimer m_acksTimer;
+	/*
+	 * ACKs received from the nodes with higher priority (only positive!);
+	 * use it for tracking which generations require no further transmissions
+	 */
+	AckBacklog m_acksRcvd;
+
 	/********************************************************************************************************/
 
 	/*

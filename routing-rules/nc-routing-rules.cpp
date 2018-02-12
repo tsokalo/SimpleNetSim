@@ -14,7 +14,7 @@
 namespace ncr {
 
 NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress destAddress, SimParameters sp) :
-		m_outdatedGens(2 * sp.numGen), m_acksSent(2 * sp.numGen, sp.ackMaxRetransNum), m_acksTimer(2 * sp.numGen, 10), m_acksRcvd(2 * sp.numGen), m_thresholdP(
+		m_acksBacklog(2 * sp.numGen), m_acksSent(2 * sp.numGen, sp.ackMaxRetransNum), m_acksTimer(2 * sp.numGen, 10), m_acksRcvd(2 * sp.numGen), m_thresholdP(
 				sp.sendRate / 10), m_gen(m_rd()), m_dis(0, 1) {
 
 	m_sp = sp;
@@ -49,6 +49,7 @@ NcRoutingRules::NcRoutingRules(UanAddress ownAddress, NodeType type, UanAddress 
 	m_maxTtl = m_sp.maxTtl;
 	SIM_LOG_NP(BRR_LOG, m_id, m_p, "Using TTL " << m_maxTtl);
 	SIM_ASSERT_MSG(m_maxTtl >= m_id, "TTL and addressing problem. TTL " << m_maxTtl << ", own ID " << m_id);
+	SIM_ASSERT_MSG(m_sp.numGen > m_sp.numGenBuffering + m_sp.numGenPtpAck + m_sp.numGenRetrans, "Check your configuration");
 	m_b = 0.1;
 	m_numRr = rr_counter_ptr(new RetransRequestCounter(sp.numRr));
 }
@@ -121,6 +122,13 @@ void NcRoutingRules::UpdateSent(GenId genId, uint32_t num, bool notify_sending) 
 		if (m_addLog) m_addLog(m_logItem, m_id);
 		m_logItem.ns = 0;
 	}
+//	//
+//	// if it was the last packet in the TX plan
+//	//
+//	if(m_txPlan[genId].num_all == 1)
+//	{
+//		m_acksTimer.add(l.addr, genId);
+//	}
 
 	DoUpdateForwardPlan();
 }
@@ -304,7 +312,9 @@ FeedbackInfo NcRoutingRules::GetServiceMessage() {
 	}
 	//
 	SetAcks();
+	CopyAcksToFeedback();
 	m_acksSent.tic();
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACKs sent (after tic) " << m_acksSent);
 	//
 	CheckReqEteAckII();
 	//
@@ -411,9 +421,9 @@ void NcRoutingRules::CheckGeneralFeedback() {
 
 			if (HaveAcksToSend()) return true;
 
-			if (m_sent >= GetRegularFeedbackFreq()) {
-				return true;
-			}
+//			if (m_sent >= GetRegularFeedbackFreq()) {
+//				return true;
+//			}
 
 //			return (m_dis(m_gen) < m_feedbackP);
 			return false;
@@ -431,7 +441,7 @@ void NcRoutingRules::CheckReqPtpAck() {
 	{
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, gid, "Checking ACK: " << IsSoftAck(gid) << " / "
 				<< IsHardAck(gid) << " / " << IsUptodateFeedback(gid));
-		if (!IsSoftAck(gid) && !IsHardAck(gid) && !IsUptodateFeedback(gid)) {
+		if (!IsSoftAck(gid) && !IsHardAck(gid) && !IsUptodateFeedback(gid) || IsThrottling()) {
 			m_service.set_want_start_service(true);
 			return true;
 		}
@@ -595,7 +605,7 @@ void NcRoutingRules::WorkInPtpAckRange(std::function<bool(GenId)> func) {
 		//
 		// avoid throttling of the traffic generator
 		//
-		auto Wt = GetActualTxWinSize();
+		auto Wt = std::min(GetMaxAmountTx(),GetActualTxWinSize());//GetActualTxWinSize();
 		auto Wr = GetActualRxWinSize();
 		auto sGen = std::min((const int) m_sp.numGenPtpAck, std::max(0, m_sp.numGenRetrans + m_sp.numGenPtpAck - Wt));
 		auto hGen = std::max(0, m_sp.numGenRetrans - Wt);
@@ -732,7 +742,7 @@ void NcRoutingRules::ProcessRegularFeedback(FeedbackInfo l) {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "feedback has no receive map for me");
 	}
 
-	if (DoesItCooperate(l.addr)) ProcessAcks(l);
+	ProcessAcks(l);
 
 	for (auto r : l.rcvNum) {
 		auto gid = r.first;
@@ -760,11 +770,11 @@ void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 
 	if (!DoICooperate(f.addr)) return;
 
-	for (auto r : f.rcvNum) {
-		auto gid = r.first;
-		assert(f.ackInfo.find(gid) != f.ackInfo.end());
-		m_f.ackInfo[gid] = f.ackInfo[gid] ? f.ackInfo[gid] : m_f.ackInfo[gid];
-	}
+//	for (auto r : f.rcvNum) {
+//		auto gid = r.first;
+//		assert(f.ackInfo.find(gid) != f.ackInfo.end());
+//		m_f.ackInfo[gid] = f.ackInfo[gid] ? f.ackInfo[gid] : m_f.ackInfo[gid];
+//	}
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACK info in received message " << f.ackInfo);
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACK info in the message to be sent " << m_f.ackInfo);
 
@@ -782,21 +792,21 @@ void NcRoutingRules::ProcessReqEteAck(FeedbackInfo f) {
 		//
 		for (auto r : f.rcvNum) {
 			auto gid = r.first;
-			if (!m_f.ackInfo[gid]) {
+//			if (!m_f.ackInfo[gid]) {
 				if (m_service.admit(ServiceMessType::REQ_ETE_ACK)) {
 					m_service.set_want_start_service(f.ttl > 0);
 					if (m_service.init()) m_f.ttl = f.ttl - 1;
 				}
 				return;
-			}
+//			}
 		}
-		//
-		// if all generations are positively ACKed then the relay node can respond the ETE ACK request
-		//
-		if (m_service.admit(ServiceMessType::RESP_ETE_ACK)) {
-			m_service.set_want_start_service(true);
-			if (m_service.init()) m_f.ttl = m_maxTtl - f.ttl + 1;
-		}
+//		//
+//		// if all generations are positively ACKed then the relay node can respond the ETE ACK request
+//		//
+//		if (m_service.admit(ServiceMessType::RESP_ETE_ACK)) {
+//			m_service.set_want_start_service(true);
+//			if (m_service.init()) m_f.ttl = m_maxTtl - f.ttl + 1;
+//		}
 	}
 }
 void NcRoutingRules::ProcessRespPtpAck(FeedbackInfo f) {
@@ -809,12 +819,12 @@ void NcRoutingRules::ProcessRespEteAck(FeedbackInfo f) {
 
 	if (!DoesItCooperate(f.addr)) return;
 
-	for (auto r : f.rcvNum) {
-		auto gid = r.first;
-		m_f.ackInfo[gid] = f.ackInfo[gid] ? f.ackInfo[gid] : m_f.ackInfo[gid];
-	}
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACK info in received message " << f.ackInfo);
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACK info in the message to be sent " << m_f.ackInfo);
+//	for (auto r : f.rcvNum) {
+//		auto gid = r.first;
+//		m_f.ackInfo[gid] = f.ackInfo[gid] ? f.ackInfo[gid] : m_f.ackInfo[gid];
+//	}
+//	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACK info in received message " << f.ackInfo);
+//	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACK info in the message to be sent " << m_f.ackInfo);
 	//
 	// forward the response
 	//
@@ -984,7 +994,7 @@ bool NcRoutingRules::MayOrigReqRetrans(GenId genId) {
 	//
 	if (m_id == m_dst) {
 		auto lgid = m_dProgress.get_latest();
-		for (auto ack : m_f.ackInfo) {
+		for (auto ack : m_acksOwn) {
 			SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Latest GID " << lgid << ", GID in ACK buffer " << ack.first << ", ACK status " << ack.second);
 			if (gen_ssn_t(lgid) > gen_ssn_t(ack.first) && !ack.second) {
 				return DoCreateRetransRequest(ack.first);
@@ -1116,9 +1126,8 @@ uint32_t NcRoutingRules::GetGenBufSize(uint32_t maxPkts) {
 
 	return max_el;
 }
-
-uint32_t NcRoutingRules::GetMaxAmountTxData() {
-
+GenId NcRoutingRules::GetMaxAmountTx()
+{
 	//
 	// obtain the earliest end of the ACK window between the vertices in the coalition and me
 	//
@@ -1149,7 +1158,12 @@ uint32_t NcRoutingRules::GetMaxAmountTxData() {
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "[e_ack " << e_ack << "],[s_f " << s_f << "],[dse " << dse << "],[res " << dse * m_sp.genSize << "]");
 
-	return dse * m_sp.genSize;
+	return dse;
+}
+
+uint32_t NcRoutingRules::GetMaxAmountTxData() {
+
+	return GetMaxAmountTx() * m_sp.genSize;
 }
 priority_t NcRoutingRules::GetPriority() {
 	return m_p;
@@ -1170,7 +1184,7 @@ GenId NcRoutingRules::GetTxWinStart() {
 	GenId s_f = (m_forwardPlan.empty()) ? MAX_GEN_SSN : m_forwardPlan.begin_orig_order()->first;
 	if (s_f == MAX_GEN_SSN) s_f = m_forwardPlan.last_key_in_mem();
 	if (s_f == MAX_GEN_SSN) {
-		s_f = m_outdatedGens.empty() ? MAX_GEN_SSN : *(m_outdatedGens.last());
+		s_f = m_acksBacklog.empty() ? MAX_GEN_SSN : *(m_acksBacklog.last());
 		s_f = (s_f == MAX_GEN_SSN) ? MAX_GEN_SSN : ((++gen_ssn_t(s_f)).val());
 	}
 	return s_f;
@@ -1179,7 +1193,7 @@ GenId NcRoutingRules::GetRxWinStart() {
 	GenId s_r = (m_inRcvNum.empty()) ? MAX_GEN_SSN : m_inRcvNum.begin_orig_order()->first;
 
 	if (s_r == MAX_GEN_SSN) {
-		s_r = m_outdatedGens.empty() ? MAX_GEN_SSN : *(m_outdatedGens.last());
+		s_r = m_acksBacklog.empty() ? MAX_GEN_SSN : *(m_acksBacklog.last());
 		s_r = (s_r == MAX_GEN_SSN) ? MAX_GEN_SSN : ((++gen_ssn_t(s_r)).val());
 	}
 	return s_r;
@@ -1214,9 +1228,13 @@ GenId NcRoutingRules::GetTxWinEnd() {
 	// get own end of ACK window
 	//
 	GenId oe_ack = GetRxWinEnd();
+	auto temp = e_ack;
 	e_ack = (e_ack == MAX_GEN_SSN) ? oe_ack : e_ack;
 
 	GenId s_ack = GetTxWinStart();
+
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "[e_ack " << temp << "],[oe_ack " << oe_ack << "],[s_ack " << s_ack << "]");
+
 	if (gen_ssn_t(e_ack) < gen_ssn_t(s_ack)) e_ack = gen_ssn_t::rotate(s_ack, 1);
 //	if (m_nodeType == SOURCE_NODE_TYPE) {
 //		auto v = gen_ssn_t::rotate(s_ack, m_sp.numGen >> 2);
@@ -1267,7 +1285,7 @@ void NcRoutingRules::SetSendingRate(Datarate d) {
 
 }
 uint16_t NcRoutingRules::GetAckBacklogSize() {
-	return m_outdatedGens.tiefe();
+	return m_acksBacklog.tiefe();
 }
 uint16_t NcRoutingRules::GetCoalitionSize() {
 	return m_coalition.size();
@@ -1523,7 +1541,7 @@ void NcRoutingRules::DoUpdateTxPlan() {
 	for (auto r : m_inRcvNum) {
 		auto genId = r.first;
 
-		if (m_txPlan.find(genId) == m_txPlan.end()) if (!m_outdatedGens.is_in(genId)) {
+		if (m_txPlan.find(genId) == m_txPlan.end()) if (!m_acksBacklog.is_in(genId)) {
 			v = false;
 			break;
 		}
@@ -1792,7 +1810,7 @@ void NcRoutingRules::DoForgetGeneration() {
 	std::vector<GenId> ids;
 	auto it = m_inRcvNum.begin_orig_order();
 	while (it != m_inRcvNum.end()) {
-		if (m_outdatedGens.is_in(it->first)) {
+		if (m_acksBacklog.is_in(it->first)) {
 			ids.push_back(it->first);
 		} else {
 			break;
@@ -1817,8 +1835,8 @@ void NcRoutingRules::DoForgetGeneration() {
 }
 void NcRoutingRules::DoForgetGeneration(GenId genId) {
 
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Erasing generation " << genId << (m_outdatedGens.is_in(genId) ? " acked" : " not acked"));
-	if (!m_outdatedGens.is_in(genId)) {
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Erasing generation " << genId << (m_acksBacklog.is_in(genId) ? " acked" : " not acked"));
+	if (!m_acksBacklog.is_in(genId)) {
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Erasing generation " << genId << " not acked");
 	}
 
@@ -1845,9 +1863,8 @@ void NcRoutingRules::DoForgetGeneration(GenId genId) {
 }
 
 void NcRoutingRules::PlanForgetGeneration(GenId gid) {
-	if (!m_outdatedGens.is_in(gid)) {
-		m_acksSent.add(gid);
-		m_outdatedGens.add(gid);
+	if (!m_acksBacklog.is_in(gid)) {
+		m_acksBacklog.add(gid);
 	}
 }
 
@@ -1984,7 +2001,7 @@ void NcRoutingRules::RefineFeedback(FeedbackInfo &fb) {
 		//
 		// check if the generation was already ACKed
 		//
-		if (m_outdatedGens.is_in(genId)) {
+		if (m_acksBacklog.is_in(genId)) {
 			ids.push_back(genId);
 			SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "ACKed: Erase generation info");
 		}
@@ -2047,7 +2064,7 @@ void NcRoutingRules::DoUpdateRetransPlan(std::map<GenId, CoderHelpInfo> helpInfo
 
 		auto genId = inf.first;
 
-		if(m_txPlan.is_in(genId)) if (m_txPlan[genId].num_all != 0) {
+		if (m_txPlan.is_in(genId)) if (m_txPlan[genId].num_all != 0) {
 			SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "We still have in TX plan " << m_txPlan[genId].num_all << " packets. Apply no retransmission");
 			continue;
 		}
@@ -2062,7 +2079,7 @@ void NcRoutingRules::DoUpdateRetransPlan(std::map<GenId, CoderHelpInfo> helpInfo
 		m_filteredPlan[genId] = 0;
 		m_outRcvNum[genId].reset_all();
 		if (m_forwardPlan.find(genId) != m_forwardPlan.end()) m_forwardPlan.erase(genId);
-		assert(!m_outdatedGens.is_in(genId));
+		assert(!m_acksBacklog.is_in(genId));
 
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId,
 				"FIN rank " << inf.second.finRank << ", ORIG rank " << inf.second.origRank << ", remaining to retransmit " << m_retransPlan[genId]);
@@ -2074,6 +2091,8 @@ void NcRoutingRules::DoUpdateRetransPlan(std::map<GenId, CoderHelpInfo> helpInfo
 void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 
 	SIM_LOG_FUNC(BRR_LOG);
+
+	if (!DoesItCooperate(l.addr)) return;
 
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Rcvd ACKs 1 " << l.ackInfo);
 
@@ -2100,7 +2119,7 @@ void NcRoutingRules::ProcessAcks(FeedbackInfo l) {
 //			oldestMentionedGenId = (oldestMentionedGenId == MAX_GEN_SSN) ? genId : oldestMentionedGenId;
 //			oldestMentionedGenId = (gen_ssn_t(genId) > gen_ssn_t(oldestMentionedGenId)) ? genId : oldestMentionedGenId;
 
-			m_f.ackInfo[genId] = m_f.ackInfo[genId] ? m_f.ackInfo[genId] : a.second;
+			m_acksOwn[genId] = m_acksOwn[genId] ? m_acksOwn[genId] : a.second;
 			m_acksTimer.add(l.addr, genId);	// add both positive and negative ACKs
 			if (a.second) m_acksRcvd.add(genId);
 
@@ -2192,30 +2211,29 @@ void NcRoutingRules::SetAcks() {
 		//
 		// source does not acknowledge itself
 		//
-			m_f.ackInfo[genId] = (m_nodeType == SOURCE_NODE_TYPE) ? false : (m_getRank(genId) == m_sp.genSize);
-			if(m_f.ackInfo[genId])m_acksSent.add(genId);
-			if(m_nodeType == DESTINATION_NODE_TYPE && m_f.ackInfo[genId])PlanForgetGeneration(genId);
-			SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, (m_f.ackInfo[genId] ? "Set ACK" : "Set NACK"));
+			m_acksOwn[genId] = (m_nodeType == SOURCE_NODE_TYPE) ? false : (m_getRank(genId) == m_sp.genSize);
+			if(m_acksOwn[genId])m_acksSent.add(genId);
+			if(m_nodeType == DESTINATION_NODE_TYPE && m_acksOwn[genId])PlanForgetGeneration(genId);
+			SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, (m_acksOwn[genId] ? "Set ACK" : "Set NACK"));
 		};
 
 	for (auto r : m_inRcvNum)
 		ack(r.first);
 
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Set ACKs of rcvd " << m_f.ackInfo);
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Set ACKs of rcvd " << m_acksOwn);
 
 	for (auto r : m_forwardPlan)
 		ack(r.first);
 
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Set ACKs of rcvd+fwrd " << m_f.ackInfo);
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Set ACKs of rcvd+fwrd " << m_acksOwn);
 
-	auto acked = m_outdatedGens.get_last(m_sp.numGen);
+	auto acked = m_acksBacklog.get_last(m_sp.numGen);
 	for (auto genId : acked) {
-		m_f.ackInfo[genId] = true;
-		m_acksSent.add(genId);
+		m_acksOwn[genId] = true;
 		SIM_LOG_NPG(BRR_LOG, m_id, m_p, genId, "Set ACK");
 	}
 
-	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Set ACKs of rcvd+fwrd+bckl " << m_f.ackInfo);
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Set ACKs of rcvd+fwrd+bckl " << m_acksOwn);
 
 	if (m_nodeType == DESTINATION_NODE_TYPE) {
 
@@ -2228,7 +2246,7 @@ void NcRoutingRules::ClearAcks() {
 
 	SIM_LOG_FUNC(BRR_LOG);
 	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "Clear ACKs");
-	m_f.ackInfo.clear();
+	m_acksOwn.clear();
 }
 
 void NcRoutingRules::EvaluateSoftAck() {
@@ -2358,13 +2376,20 @@ void NcRoutingRules::ProcessCoderInfo(FeedbackInfo fb) {
 		ProcessReqRetrans(fb);
 	}
 }
+void NcRoutingRules::CopyAcksToFeedback() {
+	m_f.ackInfo.clear();
+	for (auto a : m_acksOwn)
+		m_f.ackInfo[a.first] = a.second;
+}
 bool NcRoutingRules::HaveAcksToSend() {
 
 	SIM_LOG_FUNC(BRR_LOG);
 
 	SetAcks();
 
-	return !m_acksSent.empty();
+	SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, "ACKs sent " << m_acksSent);
+
+	return m_acksSent.any_active();
 }
 
 bool NcRoutingRules::HaveDataForRetransmissions() {
@@ -2414,7 +2439,7 @@ bool NcRoutingRules::IsRetransRequestOld(FeedbackInfo fb) {
 		//
 		bool acked = true;
 		for (auto r : m_inRcvNum) {
-			if (gen_ssn_t(ogid) > gen_ssn_t(r.first)) if (!m_outdatedGens.is_in(r.first)) acked = false;
+			if (gen_ssn_t(ogid) > gen_ssn_t(r.first)) if (!m_acksBacklog.is_in(r.first)) acked = false;
 		};;
 		SIM_LOG_NPD(BRR_LOG, m_id, m_p, m_dst, (acked ? "All" : "Not all")<< " older local generations are ACKed");
 		return acked;
@@ -2659,7 +2684,7 @@ void NcRoutingRules::CheckBuffering() {
 //	//
 //	// get the ID of the newest generation that is already ACKed
 //	//
-//	auto last_acked = gen_ssn_t(*(m_outdatedGens.last()));
+//	auto last_acked = gen_ssn_t(*(m_acksBacklog.last()));
 //	//
 //	// take the newest one
 //	//
@@ -2707,6 +2732,10 @@ bool NcRoutingRules::IsOverflowDanger() {
 	if (m_nodeType == SOURCE_NODE_TYPE) return false;
 
 	return (GetActualRxWinSize() + m_sp.numGenRetrans > m_sp.numGen);
+}
+bool NcRoutingRules::IsThrottling()
+{
+	return (GetMaxAmountTx() == 0);
 }
 
 void NcRoutingRules::Overshoot(GenId gid) {

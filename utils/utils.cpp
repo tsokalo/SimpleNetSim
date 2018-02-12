@@ -509,7 +509,8 @@ void PlotResourceWaste(LogBank lb, std::string path, double sigma, uint32_t warm
 		}
 	}
 
-	ns = ns + fb + nd + nrr;
+//	ns = ns + fb + nd + nrr;
+	ns = (double) nr / sigma + fb + nd + nrr;
 
 	std::cout << "ns " << ns << " fb " << fb << " nd " << nd << " nr " << nr << " nrr " << nrr << " sigma " << sigma << std::endl;
 	std::ofstream fd(data_file, std::ios_base::out);

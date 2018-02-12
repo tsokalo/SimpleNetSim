@@ -10,6 +10,10 @@ CPP_SRCS += \
 C_SRCS += \
 ../comp/src/list_csrc.c 
 
+O_SRCS += \
+../comp/src/compressor.o \
+../comp/src/decompressor.o 
+
 OBJS += \
 ./comp/src/compressor.o \
 ./comp/src/decompressor.o \

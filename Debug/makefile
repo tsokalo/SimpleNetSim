@@ -35,15 +35,6 @@ RM := rm -rf
 -include comp/dep/googletest/build/CMakeFiles/3.5.1/CompilerIdC/subdir.mk
 -include comp/dep/googletest/build/CMakeFiles/subdir.mk
 -include ccack/subdir.mk
--include build/utils/subdir.mk
--include build/traffic/subdir.mk
--include build/test/subdir.mk
--include build/routing-rules/subdir.mk
--include build/network/subdir.mk
--include build/lp-solver/subdir.mk
--include build/galois-field/subdir.mk
--include build/ccack/subdir.mk
--include build/subdir.mk
 -include subdir.mk
 -include objects.mk
 
@@ -73,19 +64,19 @@ endif
 # Add inputs and outputs from these tool invocations to the build variables 
 
 # All Target
-all: libSnsMulticast
+all: libSnsHeaderCompression
 
 # Tool invocations
-libSnsMulticast: $(OBJS) $(USER_OBJS)
+libSnsHeaderCompression: $(OBJS) $(USER_OBJS)
 	@echo 'Building target: $@'
 	@echo 'Invoking: GCC C++ Linker'
-	g++ -L/usr/lib/ -L/usr/local/lib/ -shared -o "libSnsMulticast" $(OBJS) $(USER_OBJS) $(LIBS)
+	g++ -L/usr/lib/ -L/usr/local/lib/ -shared -o "libSnsHeaderCompression" $(OBJS) $(USER_OBJS) $(LIBS)
 	@echo 'Finished building target: $@'
 	@echo ' '
 
 # Other Targets
 clean:
-	-$(RM) $(LIBRARIES)$(CC_DEPS)$(C++_DEPS)$(C_UPPER_DEPS)$(CXX_DEPS)$(OBJS)$(CPP_DEPS)$(C_DEPS) libSnsMulticast
+	-$(RM) $(LIBRARIES)$(CC_DEPS)$(C++_DEPS)$(C_UPPER_DEPS)$(CXX_DEPS)$(OBJS)$(CPP_DEPS)$(C_DEPS) libSnsHeaderCompression
 	-@echo ' '
 
 .PHONY: all clean dependents

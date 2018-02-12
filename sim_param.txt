@@ -1,12 +1,12 @@
-Number of generations					4
-Generation size							8
+Number of generations					8
+Generation size							128
 Symbol size / bytes						10
 Application data rate / bps				1e+06
 Sending data rate / bps					1e+06
 Number of buffering generations (Tx)	1
 Number of generations before soft ACK	1
 Number of ReqPtpAck before ReqEteAck	2
-Number of ACK retransmission (+1)		1
+Number of ACK retransmission (+1)		0
 Number of TXOP before NetDisc			20
 Number of generations before RR			1
 Number of generations in a single MPDU	20
@@ -16,7 +16,7 @@ Maximum coalition size					100
 Mutual PHY and LLC coding / flag		0
 Target packet loss ratio				0.2
 Maximum number of RRs					100
-Maximum TTL								3
+Maximum TTL								4
 CR calculation way						2
 Number of sigmas						3
 CR reduction factor						0
@@ -24,7 +24,7 @@ RR candidate selection way				4
 Type of the feedback contents			2
 Give RR priority to SRC					1
 Who can forward RR						1
-Warm-up period							100
-Warm-down period						100
-Simulation duration						20000
+Warm-up period							1000
+Warm-down period						1000
+Simulation duration						27500
 Soft ACK decision coefficient			1.1

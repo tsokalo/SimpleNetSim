@@ -34,6 +34,12 @@
 		// // W_{sGen}\in[s;e)
 		
 		// RECEPTION BUFFER AND ITS WINDOWS FOR SOURCE
+		// 
+		// - motivation for difference to the relay and destiantion: RX window on source is always full, so only TX window can be used as an indicator 
+		// - contrary to use RX window where ACKs are triggered when it gets too big, here the ACKs are triggered when TX window gets too small
+		// - number of gens without ACK equals (W_{rmax} - W_t)
+		// - when W_t gets small (numGenEteAck + numGenPtpAck), PtPAck should be requested
+		// - when W_t gets small numGenEteAck, EteAck should be requested
 		//
 		// 	NAME											WINDOWS											//
 		//																									//
@@ -41,7 +47,7 @@
 		// 	W_r:				|----------------------------------------------------sssssssssssssshhhhh|	//
 		// 	W_t:									|-------------|											//
 		// 	W_{buf}:			|--numGenBuffering--|														//
-		// 											|---numGenRetrans---|~~~~~~~~~~~~~~|					//
+		// 											|----numGenEteAck---|~~~~~~~~~~~~~~|					//
 		// 													 	   		|-numGenPtpAck-|					//		
 		// 	W_{softAck}:													 	   	 |-----sGen-----|		//
 		// 	W_{hardAck}:													 	   	 |~~~~~~~~~~~~~~hGen|	//	
@@ -49,12 +55,12 @@
 		// s - subject for the soft ACK request; it becomes also a subject for the hard ACK request when certain counter expires
 		// h - subject for the hard ACK request
 		//
-		// sGen = min(numGenPtpAck,max(0, numGenRetrans + numGenPtpAck - W_t))
+		// sGen = min(numGenPtpAck,max(0, numGenEteAck + numGenPtpAck - W_t))
 		// // start of sGen:	s = W_r - hGen			rs = std::min(W_r, hGen)
 		// // end of sGen:		e = W_r - hGen - sGen	re = std::min(W_r, hGen + sGen)
 		// // W_{sGen}\in[s;e)
 		//
-		// hGen = max(0, numGenRetrans - W_t)
+		// hGen = max(0, numGenEteAck - W_t)
 		// // start of hGen:	s = W_r					rs = 0
 		// // end of hGen:		e = W_r - hGen			re = std::min(W_r, hGen)
 		// // W_{hGen}\in[s;e)

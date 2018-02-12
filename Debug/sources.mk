@@ -23,15 +23,6 @@ C_DEPS :=
 
 # Every subdirectory with source files must be described here
 SUBDIRS := \
-build/ccack \
-build/galois-field \
-build/lp-solver \
-build \
-build/network \
-build/routing-rules \
-build/test \
-build/traffic \
-build/utils \
 ccack \
 comp/dep/googletest/build/CMakeFiles/3.5.1/CompilerIdC \
 comp/dep/googletest/build/CMakeFiles/3.5.1/CompilerIdCXX \

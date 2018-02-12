@@ -168,7 +168,7 @@ CommNet::node_ptr CommNet::ScheduleTransmission() {
 			SIM_LOG(COMM_NET_LOG, ">>>>>>>>>>>>>> Check if want to send for node " << (*it)->GetId());
 			if ((*it)->DoIwannaSend()) v.push_back(std::distance(m_nodes.begin(), it));
 		}
-		assert(timeslot++ < 1000);
+		assert(timeslot++ < 10);
 	} while (v.empty());
 
 	std::uniform_int_distribution<> dis(0, v.size() - 1);

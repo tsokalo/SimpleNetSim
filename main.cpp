@@ -364,7 +364,7 @@ int main(int argc, char *argv[]) {
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);
 
-		std::string topology = subpath + "Topologies/Topology1.txt";
+		std::string topology = subpath + "Topologies/Topology3.txt";
 		std::cout << "Looking for topology " << topology << std::endl;
 		std::string folder_with_traces = subpath + "Topologies/traces";
 		ReadScenario(net, sim_par, topology, folder_with_traces);

@@ -9,6 +9,11 @@ CPP_SRCS += \
 ../comp/tst/input.cpp \
 ../comp/tst/test.cpp 
 
+O_SRCS += \
+../comp/tst/comp.o \
+../comp/tst/input.o \
+../comp/tst/test.o 
+
 OBJS += \
 ./comp/tst/comp.o \
 ./comp/tst/decomp.o \

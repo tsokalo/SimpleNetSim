@@ -117,7 +117,7 @@ public:
 	}
 
 	void SetMean(double e) {
-		assert(0);
+		m_e = e;
 	}
 
 	uint32_t GetTraceLength()

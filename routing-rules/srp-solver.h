@@ -116,7 +116,7 @@ public:
 	TdmAccessPlan CalcTdmAccessPlan() {
 
 		TdmAccessPlan plan;
-		for(auto n : m_commNet->GetNodes())
+		for (auto n : m_commNet->GetNodes())
 			plan[n->GetId()] = m_optSolution[n->GetId()];
 		return plan;
 	}
@@ -142,7 +142,6 @@ private:
 			if (node->GetNodeType() == SOURCE_NODE_TYPE) vt.add(node->GetId());
 		}
 		assert(vt.size() == 1);
-
 
 		while (!m_dst.empty())		//-----> start main cycle
 		{
@@ -181,7 +180,7 @@ private:
 				for (auto &r : m_w[e.from]) {
 					auto sink = r.first;
 					if (sink == e.to) continue;
-					if(std::find(vt.begin(), vt.end(), sink) != vt.end())continue;
+					if (std::find(vt.begin(), vt.end(), sink) != vt.end()) continue;
 					r.second = (r.second > m_w[e.from][e.to]) ? r.second - m_w[e.from][e.to] : PRECISION_;
 					std::cout << "Change the loss ratio on (" << e.from << "," << sink << ") (old) "
 							<< m_commNet->GetNode(e.from)->GetEdge(e.from, sink)->GetLossProcess()->GetMean() << " get " << 1 - 1 / r.second << std::endl;
