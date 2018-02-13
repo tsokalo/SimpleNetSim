@@ -30,8 +30,7 @@ struct FeedbackMInfo: public FeedbackInfo {
 		FeedbackMInfo::operator=(other);
 	}
 
-	FeedbackMInfo& operator=(const FeedbackMInfo& other)
-			{
+	FeedbackMInfo& operator=(const FeedbackMInfo& other) {
 		if (this != &other) { // self-assignment check expected
 
 			FeedbackInfo::operator=(other);
@@ -39,8 +38,7 @@ struct FeedbackMInfo: public FeedbackInfo {
 		}
 		return *this;
 	}
-	FeedbackMInfo& operator=(const FeedbackInfo& other)
-			{
+	FeedbackMInfo& operator=(const FeedbackInfo& other) {
 		FeedbackInfo::operator=(other);
 		return *this;
 	}
@@ -71,6 +69,25 @@ struct FeedbackMInfo: public FeedbackInfo {
 			ss >> v;
 			ps[a] = v;
 		}
+	}
+
+	/*
+	 * we use string conversion for serialization in the simulator
+	 * in real applications, the data will be much compressed with careful bit to bit conversion
+	 * GetSerializedSize() give the header size for real applications
+	 */
+	uint32_t GetSerializedSize() {
+		uint32_t ssize = 0;
+
+		for (auto v : ps) {
+			ssize += 1; //v.first - sink address
+			ssize += 2; //v.second.val() - priority value (conversion from double to int16_t)
+		}
+		ssize += 1; // number of items in ps list
+
+		ssize += FeedbackInfo::GetSerializedSize();
+
+		return ssize;
 	}
 
 	std::unordered_map<UanAddress, priority_t> ps;

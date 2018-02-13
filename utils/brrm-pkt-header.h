@@ -75,6 +75,37 @@ struct HeaderMInfo {
 		txPlan.Deserialize(ss);
 	}
 	/*
+	 * we use string conversion for serialization in the simulator
+	 * in real applications, the data will be much compressed with careful bit to bit conversion
+	 * GetSerializedSize() give the header size for real applications
+	 */
+	uint32_t GetSerializedSize() {
+		uint32_t ssize = 0;
+
+		ssize += 1; // own address
+
+		for (auto v : p) {
+			ssize += 1; //v.first - sink address
+			ssize += 2; //v.second.val() - priority value (conversion from double to int16_t)
+		}
+
+		for (auto v : pf) {
+			ssize += 1; //v.first - sink address
+			ssize += 2; //v.second - value of the filtering coefficient (conversion from double to int16_t)
+		}
+
+		for(auto v : txPlan)
+		{
+			ssize += 2; //v.first - generation ID
+			ssize += 2; //v.second.num_all - number of packets to send
+			//v.second.all_prev_acked - neglect with the size of this flag
+		}
+
+		ssize += 3; // number of items in each of the list (1 byte per list)
+
+		return ssize;
+	}
+	/*
 	 * sender address
 	 */
 	UanAddress addr;

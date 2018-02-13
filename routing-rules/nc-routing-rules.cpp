@@ -132,11 +132,13 @@ void NcRoutingRules::UpdateSent(GenId genId, uint32_t num, bool notify_sending) 
 
 	DoUpdateForwardPlan();
 }
-void NcRoutingRules::NotifySending() {
+void NcRoutingRules::NotifySending(uint32_t ssize) {
 
 	m_logItem.ns = 1;
+	m_logItem.ssize = ssize;
 	if (m_addLog) m_addLog(m_logItem, m_id);
 	m_logItem.ns = 0;
+	m_logItem.ssize = 0;
 }
 void NcRoutingRules::AddSentCcack(GenId genId, CodingVector cv) {
 

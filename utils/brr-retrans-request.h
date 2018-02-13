@@ -42,10 +42,10 @@ struct DecoderDetails {
 
 		ss << (uint8_t) haveCodingMatrix << DELIMITER;
 		if (haveCodingMatrix) {
-			ss << (uint16_t)codingCoefs.size() << DELIMITER;
+			ss << (uint16_t) codingCoefs.size() << DELIMITER;
 
 			if (codingCoefs.size() != 0) {
-				ss << (uint16_t)codingCoefs.begin()->size() << DELIMITER;
+				ss << (uint16_t) codingCoefs.begin()->size() << DELIMITER;
 				for (auto v : codingCoefs) {
 					ss << std::string((const char*) v.data(), codingCoefs.begin()->size());
 				};;
@@ -73,7 +73,7 @@ struct DecoderDetails {
 
 		ss << (uint8_t) haveHashVector << DELIMITER;
 		if (haveHashVector) {
-			ss << (uint16_t)hashVector.size() << DELIMITER;
+			ss << (uint16_t) hashVector.size() << DELIMITER;
 			ss << hashVector.to_string() << DELIMITER;
 		}
 	}
@@ -164,6 +164,29 @@ struct DecoderDetails {
 
 		return *this;
 	}
+	/*
+	 * we use string conversion for serialization in the simulator
+	 * in real applications, the data will be much compressed with careful bit to bit conversion
+	 * GetSerializedSize() give the header size for real applications
+	 */
+	uint32_t GetSerializedSize() {
+		uint32_t ssize = 0;
+
+		ssize += 2; // generation size
+		for(auto v: codingCoefs)
+		{
+			ssize += v.size(); // size of the coding vector
+		}
+
+		ssize += ceil(coderInfo.genSize / 8); // map of seen
+		ssize += ceil(coderInfo.genSize / 8); // map of decoded
+		// coderInfo.rank can be obtained from the map of seen
+		// coderInfor.genSize is already specified for the coding matrix size
+
+		ssize += hashVector.size();
+
+		return ssize;
+	}
 
 };
 
@@ -186,7 +209,7 @@ struct RetransRequestInfo: public std::map<GenId, DecoderDetails> {
 	void Serialize(std::stringstream &ss) {
 
 		ss << forwarder << DELIMITER;
-		ss << (uint16_t)this->size() << DELIMITER;
+		ss << (uint16_t) this->size() << DELIMITER;
 		for (auto m : *this) {
 			ss << m.first << DELIMITER;
 			m.second.Serialize(ss);
@@ -205,6 +228,25 @@ struct RetransRequestInfo: public std::map<GenId, DecoderDetails> {
 			decDet.Deserialize(ss);
 			this->operator [](genId) = decDet;
 		}
+	}
+
+	/*
+	 * we use string conversion for serialization in the simulator
+	 * in real applications, the data will be much compressed with careful bit to bit conversion
+	 * GetSerializedSize() give the header size for real applications
+	 */
+	uint32_t GetSerializedSize() {
+		uint32_t ssize = 0;
+
+		ssize += 1; // forwarder address
+
+		ssize += 1; // number of items in the list
+		for (auto m : *this) {
+			ssize += 1; // generation ID
+			ssize += m.second.GetSerializedSize();
+		}
+
+		return ssize;
 	}
 
 	/*

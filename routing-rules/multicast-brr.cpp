@@ -93,9 +93,9 @@ void MulticastBrr::UpdateLoss(GenId genId, UanAddress id) {
 	for (auto brr : m_brr)
 		brr.second->UpdateLoss(genId, id);
 }
-void MulticastBrr::NotifySending() {
+void MulticastBrr::NotifySending(uint32_t ssize) {
 	for (auto brr : m_brr)
-		brr.second->NotifySending();
+		brr.second->NotifySending(ssize);
 }
 void MulticastBrr::AddSentCcack(GenId genId, CodingVector cv) {
 	for (auto brr : m_brr)

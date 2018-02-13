@@ -58,7 +58,7 @@ public:
 	void UpdateRcvd(GenId genId, UanAddress id, bool linDep = false);
 	void UpdateRcvd(GenId genId, UanAddress id, std::vector<OrigSymbol> v);
 	void UpdateLoss(GenId genId, UanAddress id);
-	void NotifySending();
+	void NotifySending(uint32_t ssize);
 	void AddSentCcack(GenId genId, CodingVector cv);
 	void AddRcvdCcack(GenId genId, CodingVector cv);
 	//

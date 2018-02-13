@@ -19,7 +19,6 @@
 
 namespace ncr {
 
-
 struct FeedbackInfo {
 
 	FeedbackInfo() {
@@ -139,6 +138,46 @@ struct FeedbackInfo {
 		deserialize_rcv_num(ss);
 
 		updated = true;
+	}
+
+	/*
+	 * we use string conversion for serialization in the simulator
+	 * in real applications, the data will be much compressed with careful bit to bit conversion
+	 * GetSerializedSize() give the header size for real applications
+	 */
+	uint32_t GetSerializedSize() {
+		uint32_t ssize = 0;
+
+		ssize += 1; // own address
+		ssize += 2; // own priority (conversion from double to int16_t)
+
+		ssize += 1; // number of items in the list
+		for (auto v : rcvMap) {
+			ssize += 1; //v.first - address
+			ssize += ceil((double)CODER_INFO_FILTER_DEPTH / 8); //length of the map in bytes
+		}
+
+		ssize += rrInfo.GetSerializedSize();
+		ssize += ackInfo.GetSerializedSize();
+
+		ssize += 1; // time to live
+		// bit updated - neglect
+
+		ssize += 1; // number of items in the list
+		for(auto v : rcvNum)
+		{
+			ssize += 2; // v.first - generation ID
+			ssize += 1; // number of items in the list
+			for(auto w : v.second)
+			{
+				ssize += 1; // w.first - address
+				ssize += 2; // w.second - number received
+			}
+		}
+
+		ssize += 1; // service message type
+
+		return ssize;
 	}
 
 	/*

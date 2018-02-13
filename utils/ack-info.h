@@ -51,6 +51,24 @@ struct AckInfo: public std::map<GenId, bool> {
 		o << "]";
 		return o;
 	}
+	/*
+	 * we use string conversion for serialization in the simulator
+	 * in real applications, the data will be much compressed with careful bit to bit conversion
+	 * GetSerializedSize() give the header size for real applications
+	 */
+	uint32_t GetSerializedSize() {
+		uint32_t ssize = 0;
+
+		ssize += 1; // number of items in the list
+		for (auto a : *this) {
+			ssize += 2; //a.first - generation ID
+			ssize += 1; //a.second - ACK/NACK
+		}
+
+		ssize += 2; // rxWinEnd - generation ID
+
+		return ssize;
+	}
 
 	/*
 	 * indicates the latest generation in the TX buffer; the vertex may already ACK this generation

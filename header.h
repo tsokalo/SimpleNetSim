@@ -229,9 +229,21 @@ struct LogItem {
 		gsn = 0;
 		dst = 0;
 		rank = 0;
+		ssize = 0;
 	}
 	LogItem(std::string init) {
 		std::stringstream ss(init);
+
+		cr = 1;
+		d = 0;
+		cs = 0;
+		ns = 0;
+		nr = 0;
+		ssn = 0;
+		gsn = 0;
+		dst = 0;
+		rank = 0;
+		ssize = 0;
 
 		int32_t v;
 		ss >> v;
@@ -256,6 +268,7 @@ struct LogItem {
 		ss >> aw.s_tx;
 		ss >> aw.e_tx;
 		ss >> aw.e_rx;
+		ss >> ssize;
 		uint16_t s_fp = 0, s_eps = 0;
 		ss >> s_fp;
 		ss >> s_eps;
@@ -292,6 +305,7 @@ struct LogItem {
 			this->rank = other.rank;
 			this->aw = other.aw;
 			this->dst = other.dst;
+			this->ssize = other.ssize;
 		}
 		return *this;
 	}
@@ -299,7 +313,8 @@ struct LogItem {
 	friend std::ostream&
 	operator<<(std::ostream& os, const LogItem& l) {
 		os << l.dst << "\t" << l.d << "\t" << l.p << "\t" << l.cr << "\t" << l.cs << "\t" << l.ns << "\t" << l.nr << "\t" << l.ssn << "\t" << l.gsn << "\t"
-				<< l.rank << "\t" << l.aw.s_rx << "\t" << l.aw.s_tx << "\t" << l.aw.e_tx << "\t" << l.aw.e_rx << "\t" << l.fp.size() << "\t" << l.eps.size();
+				<< l.rank << "\t" << l.aw.s_rx << "\t" << l.aw.s_tx << "\t" << l.aw.e_tx << "\t" << l.aw.e_rx << "\t" << l.ssize << "\t" << l.fp.size() << "\t"
+				<< l.eps.size();
 
 		for (std::map<int16_t, double>::const_iterator it = l.fp.begin(); it != l.fp.end(); it++)
 			os << "\t" << it->first << "\t" << it->second;
@@ -364,6 +379,10 @@ struct LogItem {
 	 * ARQ window
 	 */
 	ArqWin aw;
+	/*
+	 * serialized packet size
+	 */
+	uint32_t ssize;
 };
 /*
  * The history of logging items for node v
@@ -372,6 +391,7 @@ struct LogItem {
 struct LogPair {
 	LogPair() {
 		t = 0;
+		m = NONE_MSG_TYPE;
 	}
 	LogPair(int64_t t, MessType m, LogItem log) {
 		this->t = t;

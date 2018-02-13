@@ -42,18 +42,21 @@ public:
 	HeaderMInfo GetHeader() {
 		return m_header;
 	}
-	bool IsServiceMessage()
-	{
+	bool IsServiceMessage() {
 		return m_isFeedbackSymbol;
 	}
-	void SetFeedback(FeedbackMInfo fi)
-	{
+	void SetFeedback(FeedbackMInfo fi) {
 		m_feedback = fi;
 		m_isFeedbackSymbol = true;
 	}
-	FeedbackMInfo GetFeedback()
-	{
+	FeedbackMInfo GetFeedback() {
 		return m_feedback;
+	}
+	/*
+	 * unit [bytes]
+	 */
+	uint32_t GetSerializedSize() {
+		return (m_symb.size() + m_header.GetSerializedSize() + (m_isFeedbackSymbol ? m_feedback.GetSerializedSize() : 0));
 	}
 
 private:

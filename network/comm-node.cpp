@@ -133,7 +133,7 @@ NcPacket CommNode::DoBroadcast() {
 	auto plan_broadcast =
 			[this](NcPacket f, MessType m)
 			{
-				auto notify_sending = std::bind(&MulticastBrr::NotifySending, m_brr);
+				auto notify_sending = std::bind(&MulticastBrr::NotifySending, m_brr, f.GetSerializedSize());
 				for (auto i : m_outs) m_simulator->Schedule(std::bind(&Edge::Transmit, i, std::placeholders::_1), f, (i->v_ == m_outs.at(0)->v_), m, notify_sending);;
 			};
 
