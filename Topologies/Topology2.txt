@@ -2,5 +2,5 @@ Source:	mate
 Destination:	frank
 Graph:	
 mate	->	mirko,lab
-mirko	->	frank,lab
+mirko	->	lab
 lab	->	frank

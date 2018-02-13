@@ -1,4 +1,4 @@
-set terminal svg enhanced size 800 600 fname "Times New Roman" fsize 26 solid
+set terminal svg enhanced size 800 500 fname "Times New Roman" fsize 26 solid
 set encoding iso_8859_1
 
 set border 4095 front linetype -1 linewidth 1.000
@@ -6,7 +6,7 @@ set ticslevel 0
 
 set ylabel "Loss ratio"  offset 0
 set yrange [0:1]
-set format y '%0.2f'
+set format y '%0.1f'
 
 
 set xlabel "Time / number of slots"
@@ -17,6 +17,6 @@ set key right top
 
 
 set output './Results/loss_ratios_3.svg'
-plot "./gnuplot/data.txt" using 1:(($2==3&&$3==1) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 2 pt 7 ps 0.3 title "edge=<3,1>",\
-"./gnuplot/data.txt" using 1:(($2==3&&$3==2) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 3 pt 7 ps 0.3 title "edge=<3,2>",\
-"./gnuplot/data.txt" using 1:(($2==3&&$3==4) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 5 pt 7 ps 0.3 title "edge=<3,4>"
+plot "./gnuplot/data.txt" using 1:(($2==3&&$3==0) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 1 pt 7 ps 0.3 title "edge=<3,0>",\
+"./gnuplot/data.txt" using 1:(($2==3&&$3==1) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 2 pt 7 ps 0.3 title "edge=<3,1>",\
+"./gnuplot/data.txt" using 1:(($2==3&&$3==2) ? $4 : 1/0) with linespoints ls 1 lw 1 linecolor 3 pt 7 ps 0.3 title "edge=<3,2>"

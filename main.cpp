@@ -13,6 +13,7 @@
 #include <memory>
 #include <math.h>
 #include <iterator>
+#include <string>
 
 //#include <storage/storage.hpp>
 //#include <kodo_rlnc/full_vector_codes.hpp>
@@ -25,11 +26,13 @@
 #include "test/test.h"
 #include "utils/sim-parameters.h"
 #include "utils/files-dirs.h"
+#include "utils/mcs-80211n.h"
 
 namespace ncr {
 
 void ReadScenario(std::shared_ptr<CommNet> &net, SimParameters sp, std::string path, std::string folder_with_traces) {
 
+	SIM_ASSERT_MSG(IsFileCreated(path), "Topology file not found!");
 	//
 	// read topology file
 	//
@@ -92,6 +95,13 @@ void ReadScenario(std::shared_ptr<CommNet> &net, SimParameters sp, std::string p
 		assert(files.size() == 1);
 		return files.at(0);
 	};
+	auto get_mcs = [](std::string trace_file_name)
+	{
+		std::string sep = "MCS";
+		std::size_t pos = trace_file_name.find(sep);
+		std::string str = trace_file_name.substr (pos+sep.size());
+		return std::stoi (str,nullptr, 0);
+	};
 
 	uint16_t numNodes = graph_names.size() + 1;
 	net = std::shared_ptr<CommNet>(new CommNet(numNodes, sp));
@@ -100,13 +110,32 @@ void ReadScenario(std::shared_ptr<CommNet> &net, SimParameters sp, std::string p
 		auto s_id = get_id(s_name);
 		for (auto r_name : e.second) {
 			auto r_id = get_id(r_name);
-			std::cout << "connecting " << s_name << " with id " << s_id << " and " << r_name << " with id " << r_id << " using trace file "
-					<< get_trace_filename(s_name, r_name) << std::endl;
-			net->ConnectNodes(s_id, r_id, get_trace_filename(s_name, r_name));
+			auto trace_filename = get_trace_filename(s_name, r_name);
+			std::cout << "connecting " << s_name << " with id " << s_id << " and " << r_name << " with id " << r_id << " using trace file " << trace_filename
+					<< std::endl;
+			net->ConnectNodes(s_id, r_id, trace_filename);
+			std::cout << "Node " << s_id << " sends with MCS " << get_mcs(trace_filename) << " corresponding to rate " << mcs_rates.at(get_mcs(trace_filename)) << std::endl;
+			net->GetNode(s_id)->SetTxDatarate(mcs_rates.at(get_mcs(trace_filename))*1000000);
 		}
 	}
+	net->GetNode(get_id(dst))->SetTxDatarate(mcs_rates.at(13)*1000000);
 
 	net->SetDestination(get_id(dst));
+	net->Configure();
+	net->PrintNet();
+}
+
+
+void CreateScenarioA(std::shared_ptr<CommNet> &net, SimParameters sp) {
+	net = std::shared_ptr<CommNet>(new CommNet(5, sp));
+	net->ConnectNodes(0, 1, 0.28);
+	net->ConnectNodes(0, 2, 0.01);
+	net->ConnectNodes(0, 3, 0.1);
+	net->ConnectNodes(1, 3, 0.19);
+	net->ConnectNodes(2, 3, 0.11);
+	net->ConnectNodes(1, 4, 0.37);
+
+	net->SetDestination(4);
 	net->Configure();
 	net->PrintNet();
 }
@@ -364,11 +393,11 @@ int main(int argc, char *argv[]) {
 //	CreateBigMeshScenario(net, sim_par);
 //	CreateUmbrellaScenario(net, sim_par);
 
-		std::string topology = subpath + "Topologies/Topology3.txt";
-		std::cout << "Looking for topology " << topology << std::endl;
-		std::string folder_with_traces = subpath + "Topologies/traces";
-		ReadScenario(net, sim_par, topology, folder_with_traces);
-
+//		std::string topology = subpath + "Topologies/Topology3.txt";
+//		std::cout << "Looking for topology " << topology << std::endl;
+//		std::string folder_with_traces = subpath + "Topologies/traces";
+//		ReadScenario(net, sim_par, topology, folder_with_traces);
+		CreateScenarioA(net, sim_par);
 //	return 0;
 
 	}
@@ -446,6 +475,8 @@ int main(int argc, char *argv[]) {
 		//
 		PlotResourceWaste(lb, subpath, exOrSolver.GetOptChannelUses(), sim_par.warmup, sim_par.simDuration - sim_par.warmdown);
 
+		PlotEfficiencyDetails(lb, subpath, sim_par.warmup, sim_par.simDuration - sim_par.warmdown, sim_par.symbolSize, sim_par.genSize);
+
 		std::cout << "Optimal plan: " << plan_orp << ", SRP plan" << plan_srp << std::endl;
 		std::cout << "Optimal d: " << exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate() << ", SRP d: "
 				<< srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate() << std::endl;
@@ -456,7 +487,7 @@ int main(int argc, char *argv[]) {
 		//
 		std::map<UanAddress, Datarate> d;
 		for (auto node : net->GetNodes())
-			d[node->GetId()] = node->GetDatarate();
+			d[node->GetId()] = node->GetTxDatarate();
 		PlotRates(lb, subpath, exOrSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(),
 				srpSolver.GetOptChannelUses() * net->GetNodes().at(net->GetSrc())->GetDatarate(), d, sim_par.warmup, sim_par.simDuration - sim_par.warmdown,
 				sim_par.simDuration, sim_par.GetInLine(), sim_par.genSize);
@@ -494,4 +525,5 @@ int main(int argc, char *argv[]) {
 	std::cout << std::endl << "Finished successfully" << std::endl;
 	return 0;
 }
+
 

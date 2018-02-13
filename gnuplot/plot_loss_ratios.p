@@ -1,4 +1,4 @@
-set terminal svg enhanced size 800 600 fname "Times New Roman" fsize 26 solid
+set terminal svg enhanced size 800 500 fname "Times New Roman" fsize 26 solid
 set encoding iso_8859_1
 
 set border 4095 front linetype -1 linewidth 1.000
@@ -6,7 +6,7 @@ set ticslevel 0
 
 set ylabel "Loss ratio"  offset 0
 set yrange [0:1]
-set format y '%0.2f'
+set format y '%0.1f'
 
 
 set xlabel "Time / number of slots"

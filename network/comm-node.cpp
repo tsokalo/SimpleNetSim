@@ -29,6 +29,7 @@ CommNode::CommNode(UanAddress id, simulator_ptr simulator, SimParameters sp) :
 	m_nodeType = NO_NODE_TYPE;
 	m_simulator = simulator;
 	m_sp = sp;
+	m_txDatarate = 1000000;
 }
 CommNode::~CommNode() {
 

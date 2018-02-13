@@ -9,6 +9,7 @@
 #include <bitset>
 
 #include "utils.h"
+#include "utils/coder.h"
 
 namespace ncr {
 
@@ -510,12 +511,12 @@ void PlotResourceWaste(LogBank lb, std::string path, double sigma, uint32_t warm
 	}
 
 //	ns = ns + fb + nd + nrr;
-	ns = (double) nr / sigma + fb + nd + nrr;
+	ns = ns + fb + nd + nrr;
 
 	std::cout << "ns " << ns << " fb " << fb << " nd " << nd << " nr " << nr << " nrr " << nrr << " sigma " << sigma << std::endl;
 	std::ofstream fd(data_file, std::ios_base::out);
 	fd << "\"NDM\"\t" << (double) nd / (double) ns * 100 << std::endl;
-	fd << "\"\\RPIM\"\t" << (double) fb / (double) ns * 100 << std::endl;
+	fd << "\"\\nRPIM\"\t" << (double) fb / (double) ns * 100 << std::endl;
 	fd << "\"RRM\"\t" << (double) nrr / (double) ns * 100 << std::endl;
 	fd << "\"\\nExcessive redundancy\"\t" << (double) (ns - fb - nd - nrr - (double) nr / sigma) / (double) ns * 100 << std::endl;
 	fd << "\"Main data\"\t" << (double) nr / sigma / (double) ns * 100 << std::endl;
@@ -546,6 +547,159 @@ void PlotResourceWaste(LogBank lb, std::string path, double sigma, uint32_t warm
 	f << plot_command.str();
 	f.close();
 	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
+}
+void PlotEfficiencyDetails(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown, uint16_t pkt_size, GenId gen_size) {
+	std::string gnuplot_dir = path + "gnuplot/";
+	std::string res_dir = path + "Results/";
+	std::string data_file = gnuplot_dir + "data.txt";
+	std::string figure_file = res_dir + "eff_details.svg";
+
+	//
+	// calculate total amount of linear independent packets received by the destination
+	// calculate total amount of feedback messages sent by all nodes
+	// calculate total amount of network discovery messages sent by all nodes
+	// calculate total amount of sent messages by all nodes
+	//
+	uint32_t fb = 0, nd = 0, ns = 0, nss = 0, nrr = 0, nh = 0, nt = 0, nc = 0;
+
+	gen_ssn_t gsn = 0;
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::reverse_iterator tt = t->second.rbegin(); tt != t->second.rend(); tt++) {
+			if (tt->t <= warmdown) {
+				gsn = tt->log.gsn;
+				break;
+			}
+		}
+	}
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
+			if (tt->t < warmup) continue;
+			if (tt->log.gsn > gsn) continue;
+			if (tt->m == FEEDBACK_MSG_TYPE) fb += tt->log.ns * tt->log.ssize;
+			if (tt->m == NETDISC_MSG_TYPE) nd += tt->log.ns * tt->log.ssize;
+			if (tt->m == RETRANS_REQUEST_MSG_TYPE) nrr += tt->log.ns * tt->log.ssize;
+			if (tt->m == DATA_MSG_TYPE) {
+				ns += tt->log.ns * tt->log.ssize;
+				nss += tt->log.ns;
+			}
+		}
+	}
+
+	nc = coder_overhead::get(gen_size) * nss;
+	nss *= pkt_size;
+	nh = ns - nss - nc;
+	nt = ns + fb + nd + nrr;
+
+	std::cout << "nss " << nss << " nh " << nh << " ns " << ns << " fb " << fb << " nd " << nd << " nrr " << nrr << std::endl;
+	std::ofstream fd(data_file, std::ios_base::out);
+	fd << "\"OpR header\"\t" << (double) nh / (double) nt * 100 << std::endl;
+	fd << "\"\\nCoding header\"\t" << (double) nc / (double) nt * 100 << std::endl;
+	fd << "\"Payload\"\t" << (double) nss / (double) nt * 100 << std::endl;
+//	fd << "\"\\nND\"\t" << (double) nd / (double) nt * 100 << std::endl;
+	fd << "\"RR\"\t" << (double) nrr / (double) nt * 100 << std::endl;
+	fd << "\"\\nOther services\"\t" << (double) fb / (double) nt * 100 << std::endl;
+	fd.close();
+
+	//
+	// make plot command
+	//
+	std::stringstream plot_command;
+
+	plot_command << "set output '" << figure_file << "'" << std::endl;
+	plot_command << "plot ";
+	plot_command << "\"" << data_file << "\"" << " using 2:xticlabels(1)";
+	plot_command << " with boxes ls 1 lw 1 linecolor 3 notitle";
+
+	auto str_to_const_char = [](std::string str)
+	{
+		return str.c_str();
+	};
+	;
+	//
+	// make plot
+	//
+	std::string gnuplot_filename = gnuplot_dir + "plot_resource_waste.p";
+	std::string gnuplot_filename_temp = gnuplot_dir + "plot_resource_waste_temp.p";
+	ExecuteCommand(str_to_const_char("cp " + gnuplot_filename + " " + gnuplot_filename_temp));
+	std::ofstream f(gnuplot_filename_temp, std::ios_base::out | std::ios_base::app);
+	f << plot_command.str();
+	f.close();
+	ExecuteCommand(str_to_const_char("gnuplot " + gnuplot_filename_temp));
+}
+
+double GetEfficiency(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown, uint16_t pkt_size, GenId gen_size) {
+	uint32_t fb = 0, nd = 0, ns = 0, nss = 0, nrr = 0, nh = 0, nt = 0, nc = 0;
+
+	gen_ssn_t gsn = 0;
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::reverse_iterator tt = t->second.rbegin(); tt != t->second.rend(); tt++) {
+			if (tt->t <= warmdown) {
+				gsn = tt->log.gsn;
+				break;
+			}
+		}
+	}
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
+			if (tt->t < warmup) continue;
+			if (tt->log.gsn > gsn) continue;
+			if (tt->m == FEEDBACK_MSG_TYPE) fb += tt->log.ns * tt->log.ssize;
+			if (tt->m == NETDISC_MSG_TYPE) nd += tt->log.ns * tt->log.ssize;
+			if (tt->m == RETRANS_REQUEST_MSG_TYPE) nrr += tt->log.ns * tt->log.ssize;
+			if (tt->m == DATA_MSG_TYPE) {
+				ns += tt->log.ns * tt->log.ssize;
+				nss += tt->log.ns;
+			}
+		}
+	}
+
+	nss *= pkt_size;
+	nt = ns + fb + nd + nrr;
+
+	return (double) nss / (double) nt;
+}
+double GetEffDatarate(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown, std::map<UanAddress, Datarate> d, uint16_t pkt_size) {
+
+	gen_ssn_t gsn = 0;
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::reverse_iterator tt = t->second.rbegin(); tt != t->second.rend(); tt++) {
+			if (tt->t <= warmdown) {
+				gsn = tt->log.gsn;
+				break;
+			}
+		}
+	}
+
+	//
+	// calculate total amount of linear independent packets received by the destination
+	// calculate total amount of feedback messages sent by all nodes
+	// calculate total amount of network discovery messages sent by all nodes
+	// calculate total amount of sent messages by all nodes
+	//
+	uint32_t nr = 0, nru = 0;
+	std::map<UanAddress, uint32_t> ns;
+
+	for (LogBank::iterator t = lb.begin(); t != lb.end(); t++) {
+		for (LogHistory::iterator tt = t->second.begin(); tt != t->second.end(); tt++) {
+			if (tt->t < warmup) continue;
+			if (tt->log.gsn > gsn) continue;
+			if (tt->log.p == DESTINATION_PRIORITY && tt->m == ORIG_MSG_TYPE && tt->log.ssn != 0) nru++;
+			ns[t->first] += tt->log.ns;
+		}
+	}
+
+	//
+	// unit [packet per bit per second]
+	//
+	double dur = 0;
+	for (auto n : ns) {
+		assert(d.find(n.first) != d.end());
+		dur += n.second / d.at(n.first);
+	}
+
+	assert(!eq(dur, 0));
+
+	return (double) nru * pkt_size * 8 / dur / 1000000;
 }
 void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstIds, std::map<UanAddress, Datarate> d, uint32_t warmup, uint32_t warmdown) {
 	std::string gnuplot_dir = path + "gnuplot/";

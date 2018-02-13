@@ -97,6 +97,15 @@ public:
 		return m_sp.apiRate;
 	}
 
+	void SetTxDatarate(Datarate dr)
+	{
+		m_txDatarate = dr;
+	}
+	Datarate GetTxDatarate()
+	{
+		return m_txDatarate;
+	}
+
 	NodeType GetNodeType(){return m_nodeType;}
 	void SetNodeType(NodeType t){m_nodeType = t;}
 
@@ -134,6 +143,8 @@ private:
 	SimParameters m_sp;
 
 	get_rank_func m_getRank;
+
+	Datarate m_txDatarate;
 
 };
 }	//ncr

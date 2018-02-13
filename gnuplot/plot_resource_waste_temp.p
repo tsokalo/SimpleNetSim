@@ -16,5 +16,5 @@ set grid xtics ytics back lw 1 lc rgb "#AFAFAF"
 set key right top
 
 
-set output './Results/resource_waste.svg'
+set output './Results/eff_details.svg'
 plot "./gnuplot/data.txt" using 2:xticlabels(1) with boxes ls 1 lw 1 linecolor 3 notitle

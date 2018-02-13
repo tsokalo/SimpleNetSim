@@ -50,12 +50,16 @@ void PlotCoalitions(uint32_t numNodes, std::vector<UanAddress> dstIds, LogBank l
 void PlotCodingRates(uint32_t numNodes, std::vector<UanAddress> dstIds, LogBank lb, std::string path, std::string logfile);
 void PlotSendingStatistics(LogBank lb, std::string path, TdmAccessPlan optPlan, uint32_t warmup, uint32_t warmdown);
 void PlotResourceWaste(LogBank lb, std::string path, double sigma, uint32_t warmup, uint32_t warmdown);
+void PlotEfficiencyDetails(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown, uint16_t pkt_size, GenId gen_size);
 void PlotRatesPerDst(LogBank lb, std::string path, std::vector<UanAddress> dstIds, std::map<UanAddress, Datarate> d, uint32_t warmup, uint32_t warmdown);
 void PlotRates(LogBank lb, std::string path, double opt, double single_opt, std::map<UanAddress, Datarate> d, uint32_t warmup, uint32_t warmdown, uint64_t simdur, std::string sim_par, uint16_t genSize);
 void PlotRanks(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown);
 void PlotRetransmissionRequests(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown);
 void PlotOutputStability(LogBank lb, std::string path, double opt, UanAddress dst);
 void PlotSrcPriorStability(LogBank lb, std::string path, double opt, UanAddress src);
+
+double GetEfficiency(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown, uint16_t pkt_size, GenId gen_size);
+double GetEffDatarate(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown, std::map<UanAddress, Datarate> d, uint16_t pkt_size);
 
 double GetLinkLossValue(LogBank lb, std::string path, uint32_t warmup, uint32_t warmdown, uint16_t genSize);
 void CreateArqInfoCvs(LogBank lb, std::string path);
