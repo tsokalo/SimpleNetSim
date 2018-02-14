@@ -8,7 +8,7 @@
 #include "compressor.hpp"
 
 
-extern size_t g_priorituesLen;
+extern size_t g_prioritiesLen;
 extern unsigned g_priorities[];
 extern size_t LoadProbability(pf_t&, size_t);
 
@@ -76,7 +76,7 @@ TEST(Compressor, Priority)
 
     EXPECT_NO_THROW
     ({
-        for (int i = 0U; i < g_priorituesLen; ++i)
+        for (int i = 0U; i < g_prioritiesLen; ++i)
         {
             //printf("%u - %0x\n", i, g_priorities[i]);
             pf_t dummy;
@@ -95,7 +95,7 @@ TEST(Compressor, Optimistic)
 
     EXPECT_NO_THROW
     ({
-        for (int i = 0U; i < g_priorituesLen; ++i)
+        for (int i = 0U; i < g_prioritiesLen; ++i)
         {
             //printf("%u - %0x\n", i, g_priorities[i]);
             pf_t dummy;
@@ -114,7 +114,7 @@ TEST(Compressor, PrioritySensitivity)
 
     EXPECT_NO_THROW
     ({
-        for (int i = 0U; i < g_priorituesLen; ++i)
+        for (int i = 0U; i < g_prioritiesLen; ++i)
         {
             pf_t dummy;
             c.Update(g_priorities[i], dummy);
@@ -129,13 +129,13 @@ TEST(Compressor, PrioritySensitivity)
 TEST(Compressor, Probability)
 {
     fbcd::Compressor c { 1U, 1000U };
+    size_t offset = 0U;
 
     EXPECT_NO_THROW
     ({
-        for (int i = 0U; i < g_priorituesLen; ++i)
+        for (int i = 0U; i < g_prioritiesLen; ++i)
         {
             pf_t probability;
-            size_t offset = 0U;
             offset = LoadProbability(probability, offset);
 
             c.Update(g_priorities[i], probability);

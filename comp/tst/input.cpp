@@ -7,7 +7,7 @@ extern "C"
 #include <unordered_map>
 
 
-size_t g_priorituesLen = 18929U;
+size_t g_prioritiesLen = 18929U;
 
 u32_t g_priorities[] =
 {

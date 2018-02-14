@@ -7,11 +7,15 @@
 #include <cassert>
 
 
-fbcd::Compressor::Compressor(u8_t optimisticCnt, u16_t sensitivity)
+fbcd::Compressor::Compressor(u8_t   optimisticCnt,
+                             u16_t  prioritySensitivity,
+                             double probabilitySensitivity)
     : optimisticCnt { optimisticCnt }, isOptimistic { true },
-      optimisticTo { optimisticCnt }, sensitivity { sensitivity },
+      optimisticTo { optimisticCnt },
+      prioritySensitivity { prioritySensitivity },
+      probabilitySensitivity { probabilitySensitivity },
       sn { 0U }, ucBytes { 0U }, coBytes { 0U },
-      priorityPrev { 0U }, priorityCurr { 0U }
+      priorityLast { 0U }, priorityPrev { 0U }, priorityCurr { 0U }
 {
     csrc_table_init(&this->probabilityTable, 0);
     this->probabilityTable.oaCnt        = this->optimisticCnt;
@@ -23,7 +27,7 @@ fbcd::Compressor::~Compressor()
 
 } /* ~Compressor */
 
-void fbcd::Compressor::Update(u32_t priority, pf_t &probabilities)
+void fbcd::Compressor::Update(u32_t priority, pf_t probabilities)
 {
     isOptimistic   = this->optimisticTo ? true : false;
 
@@ -53,14 +57,65 @@ void fbcd::Compressor::Update(u32_t priority, pf_t &probabilities)
     size_t i = 0U;
     for (auto p : probabilities)
     {
-        //printf("%d - %f (%u)\n", p.first, p.second, (u32_t)(0.403 * 10000000) & 0xffffff);
-        u32_t item = (p.first << 24 & 0xff000000)
-            | (static_cast<u32_t>(p.second * 10000000) & 0xffffff);
-        //printf("%d (%0x)\n", item, item);
-        items[i++] = item >> 24 & 0xff;
-        items[i++] = item >> 16 & 0xff;
-        items[i++] = item >> 8 & 0xff;
-        items[i++] = item & 0xff;
+        if (this->probabilitiesLast[p.first] > p.second)
+        {
+            /*printf("%f - %f > %f\n",
+                this->probabilitiesLast[p.first], p.second,
+                this->probabilitySensitivity);*/
+            if (this->probabilitiesLast[p.first] - p.second
+                > this->probabilitySensitivity)
+            {
+                u32_t item = (p.first << 24 & 0xff000000)
+                    | (static_cast<u32_t>(p.second * 10000000) & 0xffffff);
+
+                items[i++] = item >> 24 & 0xff;
+                items[i++] = item >> 16 & 0xff;
+                items[i++] = item >> 8 & 0xff;
+                items[i++] = item & 0xff;
+
+                this->probabilitiesLast[p.first] = p.second;
+            }
+            else
+            {
+                u32_t item = (p.first << 24 & 0xff000000)
+                    | (static_cast<u32_t>(this->probabilitiesLast[p.first] * 10000000)
+                        & 0xffffff);
+
+                items[i++] = item >> 24 & 0xff;
+                items[i++] = item >> 16 & 0xff;
+                items[i++] = item >> 8 & 0xff;
+                items[i++] = item & 0xff;
+            }
+        }
+        else
+        {
+            if (p.second - this->probabilitiesLast[p.first]
+                > this->probabilitySensitivity)
+            {
+                u32_t item = (p.first << 24 & 0xff000000)
+                    | (static_cast<u32_t>(p.second * 10000000) & 0xffffff);
+
+                items[i++] = item >> 24 & 0xff;
+                items[i++] = item >> 16 & 0xff;
+                items[i++] = item >> 8 & 0xff;
+                items[i++] = item & 0xff;
+
+                this->probabilitiesLast[p.first] = p.second;
+            }
+            else
+            {
+                u32_t item = (p.first << 24 & 0xff000000)
+                    | (static_cast<u32_t>(this->probabilitiesLast[p.first] * 10000000)
+                        & 0xffffff);
+
+                items[i++] = item >> 24 & 0xff;
+                items[i++] = item >> 16 & 0xff;
+                items[i++] = item >> 8 & 0xff;
+                items[i++] = item & 0xff;
+            }
+        }
+
+
     }
     //printf("%0x %0x %0x\n", *(u32_t*)(items), *(u32_t*)(items + 4), *(u32_t*)(items + 8));
     csrc_table_evaluate_field(&this->probabilityTable,
@@ -91,11 +146,12 @@ std::stringstream& fbcd::Compressor::operator >> (std::stringstream &ss)
 
         u8_t buf[5] = { 0U };
         size_t len = 0U;
-        if (this->priorityCurr > this->priorityPrev)
+        if (this->priorityCurr > this->priorityLast)
         {
-            if (this->priorityCurr - this->priorityPrev > this->sensitivity)
+            if (this->priorityCurr - this->priorityLast > this->prioritySensitivity)
             {
-                len = CompVariableLsb(this->priorityCurr - this->priorityPrev, &buf[0]);
+                len = CompVariableLsb(this->priorityCurr - this->priorityLast, &buf[0]);
+                this->priorityLast = this->priorityCurr;
             }
             else
             {
@@ -105,10 +161,11 @@ std::stringstream& fbcd::Compressor::operator >> (std::stringstream &ss)
         }
         else
         {
-            if (this->priorityPrev - this->priorityCurr > this->sensitivity)
+            if (this->priorityLast - this->priorityCurr > this->prioritySensitivity)
             {
                 flags |= 0x40;
-                len = CompVariableLsb(this->priorityPrev - this->priorityCurr, &buf[0]);
+                len = CompVariableLsb(this->priorityLast - this->priorityCurr, &buf[0]);
+                this->priorityLast = this->priorityCurr;
             }
             else
             {

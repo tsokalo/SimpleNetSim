@@ -28,10 +28,13 @@ namespace fbcd
          *
          * Set configuration here.
          *
-         * \param optimisticCnt Number of times to repeat an update.
-         * \param sensitivity   Threshhold for priority update.
+         * \param optimisticCnt             Number of times to repeat an update.
+         * \param prioritysensitivity       Threshhold for priority update.
+         * \param probabilitySensitivity    Threshhold for probability update.
          */
-        Compressor(u8_t optimisticCnt = 0U, u16_t sensitivity = 0U);
+        Compressor(u8_t     optimisticCnt           = 0U,
+                   u16_t    prioritySensitivity     = 0U,
+                   double   probabilitySensitivity  = 0.0);
 
         Compressor(const Compressor&) = delete;
 
@@ -60,7 +63,7 @@ namespace fbcd
          * \param priority      Next priority value.
          * \param probabilities Next probability set.
          */
-        virtual void Update(u32_t priority, pf_t &probabilities);
+        virtual void Update(u32_t priority, pf_t probabilities);
 
          /*!
          * \brief Writes compressed header to stream.
@@ -101,15 +104,18 @@ namespace fbcd
         bool        isOptimistic;
         u8_t        optimisticTo;
 
-        const u16_t sensitivity;
+        const u16_t     prioritySensitivity;
+        const double    probabilitySensitivity;
 
         u32_t   sn;
         size_t  ucBytes;
         size_t  coBytes;
 
+        u32_t   priorityLast;   //!< Last transmitted priority.
         u32_t   priorityPrev;
         u32_t   priorityCurr;
 
+        pf_t probabilitiesLast;
         CSRCCompressionTable_t probabilityTable;
     }; /* Compressor */
 

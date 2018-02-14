@@ -35,6 +35,7 @@
         "functional": "cpp",
         "memory": "cpp",
         "stdio.h": "c",
-        "memory.h": "c"
+        "memory.h": "c",
+        "*.ipp": "cpp"
     }
 }
