@@ -37,6 +37,60 @@ extern double g_logTop3_1_PfNode2[];
 extern size_t g_logTop3_1_PfNode3Len;
 extern double g_logTop3_1_PfNode3[];
 
+extern size_t g_logTop3_5_PfNode0Len;
+extern double g_logTop3_5_PfNode0[];
+extern size_t g_logTop3_5_PfNode1Len;
+extern double g_logTop3_5_PfNode1[];
+extern size_t g_logTop3_5_PfNode2Len;
+extern double g_logTop3_5_PfNode2[];
+extern size_t g_logTop3_5_PfNode3Len;
+extern double g_logTop3_5_PfNode3[];
+
+extern size_t g_logTop3_10_PfNode0Len;
+extern double g_logTop3_10_PfNode0[];
+extern size_t g_logTop3_10_PfNode1Len;
+extern double g_logTop3_10_PfNode1[];
+extern size_t g_logTop3_10_PfNode2Len;
+extern double g_logTop3_10_PfNode2[];
+extern size_t g_logTop3_10_PfNode3Len;
+extern double g_logTop3_10_PfNode3[];
+
+extern size_t g_logTop2_1_PfNode0Len;
+extern double g_logTop2_1_PfNode0[];
+extern size_t g_logTop2_1_PfNode1Len;
+extern double g_logTop2_1_PfNode1[];
+extern size_t g_logTop2_1_PfNode2Len;
+extern double g_logTop2_1_PfNode2[];
+
+extern size_t g_logTop2_5_PfNode0Len;
+extern double g_logTop2_5_PfNode0[];
+extern size_t g_logTop2_5_PfNode1Len;
+extern double g_logTop2_5_PfNode1[];
+extern size_t g_logTop2_5_PfNode2Len;
+extern double g_logTop2_5_PfNode2[];
+
+extern size_t g_logTop2_10_PfNode0Len;
+extern double g_logTop2_10_PfNode0[];
+extern size_t g_logTop2_10_PfNode1Len;
+extern double g_logTop2_10_PfNode1[];
+extern size_t g_logTop2_10_PfNode2Len;
+extern double g_logTop2_10_PfNode2[];
+
+extern size_t g_logTop1_1_PfNode0Len;
+extern double g_logTop1_1_PfNode0[];
+extern size_t g_logTop1_1_PfNode1Len;
+extern double g_logTop1_1_PfNode1[];
+
+extern size_t g_logTop1_5_PfNode0Len;
+extern double g_logTop1_5_PfNode0[];
+extern size_t g_logTop1_5_PfNode1Len;
+extern double g_logTop1_5_PfNode1[];
+
+extern size_t g_logTop1_10_PfNode0Len;
+extern double g_logTop1_10_PfNode0[];
+extern size_t g_logTop1_10_PfNode1Len;
+extern double g_logTop1_10_PfNode1[];
+
 extern double g_pf[];
 extern size_t LoadProbability(pf_t&, size_t, double* = nullptr);
 
@@ -639,3 +693,302 @@ TEST(Decompressor, ProbabilityNode3WithSensitivity)
         });
     }
 } /* ProbabilityNode3WithSensitivity */
+
+TEST(Decompressor, DecompressionErrors)
+{
+    const double sensitivityMin = 0.0;
+    const double sensitivityMax = 0.5;
+    const double sensitivityStep = 0.01;
+
+    for (size_t t = 0U; t < 3; ++t)
+    {
+        for (size_t k = 0U; k < 3; ++k)
+        {
+            std::stringstream ss;
+            ss << "log/top" << t << "_pf_" << k << ".csv";
+            std::fstream csv { ss.str(), std::fstream::out };
+            csv << "sensitivity"
+                << ","
+                << "compressionRatio"
+                << ','
+                << "pfError"
+                << std::endl;
+
+            for (size_t n = 0U; n < (t == 0 ? 4 : (t == 1 ? 3: 2)); ++n)
+            {
+
+                size_t len = 0U;
+                double *array = nullptr;
+                switch (t)
+                {
+                default:
+                case 0:
+                    switch (k)
+                    {
+                    default:
+                    case 0:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop3_1_PfNode0\n");
+                            len = g_logTop3_1_PfNode0Len;
+                            array = (double*)g_logTop3_1_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop3_1_PfNode1\n");
+                            len = g_logTop3_1_PfNode1Len;
+                            array = (double*)g_logTop3_1_PfNode1;
+                            break;
+                        case 2:
+                            printf("g_logTop3_1_PfNode2\n");
+                            len = g_logTop3_1_PfNode2Len;
+                            array = (double*)g_logTop3_1_PfNode2;
+                            break;
+                        case 3:
+                            printf("g_logTop3_1_PfNode3\n");
+                            len = g_logTop3_1_PfNode3Len;
+                            array = (double*)g_logTop3_1_PfNode3;
+                            break;
+                        }
+                        break;
+
+                    case 1:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop3_5_PfNode0\n");
+                            len = g_logTop3_5_PfNode0Len;
+                            array = (double*)g_logTop3_5_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop3_5_PfNode1\n");
+                            len = g_logTop3_5_PfNode1Len;
+                            array = (double*)g_logTop3_5_PfNode1;
+                            break;
+                        case 2:
+                            printf("g_logTop3_5_PfNode2\n");
+                            len = g_logTop3_5_PfNode2Len;
+                            array = (double*)g_logTop3_5_PfNode2;
+                            break;
+                        case 3:
+                            printf("g_logTop3_5_PfNode3\n");
+                            len = g_logTop3_5_PfNode3Len;
+                            array = (double*)g_logTop3_5_PfNode3;
+                            break;
+                        }
+                        break;
+
+                    case 2:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop3_10_PfNode0\n");
+                            len = g_logTop3_10_PfNode0Len;
+                            array = (double*)g_logTop3_10_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop3_10_PfNode1\n");
+                            len = g_logTop3_10_PfNode1Len;
+                            array = (double*)g_logTop3_10_PfNode1;
+                            break;
+                        case 2:
+                            printf("g_logTop3_10_PfNode2\n");
+                            len = g_logTop3_10_PfNode2Len;
+                            array = (double*)g_logTop3_10_PfNode2;
+                            break;
+                        case 3:
+                            printf("g_logTop3_10_PfNode3\n");
+                            len = g_logTop3_10_PfNode3Len;
+                            array = (double*)g_logTop3_10_PfNode3;
+                            break;
+                        }
+                        break;
+                    } /* case 0 */
+                    break;
+
+                case 1:
+                    switch (k)
+                    {
+                    default:
+                    case 0:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop2_1_PfNode0\n");
+                            len = g_logTop2_1_PfNode0Len;
+                            array = (double*)g_logTop2_1_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop2_1_PfNode1\n");
+                            len = g_logTop2_1_PfNode1Len;
+                            array = (double*)g_logTop2_1_PfNode1;
+                            break;
+                        case 2:
+                            printf("g_logTop2_1_PfNode2\n");
+                            len = g_logTop2_1_PfNode2Len;
+                            array = (double*)g_logTop2_1_PfNode2;
+                            break;
+                        }
+                        break;
+
+                    case 1:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop2_5_PfNode0\n");
+                            len = g_logTop2_5_PfNode0Len;
+                            array = (double*)g_logTop2_5_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop2_5_PfNode1\n");
+                            len = g_logTop2_5_PfNode1Len;
+                            array = (double*)g_logTop2_5_PfNode1;
+                            break;
+                        case 2:
+                            printf("g_logTop2_5_PfNode2\n");
+                            len = g_logTop2_5_PfNode2Len;
+                            array = (double*)g_logTop2_5_PfNode2;
+                            break;
+                        }
+                        break;
+
+                    case 2:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop2_10_PfNode0\n");
+                            len = g_logTop2_10_PfNode0Len;
+                            array = (double*)g_logTop2_10_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop2_10_PfNode1\n");
+                            len = g_logTop2_10_PfNode1Len;
+                            array = (double*)g_logTop2_10_PfNode1;
+                            break;
+                        case 2:
+                            printf("g_logTop2_10_PfNode2\n");
+                            len = g_logTop2_10_PfNode2Len;
+                            array = (double*)g_logTop2_10_PfNode2;
+                            break;
+                        }
+                        break;
+                    } /* case 1 */
+                    break;
+
+                    case 2:
+                    switch (k)
+                    {
+                    default:
+                    case 0:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop1_1_PfNode0\n");
+                            len = g_logTop1_1_PfNode0Len;
+                            array = (double*)g_logTop1_1_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop1_1_PfNode1\n");
+                            len = g_logTop1_1_PfNode1Len;
+                            array = (double*)g_logTop1_1_PfNode1;
+                            break;
+                        }
+                        break;
+
+                    case 1:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop1_5_PfNode0\n");
+                            len = g_logTop1_5_PfNode0Len;
+                            array = (double*)g_logTop1_5_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop1_5_PfNode1\n");
+                            len = g_logTop1_5_PfNode1Len;
+                            array = (double*)g_logTop1_5_PfNode1;
+                            break;
+                        }
+                        break;
+
+                    case 2:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop1_10_PfNode0\n");
+                            len = g_logTop1_10_PfNode0Len;
+                            array = (double*)g_logTop1_10_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop1_10_PfNode1\n");
+                            len = g_logTop1_10_PfNode1Len;
+                            array = (double*)g_logTop1_10_PfNode1;
+                            break;
+                        }
+                        break;
+                    } /* case 2 */
+                    break;
+                } /* switch */
+
+                for (double sensitivity = 0U;
+                    sensitivity < sensitivityMax;
+                    sensitivity += sensitivityStep)
+                {
+                    fbcd::Compressor c { 0U, 0U, sensitivity};
+                    fbcd::Decompressor d;
+                    float totalError        = 0.0f;
+                    float compressionRatio  = 0.0f;
+                    size_t offset = 0U;
+
+                    EXPECT_NO_THROW
+                    ({
+                        size_t i = 0U;
+                        for (i = sensitivityMin; i < len; ++i)
+                        {
+                            pf_t probability;
+                            offset = LoadProbability(probability, offset, array);
+
+                            c.Update(0U, probability);
+                            std::stringstream ss;
+                            ss << c;
+
+                            u8_t c = 0U;
+                            d << ss;
+
+                            float error =  0.0;
+                            EXPECT_EQ((*d.Probability).size(), probability.size());
+                            for (auto p : probability)
+                            {
+                                auto i = (*d.Probability).find(p.first);
+                                ASSERT_FALSE(i == (*d.Probability).end());
+                                //printf("%f > %f - %f\n", (*i).second, p.second, sensitivity);
+                                EXPECT_TRUE(((*i).second > (p.second - sensitivity))
+                                    || ((*i).second <= (p.second + sensitivity)));
+                                error += (*i).second > p.second
+                                    ? (*i).second - p.second
+                                    : p.second - (*i).second;
+                            }
+
+                            if (probability.size())
+                            {
+                                totalError += error / probability.size();
+                            }
+                        }
+
+                        float averageError = totalError / (i - sensitivityMin);
+                        csv << sensitivity << "," << c.GetCompressionRate() << "," << averageError << std::endl;
+                    });
+                }
+            } /* n */
+        } /* k */
+    } /* t */
+} /* DecompressionErrors */
