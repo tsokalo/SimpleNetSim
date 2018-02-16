@@ -5,6 +5,7 @@ extern "C"
 
 #include <cstdio>
 #include <unordered_map>
+#include <cassert>
 
 
 size_t g_prioritiesLen = 18929U;
@@ -38009,16 +38010,19 @@ double g_pf[] =
 
 typedef std::unordered_map<short, double> pf_t;
 
-size_t LoadProbability(pf_t &out, size_t offset)
+size_t LoadProbability(pf_t &out, size_t offset, double *pfArray = nullptr)
 {
+    assert(pfArray);
+
     /* size */
-    size_t size = g_pf[offset];
-    size_t size2 = g_pf[offset + 1];
+    size_t size = *(pfArray + offset);
+    size_t size2 = *(pfArray + offset + 1);
     offset += 2U;
 
     for (size_t i = 0U; i < size; ++i)
     {
-        out.insert({ g_pf[offset], g_pf[offset + 1] });
+        //printf("%f (%d)\n", *(pfArray + offset), offset);
+        out.insert({ *(pfArray + offset), *(pfArray + offset + 1) });
         offset += 2U;
     }
     offset += 2U * size2;

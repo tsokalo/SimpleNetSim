@@ -36,6 +36,17 @@
         "memory": "cpp",
         "stdio.h": "c",
         "memory.h": "c",
-        "*.ipp": "cpp"
+        "*.ipp": "cpp",
+        "csignal": "cpp",
+        "cstdarg": "cpp",
+        "cstddef": "cpp",
+        "atomic": "cpp",
+        "chrono": "cpp",
+        "codecvt": "cpp",
+        "condition_variable": "cpp",
+        "slist": "cpp",
+        "mutex": "cpp",
+        "ratio": "cpp",
+        "thread": "cpp"
     }
 }

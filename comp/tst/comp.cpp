@@ -10,7 +10,9 @@
 
 extern size_t g_prioritiesLen;
 extern unsigned g_priorities[];
-extern size_t LoadProbability(pf_t&, size_t);
+
+extern double g_pf[];
+extern size_t LoadProbability(pf_t&, size_t, double* = nullptr);
 
 TEST(Compressor, PriorityTooLarge)
 {
@@ -136,7 +138,7 @@ TEST(Compressor, Probability)
         for (int i = 0U; i < g_prioritiesLen; ++i)
         {
             pf_t probability;
-            offset = LoadProbability(probability, offset);
+            offset = LoadProbability(probability, offset, (double*)g_pf);
 
             c.Update(g_priorities[i], probability);
             std::stringstream ss;
