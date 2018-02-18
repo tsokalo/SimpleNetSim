@@ -91,6 +91,27 @@ extern double g_logTop1_10_PfNode0[];
 extern size_t g_logTop1_10_PfNode1Len;
 extern double g_logTop1_10_PfNode1[];
 
+extern size_t g_logTop3_1_stat_PfNode0Len;
+extern double g_logTop3_1_stat_PfNode0[];
+extern size_t g_logTop3_1_stat_PfNode1Len;
+extern double g_logTop3_1_stat_PfNode1[];
+extern size_t g_logTop3_1_stat_PfNode2Len;
+extern double g_logTop3_1_stat_PfNode2[];
+extern size_t g_logTop3_1_stat_PfNode3Len;
+extern double g_logTop3_1_stat_PfNode3[];
+
+extern size_t g_logTop2_1_stat_PfNode0Len;
+extern double g_logTop2_1_stat_PfNode0[];
+extern size_t g_logTop2_1_stat_PfNode1Len;
+extern double g_logTop2_1_stat_PfNode1[];
+extern size_t g_logTop2_1_stat_PfNode2Len;
+extern double g_logTop2_1_stat_PfNode2[];
+
+extern size_t g_logTop1_1_stat_PfNode0Len;
+extern double g_logTop1_1_stat_PfNode0[];
+extern size_t g_logTop1_1_stat_PfNode1Len;
+extern double g_logTop1_1_stat_PfNode1[];
+
 extern double g_pf[];
 extern size_t LoadProbability(pf_t&, size_t, double* = nullptr);
 
@@ -700,12 +721,23 @@ TEST(Decompressor, DecompressionErrors)
     const double sensitivityMax = 0.5;
     const double sensitivityStep = 0.01;
 
-    for (size_t t = 0U; t < 3; ++t)
+    for (size_t t = 0U; t < 6; ++t)
     {
-        for (size_t k = 0U; k < 3; ++k)
+        for (size_t k = 0U; k < (t < 3 ? 3 : 1); ++k)
         {
             std::stringstream ss;
-            ss << "log/top" << t << "_pf_" << k << ".csv";
+            ss << "log/top";
+            if (t > 2)
+            {
+                ss << t - 3 << "_stat";
+            }
+            else
+            {
+                ss << t;
+            }
+            ss << "_pf_" << k << ".csv";
+
+            printf("%s\n", ss.str().c_str());
             std::fstream csv { ss.str(), std::fstream::out };
             csv << "sensitivity"
                 << ","
@@ -714,8 +746,14 @@ TEST(Decompressor, DecompressionErrors)
                 << "pfError"
                 << std::endl;
 
-            for (size_t n = 0U; n < (t == 0 ? 4 : (t == 1 ? 3: 2)); ++n)
+            for (size_t n = 0U; n <
+                (t == 0 ? 4 :
+                (t == 1 ? 3 :
+                (t == 2 ? 2 :
+                (t == 3 ? 4 :
+                (t == 4 ? 3 : 2))))); ++n)
             {
+                printf("t=%lu k=%lu n=%lu\n", t, k, n);
 
                 size_t len = 0U;
                 double *array = nullptr;
@@ -937,6 +975,72 @@ TEST(Decompressor, DecompressionErrors)
                         break;
                     } /* case 2 */
                     break;
+
+                    case 3:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop3_1_stat_PfNode0\n");
+                            len = g_logTop3_1_stat_PfNode0Len;
+                            array = (double*)g_logTop3_1_stat_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop3_1_stat_PfNode1\n");
+                            len = g_logTop3_1_stat_PfNode1Len;
+                            array = (double*)g_logTop3_1_stat_PfNode1;
+                            break;
+                        case 2:
+                            printf("g_logTop3_1_stat_PfNode2\n");
+                            len = g_logTop3_1_stat_PfNode2Len;
+                            array = (double*)g_logTop3_1_stat_PfNode2;
+                            break;
+                        case 3:
+                            printf("g_logTop3_1_stat_PfNode3\n");
+                            len = g_logTop3_1_stat_PfNode3Len;
+                            array = (double*)g_logTop3_1_stat_PfNode3;
+                            break;
+                        }
+                        break;
+
+                    case 4:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop2_1_stat_PfNode0\n");
+                            len = g_logTop2_1_stat_PfNode0Len;
+                            array = (double*)g_logTop2_1_stat_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop2_1_stat_PfNode1\n");
+                            len = g_logTop2_1_stat_PfNode1Len;
+                            array = (double*)g_logTop2_1_stat_PfNode1;
+                            break;
+                        case 2:
+                            printf("g_logTop2_1_stat_PfNode2\n");
+                            len = g_logTop2_1_stat_PfNode2Len;
+                            array = (double*)g_logTop2_1_stat_PfNode2;
+                            break;
+                        }
+                        break;
+
+                    case 5:
+                        switch (n)
+                        {
+                        default:
+                        case 0:
+                            printf("g_logTop1_1_stat_PfNode0\n");
+                            len = g_logTop1_1_stat_PfNode0Len;
+                            array = (double*)g_logTop1_1_stat_PfNode0;
+                            break;
+                        case 1:
+                            printf("g_logTop1_1_stat_PfNode1\n");
+                            len = g_logTop1_1_stat_PfNode1Len;
+                            array = (double*)g_logTop1_1_stat_PfNode1;
+                            break;
+                        }
+                        break;
                 } /* switch */
 
                 for (double sensitivity = 0U;
